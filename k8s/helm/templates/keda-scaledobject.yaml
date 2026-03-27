@@ -1,0 +1,33 @@
+{{- if and .Values.autoscaling.enabled (eq .Values.autoscaling.driver "keda") }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "agent-boilerplate.fullname" . }}
+  labels:
+    {{- include "agent-boilerplate.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    name: {{ include "agent-boilerplate.fullname" . }}
+  pollingInterval: {{ .Values.keda.pollingInterval }}
+  cooldownPeriod: {{ .Values.keda.cooldownPeriod }}
+  minReplicaCount: {{ .Values.autoscaling.minReplicas }}
+  maxReplicaCount: {{ .Values.autoscaling.maxReplicas }}
+  fallback:
+    failureThreshold: 3
+    replicas: {{ .Values.autoscaling.minReplicas }}
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: {{ .Values.keda.prometheusServerAddress }}
+        metricName: http_server_requests_seconds_count
+        query: {{ .Values.keda.prometheusQuery }}
+        threshold: {{ .Values.keda.prometheusThreshold | quote }}
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: {{ .Values.autoscaling.targetCPUUtilizationPercentage | quote }}
+    - type: memory
+      metricType: Utilization
+      metadata:
+        value: {{ .Values.autoscaling.targetMemoryUtilizationPercentage | quote }}
+{{- end }}

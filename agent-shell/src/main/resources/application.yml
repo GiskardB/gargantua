@@ -1,0 +1,19 @@
+spring:
+  main:
+    web-application-type: none
+    banner-mode: off
+  shell:
+    interactive:
+      enabled: true
+
+agent:
+  shell:
+    mode: embedded
+    user-id: dev-user
+    show-meta: true
+    show-timing: true
+    ansi: auto
+    remote:
+      url: http://localhost:8080
+      api-key: ""
+      timeout-ms: 30000

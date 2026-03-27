@@ -1,0 +1,58 @@
+replicaCount: 2
+
+image:
+  repository: ghcr.io/agentkit/agent-boilerplate
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+autoscaling:
+  enabled: true
+  driver: hpa  # hpa or keda
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+keda:
+  pollingInterval: 15
+  cooldownPeriod: 300
+  prometheusServerAddress: http://prometheus-server.monitoring.svc.cluster.local
+  prometheusQuery: sum(rate(http_server_requests_seconds_count{app="agent-boilerplate"}[2m]))
+  prometheusThreshold: "100"
+
+spring:
+  profiles: prod
+
+env: {}
+
+secrets: {}
+
+serviceMonitor:
+  enabled: true
+  interval: 15s
+  scrapeTimeout: 10s
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+serviceAccount:
+  create: true
+  name: ""
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

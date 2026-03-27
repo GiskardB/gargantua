@@ -1,0 +1,31 @@
+replicaCount: 3
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: "2"
+    memory: 2Gi
+
+autoscaling:
+  enabled: true
+  driver: keda
+  minReplicas: 3
+  maxReplicas: 20
+
+keda:
+  pollingInterval: 10
+  cooldownPeriod: 300
+  prometheusThreshold: "200"
+
+spring:
+  profiles: prod
+
+serviceMonitor:
+  enabled: true
+  interval: 10s
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2

@@ -1,0 +1,13 @@
+io.agentkit.autoconfigure.SkillRegistryAutoConfiguration
+io.agentkit.autoconfigure.GuardrailAutoConfiguration
+io.agentkit.autoconfigure.SemanticRoutingAutoConfiguration
+io.agentkit.autoconfigure.LlmProviderAutoConfiguration
+io.agentkit.autoconfigure.TokenBudgetAutoConfiguration
+io.agentkit.autoconfigure.AgentAutoConfiguration
+io.agentkit.autoconfigure.HitlAutoConfiguration
+io.agentkit.autoconfigure.CostTrackingAutoConfiguration
+io.agentkit.autoconfigure.EvalAutoConfiguration
+io.agentkit.autoconfigure.DryRunAutoConfiguration
+io.agentkit.autoconfigure.CapabilitiesAutoConfiguration
+io.agentkit.autoconfigure.ToolCacheAutoConfiguration
+io.agentkit.autoconfigure.ObservabilityAutoConfiguration

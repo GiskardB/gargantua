@@ -1,0 +1,18 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: agent-boilerplate
+  labels:
+    app.kubernetes.io/name: agent-boilerplate
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: agent-boilerplate
+  endpoints:
+    - port: http
+      path: /actuator/prometheus
+      interval: 15s
+      scrapeTimeout: 10s
+  namespaceSelector:
+    matchNames:
+      - default

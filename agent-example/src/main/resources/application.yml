@@ -1,0 +1,189 @@
+##############################################################################
+# AgentKit Example Application - Main Configuration
+##############################################################################
+
+spring:
+  application:
+    name: agentkit-example
+  threads:
+    virtual:
+      enabled: true
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/agentkit}
+      database: agentkit
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+##############################################################################
+# AgentKit Core Configuration
+##############################################################################
+
+agentkit:
+  # ── LLM Provider ──────────────────────────────────────────────────────────
+  llm:
+    provider: ${LLM_PROVIDER:openai}
+    model: ${LLM_MODEL:gpt-4o}
+    temperature: ${LLM_TEMPERATURE:0.7}
+    max-tokens: ${LLM_MAX_TOKENS:4096}
+    api-key: ${LLM_API_KEY:}
+    base-url: ${LLM_BASE_URL:}
+    timeout-seconds: ${LLM_TIMEOUT:60}
+    streaming: true
+
+  # ── Skill Routing ─────────────────────────────────────────────────────────
+  skills:
+    base-path: classpath:skills
+    default-skill: default-skill
+    routing:
+      method: ${ROUTING_METHOD:llm}
+      similarity-threshold: 0.75
+      cache-routing-decisions: true
+    hot-reload:
+      enabled: false
+      watch-interval-seconds: 30
+
+  # ── Memory ────────────────────────────────────────────────────────────────
+  memory:
+    working:
+      max-messages: ${MEMORY_MAX_MESSAGES:50}
+      truncation-strategy: sliding-window
+    episodic:
+      enabled: ${EPISODIC_MEMORY_ENABLED:true}
+      auto-summarize: true
+      summarize-threshold: 20
+    knowledge:
+      enabled: ${KNOWLEDGE_MEMORY_ENABLED:false}
+      embedding-model: ${EMBEDDING_MODEL:text-embedding-3-small}
+      chunk-size: 512
+      chunk-overlap: 50
+
+  # ── Tool Execution ────────────────────────────────────────────────────────
+  tools:
+    discovery:
+      scan-packages:
+        - io.agentkit.example.tools
+    cache:
+      enabled: true
+      default-ttl-seconds: 300
+      max-entries: 1000
+    retry:
+      default-max-attempts: 3
+      default-wait-duration-ms: 500
+      backoff-multiplier: 2.0
+    approval:
+      enabled: true
+      timeout-seconds: ${APPROVAL_TIMEOUT:300}
+      store: in-memory
+
+  # ── Guardrails ────────────────────────────────────────────────────────────
+  guardrails:
+    input:
+      enabled: true
+      max-input-length: 10000
+      block-on-fail: true
+    output:
+      enabled: true
+      block-on-fail: false
+    pii-detection:
+      enabled: ${PII_DETECTION_ENABLED:false}
+      action: redact
+
+  # ── Orchestrator ──────────────────────────────────────────────────────────
+  orchestrator:
+    max-iterations: ${MAX_ITERATIONS:10}
+    token-budget:
+      enabled: true
+      max-tokens-per-request: ${MAX_TOKENS_PER_REQUEST:16384}
+      reserve-for-response: 2048
+    context-enrichers:
+      enabled: true
+
+  # ── Dry-run / Debug ───────────────────────────────────────────────────────
+  dry-run:
+    enabled: ${DRY_RUN_ENABLED:false}
+    log-prompts: true
+
+  # ── Session ───────────────────────────────────────────────────────────────
+  session:
+    timeout-minutes: ${SESSION_TIMEOUT:30}
+    auto-summarize: true
+    max-concurrent-sessions: 100
+
+  # ── Cost Tracking ─────────────────────────────────────────────────────────
+  cost:
+    tracking-enabled: ${COST_TRACKING_ENABLED:true}
+    budget-limit-usd: ${COST_BUDGET_LIMIT:10.0}
+    alert-threshold-percent: 80
+
+  # ── Eval / Testing ────────────────────────────────────────────────────────
+  eval:
+    enabled: ${EVAL_ENABLED:false}
+    base-path: classpath:skills
+    parallelism: 4
+    timeout-seconds: 30
+
+  # ── MCP Server ────────────────────────────────────────────────────────────
+  mcp:
+    server:
+      enabled: ${MCP_SERVER_ENABLED:false}
+      transport: stdio
+      name: agentkit-example
+      version: 1.0.0
+
+  # ── Observability ─────────────────────────────────────────────────────────
+  observability:
+    tracing:
+      enabled: ${TRACING_ENABLED:false}
+      exporter: otlp
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4317}
+    logging:
+      include-prompts: false
+      include-tool-results: true
+
+  # ── Rate Limiting ─────────────────────────────────────────────────────────
+  rate-limit:
+    enabled: true
+    requests-per-minute: ${RATE_LIMIT_RPM:60}
+    tokens-per-minute: ${RATE_LIMIT_TPM:100000}
+
+##############################################################################
+# Springdoc / OpenAPI
+##############################################################################
+
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+
+##############################################################################
+# Logging
+##############################################################################
+
+logging:
+  level:
+    root: INFO
+    io.agentkit: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"

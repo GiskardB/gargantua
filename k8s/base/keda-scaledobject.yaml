@@ -1,0 +1,31 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: agent-boilerplate
+  labels:
+    app.kubernetes.io/name: agent-boilerplate
+spec:
+  scaleTargetRef:
+    name: agent-boilerplate
+  pollingInterval: 15
+  cooldownPeriod: 300
+  minReplicaCount: 2
+  maxReplicaCount: 10
+  fallback:
+    failureThreshold: 3
+    replicas: 3
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus-server.monitoring.svc.cluster.local
+        metricName: http_server_requests_seconds_count
+        query: sum(rate(http_server_requests_seconds_count{app="agent-boilerplate"}[2m]))
+        threshold: "100"
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: "70"
+    - type: memory
+      metricType: Utilization
+      metadata:
+        value: "80"
