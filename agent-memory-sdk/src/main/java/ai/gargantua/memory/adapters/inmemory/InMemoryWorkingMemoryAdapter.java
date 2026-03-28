@@ -88,7 +88,9 @@ public class InMemoryWorkingMemoryAdapter implements WorkingMemoryPort {
             return messages;
         });
         // Reset TTL on every append
-        expiryTimes.put(sessionId, System.currentTimeMillis() + ttlMs);
+        long now = System.currentTimeMillis();
+        long expiry = (Long.MAX_VALUE - ttlMs < now) ? Long.MAX_VALUE : now + ttlMs;
+        expiryTimes.put(sessionId, expiry);
         log.debug("[InMemoryWorkingMemory] Appended message to session={}, role={}", sessionId, message.role());
     }
 

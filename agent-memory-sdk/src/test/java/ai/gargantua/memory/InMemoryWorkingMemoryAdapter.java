@@ -38,7 +38,10 @@ public class InMemoryWorkingMemoryAdapter implements WorkingMemoryPort {
     @Override
     public void appendMessage(String sessionId, ChatMessage message) {
         store.computeIfAbsent(sessionId, key -> new ArrayList<>()).add(message);
-        expiryTimes.put(sessionId, System.currentTimeMillis() + ttlMs);
+        // Guard against Long overflow: if ttlMs is very large, cap expiry at Long.MAX_VALUE
+        long now = System.currentTimeMillis();
+        long expiry = (Long.MAX_VALUE - ttlMs < now) ? Long.MAX_VALUE : now + ttlMs;
+        expiryTimes.put(sessionId, expiry);
     }
 
     @Override
