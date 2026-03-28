@@ -1,14 +1,14 @@
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: agent-boilerplate
+  name: gargantua-parent
   labels:
-    app.kubernetes.io/name: agent-boilerplate
+    app.kubernetes.io/name: gargantua-parent
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: agent-boilerplate
+    name: gargantua-parent
   minReplicas: 2
   maxReplicas: 10
   metrics:

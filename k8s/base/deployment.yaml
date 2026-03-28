@@ -1,9 +1,9 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: agent-boilerplate
+  name: gargantua-parent
   labels:
-    app.kubernetes.io/name: agent-boilerplate
+    app.kubernetes.io/name: gargantua-parent
     app.kubernetes.io/component: api
 spec:
   replicas: 2
@@ -15,18 +15,18 @@ spec:
       maxSurge: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: agent-boilerplate
+      app.kubernetes.io/name: gargantua-parent
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: agent-boilerplate
+        app.kubernetes.io/name: gargantua-parent
         app.kubernetes.io/component: api
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "8080"
         prometheus.io/path: /actuator/prometheus
     spec:
-      serviceAccountName: agent-boilerplate
+      serviceAccountName: gargantua-parent
       terminationGracePeriodSeconds: 30
       securityContext:
         runAsNonRoot: true
@@ -34,7 +34,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: agent
-          image: ghcr.ai/gargantua/agent-boilerplate:latest
+          image: ghcr.ai/gargantua/gargantua-parent:latest
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -45,9 +45,9 @@ spec:
               value: "-XX:+UseZGC -XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
           envFrom:
             - configMapRef:
-                name: agent-boilerplate-config
+                name: gargantua-parent-config
             - secretRef:
-                name: agent-boilerplate-secret
+                name: gargantua-parent-secret
           resources:
             requests:
               cpu: 250m
@@ -86,4 +86,4 @@ spec:
           whenUnsatisfiable: DoNotSchedule
           labelSelector:
             matchLabels:
-              app.kubernetes.io/name: agent-boilerplate
+              app.kubernetes.io/name: gargantua-parent

@@ -1,7 +1,7 @@
 replicaCount: 2
 
 image:
-  repository: ghcr.ai/gargantua/agent-boilerplate
+  repository: ghcr.ai/gargantua/gargantua-parent
   tag: latest
   pullPolicy: IfNotPresent
 
@@ -30,7 +30,7 @@ keda:
   pollingInterval: 15
   cooldownPeriod: 300
   prometheusServerAddress: http://prometheus-server.monitoring.svc.cluster.local
-  prometheusQuery: sum(rate(http_server_requests_seconds_count{app="agent-boilerplate"}[2m]))
+  prometheusQuery: sum(rate(http_server_requests_seconds_count{app="gargantua-parent"}[2m]))
   prometheusThreshold: "100"
 
 spring:

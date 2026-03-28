@@ -1,11 +1,11 @@
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: agent-boilerplate
+  name: gargantua-parent
   labels:
-    app.kubernetes.io/name: agent-boilerplate
+    app.kubernetes.io/name: gargantua-parent
 spec:
   minAvailable: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: agent-boilerplate
+      app.kubernetes.io/name: gargantua-parent

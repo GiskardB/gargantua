@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: agent-boilerplate-config
+  name: gargantua-parent-config
   labels:
-    app.kubernetes.io/name: agent-boilerplate
+    app.kubernetes.io/name: gargantua-parent
 data:
   SPRING_PROFILES_ACTIVE: prod
   SERVER_PORT: "8080"

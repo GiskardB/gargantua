@@ -1,5 +1,5 @@
 apiVersion: v2
-name: agent-boilerplate
+name: gargantua-parent
 description: Helm chart for the AI Agent Boilerplate application
 type: application
 version: 0.1.0

@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "agent-boilerplate.fullname" . }}
+  name: {{ include "gargantua-parent.fullname" . }}
   labels:
-    {{- include "agent-boilerplate.labels" . | nindent 4 }}
+    {{- include "gargantua-parent.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.service.type }}
   ports:
@@ -12,4 +12,4 @@ spec:
       targetPort: {{ .Values.service.targetPort }}
       protocol: TCP
   selector:
-    {{- include "agent-boilerplate.selectorLabels" . | nindent 4 }}
+    {{- include "gargantua-parent.selectorLabels" . | nindent 4 }}

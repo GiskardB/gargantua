@@ -1,13 +1,13 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: agent-boilerplate
+  name: gargantua-parent
   labels:
-    app.kubernetes.io/name: agent-boilerplate
+    app.kubernetes.io/name: gargantua-parent
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/name: agent-boilerplate
+      app.kubernetes.io/name: gargantua-parent
   endpoints:
     - port: http
       path: /actuator/prometheus

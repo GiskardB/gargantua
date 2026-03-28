@@ -10,4 +10,4 @@ patches:
   - path: patch-prod.yaml
     target:
       kind: Deployment
-      name: agent-boilerplate
+      name: gargantua-parent

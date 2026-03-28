@@ -1,12 +1,12 @@
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
-  name: agent-boilerplate
+  name: gargantua-parent
   labels:
-    app.kubernetes.io/name: agent-boilerplate
+    app.kubernetes.io/name: gargantua-parent
 spec:
   scaleTargetRef:
-    name: agent-boilerplate
+    name: gargantua-parent
   pollingInterval: 15
   cooldownPeriod: 300
   minReplicaCount: 2
@@ -19,7 +19,7 @@ spec:
       metadata:
         serverAddress: http://prometheus-server.monitoring.svc.cluster.local
         metricName: http_server_requests_seconds_count
-        query: sum(rate(http_server_requests_seconds_count{app="agent-boilerplate"}[2m]))
+        query: sum(rate(http_server_requests_seconds_count{app="gargantua-parent"}[2m]))
         threshold: "100"
     - type: cpu
       metricType: Utilization

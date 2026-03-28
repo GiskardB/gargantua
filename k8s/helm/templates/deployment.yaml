@@ -1,9 +1,9 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "agent-boilerplate.fullname" . }}
+  name: {{ include "gargantua-parent.fullname" . }}
   labels:
-    {{- include "agent-boilerplate.labels" . | nindent 4 }}
+    {{- include "gargantua-parent.labels" . | nindent 4 }}
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
@@ -16,17 +16,17 @@ spec:
       maxSurge: 1
   selector:
     matchLabels:
-      {{- include "agent-boilerplate.selectorLabels" . | nindent 6 }}
+      {{- include "gargantua-parent.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "agent-boilerplate.selectorLabels" . | nindent 8 }}
+        {{- include "gargantua-parent.selectorLabels" . | nindent 8 }}
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "{{ .Values.service.targetPort }}"
         prometheus.io/path: /actuator/prometheus
     spec:
-      serviceAccountName: {{ include "agent-boilerplate.serviceAccountName" . }}
+      serviceAccountName: {{ include "gargantua-parent.serviceAccountName" . }}
       terminationGracePeriodSeconds: 30
       securityContext:
         runAsNonRoot: true
