@@ -7,9 +7,13 @@ services:
     ports:
       - "8080:8080"
     environment:
-      SPRING_DATA_MONGODB_URI: mongodb://mongo:27017/${artifactId}
-      SPRING_DATA_REDIS_HOST: redis
-      LLM_API_KEY: ${symbol_dollar}{LLM_API_KEY}
+      MONGODB_URI: mongodb://mongo:27017/${artifactId}
+      REDIS_URL: redis://redis:6379
+      LLM_PRIMARY_PROVIDER: ${symbol_dollar}{LLM_PRIMARY_PROVIDER:-openai}
+      LLM_PRIMARY_MODEL: ${symbol_dollar}{LLM_PRIMARY_MODEL:-gpt-4o}
+      LLM_PRIMARY_API_KEY: ${symbol_dollar}{LLM_PRIMARY_API_KEY}
+      LLM_FALLBACK_PROVIDER: ${symbol_dollar}{LLM_FALLBACK_PROVIDER:-anthropic}
+      LLM_FALLBACK_API_KEY: ${symbol_dollar}{LLM_FALLBACK_API_KEY:-}
     depends_on:
       mongo: { condition: service_healthy }
       redis: { condition: service_healthy }

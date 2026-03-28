@@ -1,6 +1,32 @@
 #set( $symbol_pound = '#' )
 #set( $symbol_dollar = '$' )
 #set( $symbol_escape = '\' )
+${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}
+${symbol_pound} Gargantua Agent Configuration
+${symbol_pound}
+${symbol_pound} Environment variables:
+${symbol_pound}
+${symbol_pound}   MONGODB_URI              MongoDB connection string (default: mongodb://localhost:27017/...)
+${symbol_pound}   REDIS_URL                Redis connection URL (default: redis://localhost:6379)
+${symbol_pound}   SERVER_PORT              HTTP port (default: 8080)
+${symbol_pound}
+${symbol_pound}   LLM_PRIMARY_PROVIDER     Primary LLM: openai | azure-openai | anthropic (default: openai)
+${symbol_pound}   LLM_PRIMARY_MODEL        Model name, e.g. gpt-4o, claude-sonnet-4-... (default: gpt-4o)
+${symbol_pound}   LLM_PRIMARY_API_KEY      API key for the primary LLM provider (REQUIRED)
+${symbol_pound}   LLM_PRIMARY_ENDPOINT     Base URL (required for azure-openai, optional otherwise)
+${symbol_pound}   LLM_PRIMARY_TEMPERATURE  Sampling temperature 0.0-1.0 (default: 0.7)
+${symbol_pound}   LLM_PRIMARY_MAX_TOKENS   Max response tokens (default: 1000)
+${symbol_pound}
+${symbol_pound}   LLM_FALLBACK_PROVIDER    Fallback provider when primary fails (default: anthropic)
+${symbol_pound}   LLM_FALLBACK_MODEL       Fallback model name (default: claude-sonnet-4-20250514)
+${symbol_pound}   LLM_FALLBACK_API_KEY     Fallback API key (optional)
+${symbol_pound}
+${symbol_pound}   LLM_ROUTING_PROVIDER     Routing model provider — cheap, for skill routing (default: openai)
+${symbol_pound}   LLM_ROUTING_MODEL        Routing model name (default: gpt-4o-mini)
+${symbol_pound}   LLM_ROUTING_API_KEY      Routing API key (defaults to primary key)
+${symbol_pound}
+${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}
+
 spring:
   application:
     name: ${artifactId}
@@ -14,7 +40,7 @@ spring:
       url: ${symbol_dollar}{REDIS_URL:redis://localhost:6379}
 
 server:
-  port: 8080
+  port: ${symbol_dollar}{SERVER_PORT:8080}
   shutdown: graceful
 
 management:
@@ -26,19 +52,21 @@ management:
 agent:
   llm:
     primary:
-      provider: ${symbol_dollar}{LLM_PROVIDER:openai}
-      model: ${symbol_dollar}{LLM_MODEL:gpt-4o}
-      api-key: ${symbol_dollar}{LLM_API_KEY:}
-      temperature: 0.7
-      max-tokens: 1000
+      provider: ${symbol_dollar}{LLM_PRIMARY_PROVIDER:openai}
+      model: ${symbol_dollar}{LLM_PRIMARY_MODEL:gpt-4o}
+      api-key: ${symbol_dollar}{LLM_PRIMARY_API_KEY:}
+      endpoint: ${symbol_dollar}{LLM_PRIMARY_ENDPOINT:}
+      temperature: ${symbol_dollar}{LLM_PRIMARY_TEMPERATURE:0.7}
+      max-tokens: ${symbol_dollar}{LLM_PRIMARY_MAX_TOKENS:1000}
     fallback:
-      provider: anthropic
-      model: claude-sonnet-4-20250514
-      api-key: ${symbol_dollar}{ANTHROPIC_API_KEY:}
+      provider: ${symbol_dollar}{LLM_FALLBACK_PROVIDER:anthropic}
+      model: ${symbol_dollar}{LLM_FALLBACK_MODEL:claude-sonnet-4-20250514}
+      api-key: ${symbol_dollar}{LLM_FALLBACK_API_KEY:}
+      endpoint: ${symbol_dollar}{LLM_FALLBACK_ENDPOINT:}
     routing-model:
-      provider: openai
-      model: gpt-4o-mini
-      api-key: ${symbol_dollar}{OPENAI_API_KEY:}
+      provider: ${symbol_dollar}{LLM_ROUTING_PROVIDER:openai}
+      model: ${symbol_dollar}{LLM_ROUTING_MODEL:gpt-4o-mini}
+      api-key: ${symbol_dollar}{LLM_ROUTING_API_KEY:${symbol_dollar}{LLM_PRIMARY_API_KEY:}}
       temperature: 0.0
       max-tokens: 50
 

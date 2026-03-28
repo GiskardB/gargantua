@@ -59,10 +59,21 @@ cd my-agent
 docker compose up -d mongo redis
 ```
 
-### 3. Set your LLM API key and run
+### 3. Configure your LLM provider and run
 
 ```bash
-export LLM_API_KEY=sk-...
+# Required: primary LLM provider API key
+export LLM_PRIMARY_API_KEY=sk-...
+
+# Optional: choose provider and model (defaults: openai / gpt-4o)
+export LLM_PRIMARY_PROVIDER=openai        # openai | azure-openai | anthropic
+export LLM_PRIMARY_MODEL=gpt-4o
+
+# Optional: fallback provider (used when primary fails)
+export LLM_FALLBACK_API_KEY=sk-ant-...
+export LLM_FALLBACK_PROVIDER=anthropic
+export LLM_FALLBACK_MODEL=claude-sonnet-4-20250514
+
 mvn spring-boot:run
 ```
 
@@ -330,6 +341,36 @@ gargantua/
 | `POST` | `/api/admin/llm/simulate` | Simulate LLM routing |
 | `GET` | `/swagger-ui` | Swagger UI |
 | `GET` | `/docs` | Redoc documentation |
+
+---
+
+## Environment Variables Reference
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| **Infrastructure** | | |
+| `MONGODB_URI` | MongoDB connection string | `mongodb://localhost:27017/gargantua` |
+| `REDIS_URL` | Redis connection URL | `redis://localhost:6379` |
+| `SERVER_PORT` | HTTP server port | `8080` |
+| **Primary LLM** | | |
+| `LLM_PRIMARY_PROVIDER` | LLM provider: `openai`, `azure-openai`, `anthropic` | `openai` |
+| `LLM_PRIMARY_MODEL` | Model name (e.g. `gpt-4o`, `claude-sonnet-4-20250514`) | `gpt-4o` |
+| `LLM_PRIMARY_API_KEY` | API key for the primary provider | **(required)** |
+| `LLM_PRIMARY_ENDPOINT` | Base URL / endpoint (required for `azure-openai`) | provider default |
+| `LLM_PRIMARY_TEMPERATURE` | Sampling temperature (0.0 -- 1.0) | `0.7` |
+| `LLM_PRIMARY_MAX_TOKENS` | Max tokens in LLM response | `1000` |
+| **Fallback LLM** | Used automatically when primary provider fails | |
+| `LLM_FALLBACK_PROVIDER` | Fallback provider | `anthropic` |
+| `LLM_FALLBACK_MODEL` | Fallback model | `claude-sonnet-4-20250514` |
+| `LLM_FALLBACK_API_KEY` | Fallback API key | *(optional)* |
+| `LLM_FALLBACK_ENDPOINT` | Fallback endpoint | provider default |
+| **Routing LLM** | Cheap model for skill routing, eval judge, session summaries | |
+| `LLM_ROUTING_PROVIDER` | Routing model provider | `openai` |
+| `LLM_ROUTING_MODEL` | Routing model name | `gpt-4o-mini` |
+| `LLM_ROUTING_API_KEY` | Routing model API key | same as primary |
+| **Routing** | | |
+| `ROUTING_STRATEGY` | Skill routing: `hybrid`, `semantic`, `llm` | `hybrid` |
+| `ROUTING_THRESHOLD` | Semantic similarity threshold (0.0 -- 1.0) | `0.82` |
 
 ---
 

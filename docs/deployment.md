@@ -96,14 +96,26 @@ All state is in Redis (working memory, HITL, tool cache) and MongoDB (episodic, 
 | Prod Native | 3-30 | 250m/1000m | 128Mi/256Mi |
 
 ## Environment Variables
+
 | Variable | Description | Default |
 |----------|-------------|---------|
-| MONGODB_URI | MongoDB connection | mongodb://localhost:27017/gargantua |
-| REDIS_URL | Redis connection | redis://localhost:6379 |
-| OPENAI_API_KEY | OpenAI API key | — |
-| AZURE_OPENAI_KEY | Azure OpenAI key | — |
-| ANTHROPIC_API_KEY | Anthropic key | — |
-| SPRING_PROFILES_ACTIVE | Spring profile | dev |
+| `MONGODB_URI` | MongoDB connection string | `mongodb://localhost:27017/gargantua` |
+| `REDIS_URL` | Redis connection URL | `redis://localhost:6379` |
+| `SERVER_PORT` | HTTP server port | `8080` |
+| `LLM_PRIMARY_PROVIDER` | Primary LLM: `openai` / `azure-openai` / `anthropic` | `openai` |
+| `LLM_PRIMARY_MODEL` | Primary model name (e.g. `gpt-4o`) | `gpt-4o` |
+| `LLM_PRIMARY_API_KEY` | API key for the primary LLM provider | **(required)** |
+| `LLM_PRIMARY_ENDPOINT` | Base URL (required for `azure-openai`) | provider default |
+| `LLM_PRIMARY_TEMPERATURE` | Sampling temperature 0.0-1.0 | `0.7` |
+| `LLM_PRIMARY_MAX_TOKENS` | Max response tokens | `1000` |
+| `LLM_FALLBACK_PROVIDER` | Fallback provider (on primary failure) | `anthropic` |
+| `LLM_FALLBACK_MODEL` | Fallback model | `claude-sonnet-4-20250514` |
+| `LLM_FALLBACK_API_KEY` | Fallback API key | *(optional)* |
+| `LLM_ROUTING_PROVIDER` | Routing model provider (cheap) | `openai` |
+| `LLM_ROUTING_MODEL` | Routing model name | `gpt-4o-mini` |
+| `LLM_ROUTING_API_KEY` | Routing model API key | same as primary |
+| `ROUTING_STRATEGY` | Skill routing: `hybrid` / `semantic` / `llm` | `hybrid` |
+| `SPRING_PROFILES_ACTIVE` | Spring profile | `dev` |
 
 ## Health Probes
 - Liveness: `/actuator/health/liveness`
