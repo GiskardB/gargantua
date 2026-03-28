@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * Usage: {@code cost summary}, {@code cost by-skill}. Displays data in formatted tables.
  */
 @Component
-@Command(command = "cost")
+@Command(name = "cost")
 public class CostCommand {
 
     private final StreamingRenderer renderer;
@@ -36,7 +36,7 @@ public class CostCommand {
         this.tableRenderer = tableRenderer;
     }
 
-    @Command(command = "summary", description = "Show cost summary for the current shell session")
+    @Command(name = "summary", description = "Show cost summary for the current shell session")
     public String summary() {
         if (totalRequests.get() == 0) {
             return "No requests recorded yet. Start a chat session to track costs.";

@@ -46,7 +46,7 @@ public class ChatCommand {
         this.userId = defaultUserId;
     }
 
-    @Command(command = "chat", description = "Start interactive chat session")
+    @Command(name = "chat", description = "Start interactive chat session")
     public void chat() {
         sessionId = agentClient.newSession();
         renderer.printChatHeader(sessionId, userId, dryRun);

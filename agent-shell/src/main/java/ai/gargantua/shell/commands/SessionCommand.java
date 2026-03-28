@@ -18,7 +18,7 @@ import java.util.Map;
  * {@code session show <id>}. Tracks active sessions in the shell's local state.
  */
 @Component
-@Command(command = "session")
+@Command(name = "session")
 public class SessionCommand {
 
     private final AgentClient agentClient;
@@ -39,7 +39,7 @@ public class SessionCommand {
         this.tableRenderer = tableRenderer;
     }
 
-    @Command(command = "new", description = "Create a new chat session")
+    @Command(name = "new", description = "Create a new chat session")
     public String newSession() {
         String sessionId = agentClient.newSession();
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
@@ -48,7 +48,7 @@ public class SessionCommand {
         return "New session created: " + sessionId;
     }
 
-    @Command(command = "list", description = "List all sessions")
+    @Command(name = "list", description = "List all sessions")
     public String list() {
         if (sessions.isEmpty()) {
             return "No sessions. Use 'session new' to create one.";
@@ -69,7 +69,7 @@ public class SessionCommand {
         return tableRenderer.renderTable(headers, rows);
     }
 
-    @Command(command = "resume", description = "Resume an existing session by ID")
+    @Command(name = "resume", description = "Resume an existing session by ID")
     public String resume(String sessionId) {
         if (!sessions.containsKey(sessionId)) {
             // Allow resuming sessions that weren't tracked locally
