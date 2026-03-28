@@ -29,7 +29,7 @@ public class StreamingRenderer {
         this.ansiEnabled = resolveAnsi(ansiMode);
     }
 
-    StreamingRenderer(boolean ansiEnabled, PrintStream out) {
+    public StreamingRenderer(boolean ansiEnabled, PrintStream out) {
         this.ansiEnabled = ansiEnabled;
         this.out = out;
     }
