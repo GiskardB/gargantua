@@ -1,0 +1,25 @@
+# ══════════════════════════════════════════════════════════════════
+# Embedded mode — no MongoDB, no Redis, everything in-memory
+# Activate with: SPRING_PROFILES_ACTIVE=embedded
+# ══════════════════════════════════════════════════════════════════
+
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.mongo.MongoRepositoriesAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+
+# Disable health checks for infra we don't have
+management:
+  health:
+    mongo:
+      enabled: false
+    redis:
+      enabled: false
+
+logging:
+  level:
+    ai.gargantua: DEBUG

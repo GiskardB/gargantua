@@ -18,17 +18,24 @@ Built on Spring Boot 4.0.4 and LangChain4j 1.12.1.
 
 - **Java 21+** — the framework uses Virtual Threads (Project Loom)
 - **Maven 3.9+**
-- **Docker & Docker Compose** — for MongoDB and Redis
+- **Docker & Docker Compose** — for MongoDB and Redis *(not needed in embedded mode)*
 
 > **Why MongoDB and Redis?**
-> Gargantua requires two infrastructure services that run alongside your agent:
+> In production, Gargantua uses two infrastructure services:
 >
 > | Service | Why it's needed | What it stores |
 > |---------|----------------|----------------|
 > | **MongoDB** | Persistent storage | Episodic memory (session summaries), knowledge memory (user profiles), chat history, eval reports, cost tracking |
 > | **Redis** | Fast session storage + caching | Working memory (current conversation), HITL approval requests, tool output cache, rate limiting counters |
 >
-> Both start automatically via `docker compose`. No manual database setup, schema migration, or configuration is needed — the framework creates collections and keys on first use.
+> Both start via `docker compose`. No manual schema setup needed.
+>
+> **Want to skip Docker entirely?** Use **embedded mode** — everything runs in-memory:
+> ```bash
+> export LLM_PRIMARY_API_KEY=sk-...
+> SPRING_PROFILES_ACTIVE=embedded mvn spring-boot:run
+> ```
+> Data is lost on restart, but it's perfect for prototyping and demos. See [Embedded Mode](#embedded-mode) below.
 
 ### 1. Generate the project from the archetype
 
@@ -360,6 +367,41 @@ gargantua/
 | `POST` | `/api/admin/llm/simulate` | Simulate LLM routing |
 | `GET` | `/swagger-ui` | Swagger UI |
 | `GET` | `/docs` | Redoc documentation |
+
+---
+
+## Embedded Mode
+
+Run an agent with **zero infrastructure** — no Docker, no MongoDB, no Redis:
+
+```bash
+export LLM_PRIMARY_API_KEY=sk-...
+SPRING_PROFILES_ACTIVE=embedded mvn spring-boot:run
+```
+
+All storage uses in-memory ConcurrentHashMaps. Data is lost on restart.
+
+| What | Standard mode | Embedded mode |
+|------|--------------|---------------|
+| Working memory | Redis | ConcurrentHashMap |
+| Episodic memory | MongoDB | ConcurrentHashMap |
+| Knowledge memory | MongoDB | ConcurrentHashMap |
+| Chat history | MongoDB | ConcurrentHashMap |
+| HITL approvals | Redis | ConcurrentHashMap |
+| Tool cache | Redis | ConcurrentHashMap |
+| Cost tracking | MongoDB | ConcurrentHashMap |
+| Requires Docker | Yes | **No** |
+| Data persisted | Yes | **No** (lost on restart) |
+
+**When to use embedded mode:**
+- Local development and prototyping
+- CI/CD pipelines and automated testing
+- Quick demos
+- Learning the framework
+
+**When NOT to use it:**
+- Production (use MongoDB + Redis)
+- Load testing (in-memory has no eviction policies)
 
 ---
 

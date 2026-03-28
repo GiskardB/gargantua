@@ -11,3 +11,4 @@ ai.gargantua.autoconfigure.DryRunAutoConfiguration
 ai.gargantua.autoconfigure.CapabilitiesAutoConfiguration
 ai.gargantua.autoconfigure.ToolCacheAutoConfiguration
 ai.gargantua.autoconfigure.ObservabilityAutoConfiguration
+ai.gargantua.autoconfigure.EmbeddedProfileAutoConfiguration
