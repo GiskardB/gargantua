@@ -16,7 +16,6 @@ import java.util.List;
  * {@code skill reload}. Displays skill metadata in a formatted table.
  */
 @Component
-@Command(name = "skill")
 public class SkillCommand {
 
     private final SkillRegistry skillRegistry;
@@ -31,7 +30,7 @@ public class SkillCommand {
         this.tableRenderer = tableRenderer;
     }
 
-    @Command(name = "list", description = "List all available skills in table format")
+    @Command(name = {"skill", "list"}, description = "List all available skills in table format")
     public String list() {
         List<SkillMeta> skills = skillRegistry.listMeta();
         if (skills.isEmpty()) {
@@ -55,7 +54,7 @@ public class SkillCommand {
         return tableRenderer.renderTable(headers, rows);
     }
 
-    @Command(name = "show", description = "Show detailed information about a specific skill")
+    @Command(name = {"skill", "show"}, description = "Show detailed information about a specific skill")
     public String show(String name) {
         SkillCard card = skillRegistry.load(name);
         if (card == null) {
@@ -94,7 +93,7 @@ public class SkillCommand {
         return sb.toString();
     }
 
-    @Command(name = "reload", description = "Trigger hot reload of all skills")
+    @Command(name = {"skill", "reload"}, description = "Trigger hot reload of all skills")
     public String reload() {
         try {
             skillRegistry.reload();

@@ -22,7 +22,6 @@ import java.util.UUID;
  * and displays pass/fail/partial results.
  */
 @Component
-@Command(name = "eval")
 public class EvalCommand {
 
     private final SkillRegistry skillRegistry;
@@ -40,10 +39,10 @@ public class EvalCommand {
         this.tableRenderer = tableRenderer;
     }
 
-    @Command(name = "run", description = "Run eval suite for a skill")
+    @Command(name = {"eval", "run"}, description = "Run eval suite for a skill")
     public String run(
-            @Option(name = "skill", description = "Skill name to evaluate") String skillName,
-            @Option(name = "all", description = "Run evals for all skills") boolean all) {
+            @Option(longName = "skill", description = "Skill name to evaluate") String skillName,
+            @Option(longName = "all", description = "Run evals for all skills") boolean all) {
 
         if (!all && (skillName == null || skillName.isBlank())) {
             return "Please specify --skill <name> or --all";

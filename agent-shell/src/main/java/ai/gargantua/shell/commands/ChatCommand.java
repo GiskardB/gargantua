@@ -17,7 +17,6 @@ import java.util.Scanner;
  * Supports streaming output, dry-run mode, and forced skill selection.
  */
 @Component
-@Command
 public class ChatCommand {
 
     private final AgentClient agentClient;
