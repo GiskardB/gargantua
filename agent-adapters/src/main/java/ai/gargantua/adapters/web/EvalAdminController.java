@@ -8,6 +8,7 @@ import ai.gargantua.core.skill.SkillRegistry;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,6 +25,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/admin/evals")
+@ConditionalOnBean(MongoEvalReportRepository.class)
 @Tag(name = "Admin \u2014 Evals")
 public class EvalAdminController {
 

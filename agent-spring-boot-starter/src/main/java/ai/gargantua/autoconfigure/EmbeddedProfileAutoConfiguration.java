@@ -8,6 +8,7 @@ import ai.gargantua.memory.adapters.inmemory.InMemoryApprovalStore;
 import ai.gargantua.memory.adapters.inmemory.InMemoryEpisodicMemoryAdapter;
 import ai.gargantua.memory.adapters.inmemory.InMemoryKnowledgeMemoryAdapter;
 import ai.gargantua.memory.adapters.inmemory.InMemoryWorkingMemoryAdapter;
+import ai.gargantua.memory.autoconfigure.AgentMemoryAutoConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -39,7 +40,8 @@ import org.springframework.context.annotation.Profile;
 @AutoConfiguration(before = {
         MongoAutoConfiguration.class,
         MongoDataAutoConfiguration.class,
-        RedisAutoConfiguration.class
+        RedisAutoConfiguration.class,
+        AgentMemoryAutoConfiguration.class
 })
 @Profile("embedded")
 public class EmbeddedProfileAutoConfiguration {

@@ -1,6 +1,7 @@
 package ai.gargantua.adapters.eval;
 
 import ai.gargantua.core.eval.EvalReport;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -16,6 +17,7 @@ import java.util.Optional;
  * retrieval of the latest report per skill for regression comparison.
  */
 @Component
+@ConditionalOnBean(MongoTemplate.class)
 public class MongoEvalReportRepository {
 
     private static final String COLLECTION = "eval_reports";

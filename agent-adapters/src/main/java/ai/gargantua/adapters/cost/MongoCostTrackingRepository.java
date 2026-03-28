@@ -1,5 +1,6 @@
 package ai.gargantua.adapters.cost;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
@@ -17,6 +18,7 @@ import java.util.Map;
  * support for cost summaries grouped by skill and provider.
  */
 @Component
+@ConditionalOnBean(MongoTemplate.class)
 public class MongoCostTrackingRepository {
 
     private static final String COLLECTION = "token_usage";
