@@ -8,14 +8,10 @@ import ai.gargantua.memory.adapters.inmemory.InMemoryApprovalStore;
 import ai.gargantua.memory.adapters.inmemory.InMemoryEpisodicMemoryAdapter;
 import ai.gargantua.memory.adapters.inmemory.InMemoryKnowledgeMemoryAdapter;
 import ai.gargantua.memory.adapters.inmemory.InMemoryWorkingMemoryAdapter;
-import ai.gargantua.memory.autoconfigure.AgentMemoryAutoConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration;
-import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
-import org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Profile;
 
@@ -34,15 +30,14 @@ import org.springframework.context.annotation.Profile;
  *   <li>Learning the framework</li>
  * </ul>
  *
+ * <p>The actual exclusion of Mongo/Redis auto-configuration is done in
+ * {@code application-embedded.yml} via {@code spring.autoconfigure.exclude}.
+ * This class only provides the in-memory bean replacements.</p>
+ *
  * <p><strong>Warning:</strong> All data is lost when the process stops.
  * Do NOT use in production.</p>
  */
-@AutoConfiguration(before = {
-        MongoAutoConfiguration.class,
-        MongoDataAutoConfiguration.class,
-        RedisAutoConfiguration.class,
-        AgentMemoryAutoConfiguration.class
-})
+@AutoConfiguration
 @Profile("embedded")
 public class EmbeddedProfileAutoConfiguration {
 
