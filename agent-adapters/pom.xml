@@ -38,6 +38,12 @@
       <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
     </dependency>
 
+    <!-- Web (needed for @WebMvcTest in tests + controller compilation) -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+
     <!-- Test -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
