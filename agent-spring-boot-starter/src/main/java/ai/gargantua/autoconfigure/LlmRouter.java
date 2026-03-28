@@ -10,7 +10,14 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Evaluates routing rules from config to resolve which LLM model alias to use.
+ * Evaluates routing rules from configuration to select which LLM model alias handles a request.
+ * Rules are sorted by priority (lowest first) and evaluated against the {@link ai.gargantua.core.llm.LlmRoutingContext}.
+ * The first matching rule wins. If no rule matches, the primary model alias is used.
+ *
+ * <p>Supported condition keys: {@code skill}, {@code domain}, {@code minTokens},
+ * {@code userTier}, and any custom key matched against context attributes.</p>
+ *
+ * @see ai.gargantua.core.llm.LlmRoutingContext
  */
 @Component
 public class LlmRouter {

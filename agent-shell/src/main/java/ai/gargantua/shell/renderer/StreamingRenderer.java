@@ -6,6 +6,10 @@ import org.springframework.stereotype.Component;
 import java.io.PrintStream;
 import java.util.Scanner;
 
+/**
+ * Renders streaming agent responses to the terminal with ANSI color support.
+ * Handles token-by-token output, tool call indicators, and metadata display.
+ */
 @Component
 public class StreamingRenderer {
 

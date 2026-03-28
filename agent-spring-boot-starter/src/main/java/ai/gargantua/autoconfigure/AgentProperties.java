@@ -7,6 +7,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Master configuration properties for the Gargantua Agent Framework,
+ * bound to the {@code agent.*} prefix. Controls all aspects of the agent:
+ * API metadata, skill discovery, LLM providers, routing, memory, guardrails,
+ * HITL, cost tracking, evals, dry-run, chat history, observability, shell, and MCP.
+ */
 @ConfigurationProperties(prefix = "agent")
 public class AgentProperties {
 

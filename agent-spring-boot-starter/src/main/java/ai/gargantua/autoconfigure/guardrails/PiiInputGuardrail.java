@@ -12,6 +12,12 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * Input guardrail that detects and masks PII (emails, IBANs, phone numbers) in user messages.
+ * Always returns PASS -- masking is informational, not blocking. The PII map is stored
+ * in context attributes for potential de-anonymization by the output guardrail.
+ * Disabled by default; enable via {@code agent.guardrail.input.pii-masking-enabled=true}.
+ */
 @Component
 @Order(40)
 public class PiiInputGuardrail implements InputGuardrail {

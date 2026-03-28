@@ -8,6 +8,11 @@ import org.springframework.aot.hint.RuntimeHintsRegistrar;
 import org.springframework.context.annotation.ImportRuntimeHints;
 import org.springframework.stereotype.Component;
 
+/**
+ * GraalVM native-image runtime hints for the example agent. Registers tool classes
+ * and their inner record types for reflection, since native-image cannot discover
+ * them automatically. Also registers resource patterns for skill files.
+ */
 @Component
 @ImportRuntimeHints(AgentKitRuntimeHints.Registrar.class)
 public class AgentKitRuntimeHints {

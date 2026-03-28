@@ -10,6 +10,13 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Decorator that adds Caffeine-based TTL caching to any {@link SkillRegistry}.
+ * Caches the metadata list (single entry) and individual skill cards (up to 200).
+ * Calling {@link #reload()} invalidates all caches and delegates to the underlying registry.
+ *
+ * @see CompositeSkillRegistry
+ */
 public class CachedSkillRegistry implements SkillRegistry {
 
     private static final String LIST_META_KEY = "ALL";

@@ -1,5 +1,13 @@
 package ai.gargantua.core.orchestrator;
 
+/**
+ * Outcome of the skill routing phase. Captures which skill was selected,
+ * how it was selected, and the confidence level of the match.
+ *
+ * <p>Use the static factory methods for common construction patterns.</p>
+ *
+ * @see RoutingMethod
+ */
 public record RoutingResult(
         String skillName,
         RoutingMethod method,

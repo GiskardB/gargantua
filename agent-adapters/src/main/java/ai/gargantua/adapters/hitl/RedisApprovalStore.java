@@ -14,6 +14,13 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.util.Optional;
 
+/**
+ * Redis-backed implementation of {@link ApprovalStore}. Stores pending approval requests
+ * as JSON in Redis keys prefixed with {@code approval:} with TTL-based expiry.
+ * Resolved requests are deleted from Redis.
+ *
+ * @see ai.gargantua.core.hitl.ApprovalStore
+ */
 @Component
 public class RedisApprovalStore implements ApprovalStore {
 

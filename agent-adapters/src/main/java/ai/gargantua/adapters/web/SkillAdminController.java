@@ -16,6 +16,10 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Admin REST endpoint for managing skills. Lists metadata, loads full skill cards,
+ * and triggers manual reloads of the skill registry.
+ */
 @RestController
 @RequestMapping("/api/admin/skills")
 @Tag(name = "Admin \u2014 Skills")

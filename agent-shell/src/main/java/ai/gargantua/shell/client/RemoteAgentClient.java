@@ -9,6 +9,11 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
 
+/**
+ * Shell client that communicates with a remote agent server via HTTP REST calls.
+ * Activated when {@code agent.shell.mode=remote}. Connects to the URL configured
+ * via {@code agent.shell.remote.url}.
+ */
 @Component
 @ConditionalOnProperty(name = "agent.shell.mode", havingValue = "remote")
 public class RemoteAgentClient implements AgentClient {

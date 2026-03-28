@@ -11,6 +11,11 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * MongoDB repository for persisting and querying token usage data.
+ * Stores documents in the {@code token_usage} collection with aggregation
+ * support for cost summaries grouped by skill and provider.
+ */
 @Component
 public class MongoCostTrackingRepository {
 

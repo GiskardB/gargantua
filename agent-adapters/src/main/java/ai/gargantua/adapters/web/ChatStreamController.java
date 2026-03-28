@@ -23,6 +23,10 @@ import reactor.core.scheduler.Schedulers;
 
 import java.util.Map;
 
+/**
+ * REST endpoint for streaming chat interactions via Server-Sent Events (SSE).
+ * Emits token-by-token events, tool call notifications, approval requests, and metadata.
+ */
 @RestController
 @RequestMapping("/api/agent/chat")
 @Tag(name = "Chat")

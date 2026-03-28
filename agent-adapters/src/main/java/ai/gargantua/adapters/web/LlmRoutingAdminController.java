@@ -19,6 +19,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Admin REST endpoint for inspecting and testing LLM routing rules.
+ * Allows dry-testing a routing context against the configured rules.
+ */
 @RestController
 @RequestMapping("/api/admin/llm")
 @Tag(name = "Admin \u2014 LLM Routing")

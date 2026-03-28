@@ -16,6 +16,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
+/**
+ * REST endpoint for resolving human-in-the-loop approval requests.
+ * A human reviewer calls this to approve or deny a pending tool execution.
+ */
 @RestController
 @RequestMapping("/api/agent/approval")
 @Tag(name = "Chat")

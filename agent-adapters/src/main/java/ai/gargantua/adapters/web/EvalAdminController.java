@@ -18,6 +18,10 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Admin REST endpoint for running and reviewing skill evaluation suites.
+ * Triggers eval runs, retrieves reports, and lists available eval datasets.
+ */
 @RestController
 @RequestMapping("/api/admin/evals")
 @Tag(name = "Admin \u2014 Evals")

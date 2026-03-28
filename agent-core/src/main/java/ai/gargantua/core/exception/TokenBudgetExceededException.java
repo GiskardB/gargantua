@@ -1,5 +1,10 @@
 package ai.gargantua.core.exception;
 
+/**
+ * Thrown when the fixed-cost prompt components (system prompt + user message + tools)
+ * alone exceed the configured context window. This means even after removing all
+ * optional memory, the prompt cannot fit.
+ */
 public class TokenBudgetExceededException extends RuntimeException {
 
     private final int fixedTokens;

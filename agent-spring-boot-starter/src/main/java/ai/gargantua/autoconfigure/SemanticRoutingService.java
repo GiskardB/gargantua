@@ -11,8 +11,16 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Semantic routing service. Pre-computes embeddings (placeholder: stores description hashes)
- * at boot and computes similarity for routing. Falls back to LLM routing if below threshold.
+ * Hybrid skill routing service. First attempts semantic matching (cosine similarity
+ * of term frequencies between user message and skill descriptions). If the best
+ * score is below the configured threshold, falls back to LLM-based routing.
+ *
+ * <p>The current implementation uses simple term overlap as a placeholder for real
+ * embedding-based similarity. In production, this will use a sentence transformer
+ * model (e.g. all-MiniLM-L6-v2) for proper vector similarity.</p>
+ *
+ * @see RoutingService
+ * @see ai.gargantua.core.orchestrator.RoutingResult
  */
 @Component
 public class SemanticRoutingService {

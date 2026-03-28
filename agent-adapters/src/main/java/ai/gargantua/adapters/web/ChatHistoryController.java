@@ -22,6 +22,10 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * REST endpoint for browsing and searching chat history stored in MongoDB.
+ * Supports session listing, message retrieval, full-text search, and deletion.
+ */
 @RestController
 @RequestMapping("/api/agent/chat")
 @Tag(name = "History")

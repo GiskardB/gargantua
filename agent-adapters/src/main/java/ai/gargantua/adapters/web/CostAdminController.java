@@ -17,6 +17,10 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Admin REST endpoint for querying token usage and cost reports.
+ * Aggregates data from MongoDB by skill, provider, and time range.
+ */
 @RestController
 @RequestMapping("/api/admin/costs")
 @Tag(name = "Admin \u2014 Costs")

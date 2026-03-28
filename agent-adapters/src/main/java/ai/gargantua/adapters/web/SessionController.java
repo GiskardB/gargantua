@@ -11,6 +11,10 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * REST endpoint for session lifecycle management. Creates new unique session
+ * identifiers for chat interactions.
+ */
 @RestController
 @RequestMapping("/api/agent/session")
 @Tag(name = "Chat")

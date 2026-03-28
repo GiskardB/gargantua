@@ -19,7 +19,10 @@ import org.springframework.context.annotation.Bean;
 import java.util.List;
 
 /**
- * Auto-configuration for guardrail pipeline and all built-in guardrails.
+ * Auto-configuration for the guardrail pipeline and all built-in guardrails.
+ * Registers input guardrails (max-length, prompt injection, topic scope, PII masking,
+ * rate limit) and output guardrails (PII redaction, disclaimer injection, scope validation,
+ * schema validation). Each guardrail is {@code @ConditionalOnMissingBean} for easy override.
  */
 @AutoConfiguration
 @EnableConfigurationProperties(AgentProperties.class)

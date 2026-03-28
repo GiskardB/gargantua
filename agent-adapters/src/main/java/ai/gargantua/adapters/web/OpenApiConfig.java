@@ -9,6 +9,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * Configures OpenAPI/Swagger documentation with grouped endpoints for
+ * the chat API and admin APIs.
+ */
 @Configuration
 public class OpenApiConfig {
 

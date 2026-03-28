@@ -20,6 +20,12 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+/**
+ * Loads skills from SKILL.md files on the local filesystem. Scans the configured
+ * skill directory ({@code agent.skill.path}) for subdirectories containing SKILL.md files.
+ *
+ * @see CompositeSkillRegistry
+ */
 @Component("filesystemSkillRegistry")
 public class FilesystemSkillRegistry implements SkillRegistry {
 

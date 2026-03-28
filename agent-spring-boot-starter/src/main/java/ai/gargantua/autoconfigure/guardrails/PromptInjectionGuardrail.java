@@ -10,6 +10,11 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.regex.Pattern;
 
+/**
+ * Input guardrail that detects common prompt injection patterns (e.g. "ignore previous instructions",
+ * "you are now a...", "DAN mode"). Blocks the request if any pattern matches.
+ * Enabled by default; configure via {@code agent.guardrail.input.prompt-injection-enabled}.
+ */
 @Component
 @Order(20)
 public class PromptInjectionGuardrail implements InputGuardrail {

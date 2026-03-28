@@ -10,6 +10,12 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Parses SKILL.md files in the adapters module. Delegates to the same logic as
+ * the starter module's parser but lives here to avoid a circular dependency.
+ *
+ * @see ai.gargantua.autoconfigure.SkillMdParser
+ */
 @Component
 public class SkillMdParser {
 

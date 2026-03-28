@@ -11,6 +11,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * Merges multiple {@link SkillRegistry} sources into a single view. Skills from
+ * earlier registries take precedence (first match wins). Typically wraps a
+ * {@code FilesystemSkillRegistry} and a {@code ClasspathSkillsJarRegistry}.
+ *
+ * @see CachedSkillRegistry
+ * @see HotReloadSkillRegistry
+ */
 public class CompositeSkillRegistry implements SkillRegistry {
 
     private final List<SkillRegistry> registries;

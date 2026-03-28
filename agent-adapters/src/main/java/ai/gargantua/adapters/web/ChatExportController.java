@@ -21,6 +21,10 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.Instant;
 import java.util.List;
 
+/**
+ * REST endpoint for exporting chat history in various formats (JSON, Markdown).
+ * Useful for compliance, auditing, or user data portability.
+ */
 @RestController
 @RequestMapping("/api/agent/chat/export")
 @Tag(name = "History")

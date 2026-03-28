@@ -1,5 +1,9 @@
 package ai.gargantua.core.exception;
 
+/**
+ * Thrown when the agent's response fails JSON Schema validation against
+ * the skill's configured output schema.
+ */
 public class SchemaValidationException extends RuntimeException {
 
     private final String skillName;

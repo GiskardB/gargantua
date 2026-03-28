@@ -20,6 +20,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * REST endpoint exposing the agent's capabilities (registered skills, tools, metadata).
+ * Response is cacheable for 60 seconds to reduce load during capability discovery.
+ */
 @RestController
 @RequestMapping("/api/capabilities")
 @Tag(name = "Capabilities")

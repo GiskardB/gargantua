@@ -16,6 +16,15 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
+/**
+ * Auto-configuration for the three-layer memory subsystem.
+ * Registers Redis-backed working memory, MongoDB-backed episodic and knowledge
+ * memory, and the {@link ai.gargantua.memory.composer.MemoryComposer} that
+ * merges all three layers into a single prompt-ready structure.
+ *
+ * <p>All beans are {@code @ConditionalOnMissingBean} so applications can override
+ * any adapter with a custom implementation.</p>
+ */
 @AutoConfiguration
 @EnableConfigurationProperties(AgentMemoryProperties.class)
 public class AgentMemoryAutoConfiguration {

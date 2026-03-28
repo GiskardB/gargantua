@@ -33,7 +33,27 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Default orchestrator engine implementing the full agent invocation flow.
+ * Default implementation of {@link OrchestratorEngine} that executes the full
+ * 12-step agent invocation pipeline:
+ *
+ * <ol>
+ *   <li>Extract dry-run context</li>
+ *   <li>Run input guardrails (max-length, prompt injection, PII masking, topic scope, rate limit)</li>
+ *   <li>List available skills from the registry</li>
+ *   <li>Route to the best skill (semantic match, LLM fallback, or forced)</li>
+ *   <li>Load the full skill card (system prompt, allowed tools, schema)</li>
+ *   <li>Compose memory from all three layers (working, episodic, knowledge)</li>
+ *   <li>Build the system prompt with enricher context and memory sections</li>
+ *   <li>Allocate the token budget and truncate lower-priority sections if needed</li>
+ *   <li>Call the LLM via the provider factory (with model routing)</li>
+ *   <li>Run output guardrails (PII redaction, disclaimer injection, schema validation)</li>
+ *   <li>Persist memory (skip in dry-run mode)</li>
+ *   <li>Build and return the response with metadata</li>
+ * </ol>
+ *
+ * @see OrchestratorEngine
+ * @see AgentRequest
+ * @see AgentResponse
  */
 @Component
 public class DefaultOrchestratorEngine implements OrchestratorEngine {

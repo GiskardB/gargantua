@@ -11,6 +11,10 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
 
+/**
+ * Shell client that calls the orchestrator directly in-process. Default mode
+ * when no {@code agent.shell.mode} is configured. No network overhead.
+ */
 @Component
 @ConditionalOnProperty(name = "agent.shell.mode", havingValue = "embedded", matchIfMissing = true)
 public class EmbeddedAgentClient implements AgentClient {

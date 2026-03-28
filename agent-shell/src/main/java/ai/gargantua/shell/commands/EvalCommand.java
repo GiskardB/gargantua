@@ -16,6 +16,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Shell commands for running and viewing skill evaluation suites.
+ * Usage: {@code eval run <skill>}, {@code eval report <skill>}. Runs evals in dry-run mode
+ * and displays pass/fail/partial results.
+ */
 @Component
 @Command(command = "eval")
 public class EvalCommand {

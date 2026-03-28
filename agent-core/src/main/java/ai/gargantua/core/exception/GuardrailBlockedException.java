@@ -2,6 +2,10 @@ package ai.gargantua.core.exception;
 
 import java.util.Map;
 
+/**
+ * Thrown when an input guardrail returns a BLOCK verdict, aborting the request.
+ * Handled by the exception handler to return a 422 response with details.
+ */
 public class GuardrailBlockedException extends RuntimeException {
 
     private final String guardrailName;

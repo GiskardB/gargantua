@@ -3,6 +3,15 @@ package ai.gargantua.core.guardrail;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Outcome of a single {@link InputGuardrail} check. Immutable -- use {@link #withMetadata}
+ * to attach additional diagnostic info. Use the static factories for common verdicts.
+ *
+ * @param verdict       PASS, WARN, or BLOCK
+ * @param reason        human-readable explanation (null for PASS)
+ * @param guardrailName which guardrail produced this result
+ * @param metadata      optional diagnostic key-value pairs (e.g. matched pattern, PII count)
+ */
 public record GuardrailResult(
         GuardrailVerdict verdict,
         String reason,

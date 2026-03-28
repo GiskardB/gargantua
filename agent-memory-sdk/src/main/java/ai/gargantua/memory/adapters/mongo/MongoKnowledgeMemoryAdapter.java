@@ -14,7 +14,10 @@ import java.util.List;
 
 /**
  * MongoDB-backed implementation of {@link KnowledgeMemoryPort}.
- * Stores knowledge segments in the "user_knowledge" collection.
+ * Stores knowledge segments in the {@code user_knowledge} collection,
+ * keyed by {@code (userId, segmentKey)} with upsert semantics.
+ *
+ * @see ai.gargantua.core.memory.KnowledgeMemoryPort
  */
 public class MongoKnowledgeMemoryAdapter implements KnowledgeMemoryPort {
 

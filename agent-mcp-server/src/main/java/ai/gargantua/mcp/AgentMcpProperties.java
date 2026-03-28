@@ -3,7 +3,8 @@ package ai.gargantua.mcp;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Configuration properties for the Agent MCP Server.
+ * Configuration properties for the Agent MCP Server, bound to {@code agent.mcp.*}.
+ * Controls server identity, transport (SSE or stdio), gateway tool naming, and security.
  */
 @ConfigurationProperties(prefix = "agent.mcp")
 public class AgentMcpProperties {

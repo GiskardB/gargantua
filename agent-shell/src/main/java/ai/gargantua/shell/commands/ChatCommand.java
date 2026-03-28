@@ -12,6 +12,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 
+/**
+ * Shell command for interactive chat with the agent. Usage: {@code chat "your message"}.
+ * Supports streaming output, dry-run mode, and forced skill selection.
+ */
 @Component
 @Command
 public class ChatCommand {

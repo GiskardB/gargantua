@@ -2,6 +2,11 @@ package ai.gargantua.shell.client;
 
 import java.util.function.Consumer;
 
+/**
+ * Abstraction for communicating with the agent from the shell.
+ * Two implementations: {@link EmbeddedAgentClient} (in-process) and
+ * {@link RemoteAgentClient} (HTTP). Selected via {@code agent.shell.mode}.
+ */
 public interface AgentClient {
 
     void stream(ShellChatRequest request, Consumer<SseEvent> eventConsumer);

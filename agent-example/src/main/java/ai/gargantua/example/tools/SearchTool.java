@@ -5,6 +5,10 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
+/**
+ * Reference implementation of a web search tool. Returns mock results.
+ * Demonstrates a simple {@code @AgentTool} with no additional annotations.
+ */
 @Component
 public class SearchTool {
 

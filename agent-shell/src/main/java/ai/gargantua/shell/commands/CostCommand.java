@@ -14,6 +14,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+/**
+ * Shell commands for viewing token usage and cost statistics.
+ * Usage: {@code cost summary}, {@code cost by-skill}. Displays data in formatted tables.
+ */
 @Component
 @Command(command = "cost")
 public class CostCommand {

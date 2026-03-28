@@ -8,6 +8,12 @@ import ai.gargantua.core.guardrail.OutputGuardrail;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
+/**
+ * Output guardrail that validates whether the response stays within the skill's scope.
+ * Currently a placeholder that always passes. The real implementation will use an LLM
+ * judge to detect off-topic responses.
+ * Disabled by default; enable via {@code agent.guardrail.output.scope-validation-enabled=true}.
+ */
 @Component
 @Order(30)
 public class ScopeValidatorGuardrail implements OutputGuardrail {

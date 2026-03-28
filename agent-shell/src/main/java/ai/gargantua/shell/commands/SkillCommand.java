@@ -11,6 +11,10 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Shell commands for skill management. Usage: {@code skill list}, {@code skill show <name>},
+ * {@code skill reload}. Displays skill metadata in a formatted table.
+ */
 @Component
 @Command(command = "skill")
 public class SkillCommand {

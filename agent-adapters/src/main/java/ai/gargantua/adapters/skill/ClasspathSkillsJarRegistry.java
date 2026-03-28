@@ -19,6 +19,13 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+/**
+ * Loads skills packaged inside JAR files on the classpath. Scans for
+ * {@code META-INF/skills/ * /SKILL.md} resources, allowing skill libraries
+ * to be distributed as Maven/Gradle dependencies.
+ *
+ * @see CompositeSkillRegistry
+ */
 @Component("classpathSkillsJarRegistry")
 public class ClasspathSkillsJarRegistry implements SkillRegistry {
 

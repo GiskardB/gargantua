@@ -7,6 +7,11 @@ import ai.gargantua.core.guardrail.InputGuardrail;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
+/**
+ * Input guardrail for per-user rate limiting. Currently a placeholder that always
+ * passes. The real implementation will use a Redis sliding window counter.
+ * Disabled by default; enable via {@code agent.guardrail.input.rate-limit-enabled=true}.
+ */
 @Component
 @Order(50)
 public class RateLimitGuardrail implements InputGuardrail {

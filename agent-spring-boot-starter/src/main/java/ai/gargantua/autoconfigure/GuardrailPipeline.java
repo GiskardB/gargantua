@@ -16,7 +16,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Runs ordered input and output guardrail pipelines.
+ * Executes input and output guardrails in a Chain of Responsibility pattern.
+ * Input guardrails are evaluated in Spring {@code @Order} sequence; the first BLOCK
+ * short-circuits the pipeline. Output guardrails chain transformations on the response
+ * text, each receiving the output of the previous guardrail.
+ *
+ * @see ai.gargantua.core.guardrail.InputGuardrail
+ * @see ai.gargantua.core.guardrail.OutputGuardrail
  */
 @Component
 public class GuardrailPipeline {

@@ -19,6 +19,12 @@ import org.springframework.stereotype.Component;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * Output guardrail that validates JSON responses against the skill's output schema
+ * using JSON Schema Draft-07. Only activates for skills with {@code hasSchema=true}.
+ * Extracts JSON from markdown code blocks or raw JSON responses before validation.
+ * Enabled by default; configure via {@code agent.guardrail.output.schema-validation-enabled}.
+ */
 @Component
 @Order(40)
 public class SchemaValidatorGuardrail implements OutputGuardrail {

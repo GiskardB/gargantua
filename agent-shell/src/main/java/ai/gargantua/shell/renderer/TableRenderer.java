@@ -5,6 +5,10 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Renders data as ASCII tables in the terminal. Auto-calculates column widths
+ * based on content and adds separator lines between header and data rows.
+ */
 @Component
 public class TableRenderer {
 

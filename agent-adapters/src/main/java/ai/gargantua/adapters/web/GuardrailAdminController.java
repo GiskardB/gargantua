@@ -19,6 +19,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Admin REST endpoint for inspecting and toggling guardrails at runtime.
+ * Lists all registered input/output guardrails and their enabled status.
+ */
 @RestController
 @RequestMapping("/api/admin/guardrails")
 @Tag(name = "Admin \u2014 Guardrails")

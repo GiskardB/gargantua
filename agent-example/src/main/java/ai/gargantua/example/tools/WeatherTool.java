@@ -11,6 +11,13 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.IntStream;
 
+/**
+ * Reference implementation of agent tools for weather data. Demonstrates all tool
+ * annotations: {@code @AgentTool} for basic tools, {@code @CacheableToolResult} for
+ * caching, {@code @ToolRetry} for resilience, and {@code @RequiresApproval} for HITL.
+ *
+ * <p>All implementations return mock data. In production, these would call real APIs.</p>
+ */
 @Component
 public class WeatherTool {
 

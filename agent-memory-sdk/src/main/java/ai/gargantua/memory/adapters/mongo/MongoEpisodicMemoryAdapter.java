@@ -13,7 +13,10 @@ import java.util.List;
 
 /**
  * MongoDB-backed implementation of {@link EpisodicMemoryPort}.
- * Stores session summaries in the "session_summaries" collection.
+ * Stores session summaries in the {@code session_summaries} collection,
+ * queried by {@code userId} and sorted by {@code sessionDate} descending.
+ *
+ * @see ai.gargantua.core.memory.EpisodicMemoryPort
  */
 public class MongoEpisodicMemoryAdapter implements EpisodicMemoryPort {
 

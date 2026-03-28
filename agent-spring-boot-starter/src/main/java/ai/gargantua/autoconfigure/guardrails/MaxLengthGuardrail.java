@@ -7,6 +7,11 @@ import ai.gargantua.core.guardrail.InputGuardrail;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
+/**
+ * Input guardrail that blocks messages exceeding the configured character limit.
+ * Runs first (order=10) to reject oversized inputs before any expensive processing.
+ * Enabled by default; configure via {@code agent.guardrail.input.max-length-chars}.
+ */
 @Component
 @Order(10)
 public class MaxLengthGuardrail implements InputGuardrail {

@@ -1,5 +1,9 @@
 package ai.gargantua.core.exception;
 
+/**
+ * Thrown when a user exceeds the configured request rate limit.
+ * Handled by the exception handler to return a 429 response.
+ */
 public class RateLimitExceededException extends RuntimeException {
 
     private final String userId;

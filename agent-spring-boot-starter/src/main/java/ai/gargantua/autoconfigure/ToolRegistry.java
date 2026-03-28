@@ -17,8 +17,15 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Scans Spring beans at boot for methods annotated with @AgentTool
- * and builds a registry of tool definitions.
+ * Auto-discovers tools at boot by scanning all Spring beans for methods annotated
+ * with {@link AgentTool}. Also reads {@link RequiresApproval} metadata to build
+ * complete {@link ToolDefinition} descriptors.
+ *
+ * <p>The orchestrator uses {@link #getFilteredTools(List)} to restrict available tools
+ * to those listed in the skill's {@code allowed-tools} frontmatter.</p>
+ *
+ * @see AgentTool
+ * @see ToolDefinition
  */
 @Component
 public class ToolRegistry {

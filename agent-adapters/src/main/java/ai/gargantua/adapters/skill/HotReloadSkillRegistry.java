@@ -25,6 +25,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * Decorator that watches the skill directory for filesystem changes using {@link java.nio.file.WatchService}.
+ * When a SKILL.md file is created, modified, or deleted, the delegate registry is reloaded
+ * and a {@link SkillReloadedEvent} is published for downstream listeners (e.g. to re-index semantic routes).
+ * Enabled via {@code agent.skill.hot-reload=true}.
+ *
+ * @see CachedSkillRegistry
+ * @see SkillReloadedEvent
+ */
 public class HotReloadSkillRegistry implements SkillRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(HotReloadSkillRegistry.class);

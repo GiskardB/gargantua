@@ -15,6 +15,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * Admin REST endpoint for inspecting and clearing cached tool results in Redis.
+ * Cache keys are prefixed with {@code tool-cache:}.
+ */
 @RestController
 @RequestMapping("/api/admin/tool-cache")
 @Tag(name = "Admin \u2014 Tool Cache")

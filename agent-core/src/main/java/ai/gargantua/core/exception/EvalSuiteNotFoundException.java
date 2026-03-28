@@ -1,5 +1,8 @@
 package ai.gargantua.core.exception;
 
+/**
+ * Thrown when requesting an eval run for a skill that has no {@code evals/evals.json} dataset.
+ */
 public class EvalSuiteNotFoundException extends RuntimeException {
 
     private final String skillName;

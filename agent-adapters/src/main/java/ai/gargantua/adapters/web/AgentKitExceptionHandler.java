@@ -17,6 +17,10 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 
 import java.net.URI;
 
+/**
+ * Global exception handler that maps framework exceptions to RFC 7807 Problem Detail
+ * responses with appropriate HTTP status codes (404, 422, 429, etc.).
+ */
 @ControllerAdvice
 public class AgentKitExceptionHandler {
 

@@ -10,6 +10,11 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * MongoDB repository for persisting and querying eval reports.
+ * Stores documents in the {@code eval_reports} collection, supporting
+ * retrieval of the latest report per skill for regression comparison.
+ */
 @Component
 public class MongoEvalReportRepository {
 

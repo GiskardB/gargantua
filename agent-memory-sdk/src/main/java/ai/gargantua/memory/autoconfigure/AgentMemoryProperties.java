@@ -2,6 +2,10 @@ package ai.gargantua.memory.autoconfigure;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+/**
+ * Configuration properties for the memory subsystem, bound to {@code agentkit.memory.*}.
+ * Controls TTLs, message limits, and token budgets for each memory layer.
+ */
 @ConfigurationProperties(prefix = "agentkit.memory")
 public class AgentMemoryProperties {
 

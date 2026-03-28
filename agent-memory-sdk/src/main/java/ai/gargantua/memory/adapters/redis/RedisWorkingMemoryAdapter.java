@@ -13,7 +13,20 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Redis-backed implementation of {@link WorkingMemoryPort}.
- * Stores chat messages as JSON strings in a Redis LIST keyed by session id.
+ * Stores chat messages as JSON strings in a Redis LIST keyed by {@code working_memory:{sessionId}}.
+ *
+ * <p>Key behaviors:</p>
+ * <ul>
+ *   <li>Messages are trimmed to {@code maxMessages} on each append (sliding window).</li>
+ *   <li>The TTL is reset on every append, so active sessions stay alive.</li>
+ *   <li>When the TTL expires, the key vanishes from Redis -- the orchestrator can
+ *       then trigger {@link ai.gargantua.core.session.SessionSummarizer} to compress
+ *       the conversation into episodic memory.</li>
+ * </ul>
+ *
+ * <p>Uses manual JSON serialization to avoid a Jackson dependency in the memory SDK.</p>
+ *
+ * @see ai.gargantua.core.memory.WorkingMemoryPort
  */
 public class RedisWorkingMemoryAdapter implements WorkingMemoryPort {
 

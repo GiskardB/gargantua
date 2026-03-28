@@ -17,6 +17,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
+/**
+ * REST endpoint for synchronous chat interactions with the agent.
+ * Accepts a user message and returns the full agent response including metadata.
+ * User and session identity are passed via HTTP headers.
+ */
 @RestController
 @RequestMapping("/api/agent/chat")
 @Tag(name = "Chat")

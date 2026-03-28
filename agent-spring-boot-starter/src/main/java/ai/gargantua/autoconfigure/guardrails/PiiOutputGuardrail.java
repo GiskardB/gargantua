@@ -12,6 +12,11 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * Output guardrail that redacts PII (emails, IBANs, phone numbers) from the agent's response.
+ * Runs first in the output pipeline (order=10) to sanitize before other transformations.
+ * Disabled by default; enable via {@code agent.guardrail.output.pii-masking-enabled=true}.
+ */
 @Component
 @Order(10)
 public class PiiOutputGuardrail implements OutputGuardrail {

@@ -13,8 +13,20 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Default token budget manager that estimates tokens as text.length()/4
- * and implements a truncation strategy when budget is exceeded.
+ * Default {@link TokenBudgetManager} implementation. Uses a {@code text.length() / 4}
+ * heuristic for token estimation and a priority-based truncation strategy:
+ *
+ * <ol>
+ *   <li>System prompt, user message, and tool descriptions are fixed cost (never truncated).</li>
+ *   <li>References get at most 1/3 of the remaining budget.</li>
+ *   <li>Episodic summaries get at most 1/2 of what remains after references.</li>
+ *   <li>Knowledge segments get whatever is left.</li>
+ * </ol>
+ *
+ * <p>Throws {@link ai.gargantua.core.exception.TokenBudgetExceededException} if
+ * fixed costs alone exceed the budget.</p>
+ *
+ * @see ai.gargantua.core.orchestrator.TokenBudgetManager
  */
 @Component
 public class DefaultTokenBudgetManager implements TokenBudgetManager {

@@ -10,6 +10,11 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
+/**
+ * Output guardrail that appends a configurable disclaimer to the agent's response.
+ * Can be scoped to specific skill domains (e.g. only add "not medical advice" to health skills).
+ * Disabled by default; enable via {@code agent.guardrail.output.disclaimer-enabled=true}.
+ */
 @Component
 @Order(20)
 public class DisclaimerInjectorGuardrail implements OutputGuardrail {

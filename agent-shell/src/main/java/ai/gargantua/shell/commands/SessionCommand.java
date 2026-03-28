@@ -13,6 +13,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Shell commands for session management. Usage: {@code session new}, {@code session list},
+ * {@code session show <id>}. Tracks active sessions in the shell's local state.
+ */
 @Component
 @Command(command = "session")
 public class SessionCommand {

@@ -7,6 +7,12 @@ import ai.gargantua.core.guardrail.InputGuardrail;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
+/**
+ * Input guardrail that blocks messages containing forbidden topics.
+ * Uses simple keyword matching against a configurable blocklist.
+ * Disabled by default; enable via {@code agent.guardrail.input.topic-scope-enabled=true}
+ * and populate {@code agent.guardrail.input.blocked-topics}.
+ */
 @Component
 @Order(30)
 public class TopicScopeGuardrail implements InputGuardrail {

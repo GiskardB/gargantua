@@ -5,6 +5,20 @@ import ai.gargantua.core.session.DryRunContext;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Immutable request sent to the {@link OrchestratorEngine}. Use the {@link #builder()}
+ * for a fluent construction API.
+ *
+ * @param message           the user's natural-language input
+ * @param userId            caller identity, used for memory and rate limiting
+ * @param sessionId         conversation session id, used for working memory
+ * @param forceSkill        if non-null, bypasses routing and activates this skill directly
+ * @param dryRunContext     when active, tool calls are stubbed and memory is not persisted
+ * @param contextAttributes arbitrary key-value pairs forwarded to enrichers and guardrails
+ *
+ * @see AgentResponse
+ * @see OrchestratorEngine
+ */
 public record AgentRequest(
         String message,
         String userId,
