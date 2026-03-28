@@ -34,8 +34,8 @@ Exposes fine-grained primitives:
 | MCP primitive | What it maps to |
 |---------------|-----------------|
 | Tool `invoke_skill` | OrchestratorEngine with forceSkill |
-| Resource `agentkit://capabilities` | CapabilitiesService |
-| Resource `agentkit://skill/{name}` | SkillRegistry (description only) |
+| Resource `gargantua://capabilities` | CapabilitiesService |
+| Resource `gargantua://skill/{name}` | SkillRegistry (description only) |
 | Prompt `use-skill` | SKILL.md body as prompt template |
 
 ## SSE Endpoints

@@ -29,6 +29,6 @@ springdoc:
 logging:
   level:
     root: INFO
-    io.agentkit: DEBUG
+    ai.gargantua: DEBUG
     org.springframework.web: DEBUG
     org.springframework.data.mongodb: DEBUG

@@ -6,7 +6,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.agentkit</groupId>
+    <groupId>ai.gargantua</groupId>
     <artifactId>agent-boilerplate</artifactId>
     <version>1.0.0</version>
   </parent>
@@ -18,11 +18,11 @@
   <dependencies>
     <!-- Internal -->
     <dependency>
-      <groupId>io.agentkit</groupId>
+      <groupId>ai.gargantua</groupId>
       <artifactId>agent-adapters</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.agentkit</groupId>
+      <groupId>ai.gargantua</groupId>
       <artifactId>agent-mcp-server</artifactId>
     </dependency>
 

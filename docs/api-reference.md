@@ -81,7 +81,7 @@ Returns AgentCapabilities with list of active skills, their tools, domains.
 All errors use Problem Details format:
 ```json
 {
-  "type": "https://agentkit.io/errors/guardrail-blocked",
+  "type": "https://gargantua.ai/errors/guardrail-blocked",
   "title": "Request blocked by guardrail",
   "status": 400,
   "detail": "Potential prompt injection detected",

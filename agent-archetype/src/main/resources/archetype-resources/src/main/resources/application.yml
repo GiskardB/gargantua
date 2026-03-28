@@ -1,0 +1,103 @@
+#set( $symbol_pound = '#' )
+#set( $symbol_dollar = '$' )
+#set( $symbol_escape = '\' )
+spring:
+  application:
+    name: ${artifactId}
+  threads:
+    virtual:
+      enabled: true
+  data:
+    mongodb:
+      uri: ${symbol_dollar}{MONGODB_URI:mongodb://localhost:27017/${artifactId}}
+    redis:
+      url: ${symbol_dollar}{REDIS_URL:redis://localhost:6379}
+
+server:
+  port: 8080
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+
+agent:
+  llm:
+    primary:
+      provider: ${symbol_dollar}{LLM_PROVIDER:openai}
+      model: ${symbol_dollar}{LLM_MODEL:gpt-4o}
+      api-key: ${symbol_dollar}{LLM_API_KEY:}
+      temperature: 0.7
+      max-tokens: 1000
+    fallback:
+      provider: anthropic
+      model: claude-sonnet-4-20250514
+      api-key: ${symbol_dollar}{ANTHROPIC_API_KEY:}
+    routing-model:
+      provider: openai
+      model: gpt-4o-mini
+      api-key: ${symbol_dollar}{OPENAI_API_KEY:}
+      temperature: 0.0
+      max-tokens: 50
+
+  skill:
+    path: classpath:skills/
+    hot-reload: false
+    cache-ttl-minutes: 60
+
+  routing:
+    strategy: hybrid
+    fallback-skill: default-skill
+    semantic:
+      threshold: 0.82
+
+  memory:
+    working:
+      max-messages: 20
+      ttl-minutes: 30
+    episodic:
+      max-summaries: 5
+      ttl-days: 365
+    knowledge:
+      max-segments: 10
+    composer:
+      max-context-tokens: 3000
+
+  guardrail:
+    input:
+      max-chars: 2000
+      injection-guard:
+        enabled: true
+      pii-masking:
+        enabled: true
+    output:
+      pii-redaction:
+        enabled: true
+      schema-validator:
+        enabled: true
+
+  hitl:
+    enabled: true
+    default-ttl-minutes: 5
+
+  cost-tracking:
+    enabled: true
+    retention-days: 365
+
+  dry-run:
+    enabled: true
+
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui
+
+logging:
+  level:
+    root: INFO
+    ${package}: DEBUG

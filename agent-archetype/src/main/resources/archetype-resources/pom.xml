@@ -1,0 +1,119 @@
+#set( $symbol_pound = '#' )
+#set( $symbol_dollar = '$' )
+#set( $symbol_escape = '\' )
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>4.0.4</version>
+    <relativePath/>
+  </parent>
+
+  <groupId>${groupId}</groupId>
+  <artifactId>${artifactId}</artifactId>
+  <version>${version}</version>
+  <name>${artifactId}</name>
+  <description>AI Agent powered by Gargantua framework</description>
+
+  <properties>
+    <java.version>21</java.version>
+    <gargantua.version>1.0.0</gargantua.version>
+  </properties>
+
+  <dependencies>
+    <!-- Gargantua Agent Framework — includes everything -->
+    <dependency>
+      <groupId>ai.gargantua</groupId>
+      <artifactId>agent-spring-boot-starter</artifactId>
+      <version>${symbol_dollar}{gargantua.version}</version>
+    </dependency>
+
+    <!-- Gargantua REST controllers, skill registries, admin endpoints -->
+    <dependency>
+      <groupId>ai.gargantua</groupId>
+      <artifactId>agent-adapters</artifactId>
+      <version>${symbol_dollar}{gargantua.version}</version>
+    </dependency>
+
+    <!-- MCP Server (optional — expose agent via MCP protocol) -->
+    <dependency>
+      <groupId>ai.gargantua</groupId>
+      <artifactId>agent-mcp-server</artifactId>
+      <version>${symbol_dollar}{gargantua.version}</version>
+    </dependency>
+
+    <!-- Spring Boot starters provided transitively, but explicit for clarity -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-mongodb</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-redis</artifactId>
+    </dependency>
+
+    <!-- Test -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+      <!-- SKILL.md linter — validates skills at build time -->
+      <plugin>
+        <groupId>ai.gargantua</groupId>
+        <artifactId>agent-skill-linter-maven-plugin</artifactId>
+        <version>${symbol_dollar}{gargantua.version}</version>
+        <executions>
+          <execution>
+            <phase>verify</phase>
+            <goals><goal>lint</goal></goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+
+  <!-- GraalVM native profile -->
+  <profiles>
+    <profile>
+      <id>native</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.graalvm.buildtools</groupId>
+            <artifactId>native-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>build-native</id>
+                <goals><goal>compile-no-fork</goal></goals>
+                <phase>package</phase>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+</project>

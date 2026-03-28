@@ -80,7 +80,7 @@ agentkit:
   tools:
     discovery:
       scan-packages:
-        - io.agentkit.example.tools
+        - ai.gargantua.example.tools
     cache:
       enabled: true
       default-ttl-seconds: 300
@@ -184,6 +184,6 @@ springdoc:
 logging:
   level:
     root: INFO
-    io.agentkit: INFO
+    ai.gargantua: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"

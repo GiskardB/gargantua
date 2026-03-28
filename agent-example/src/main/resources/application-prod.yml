@@ -42,4 +42,4 @@ springdoc:
 logging:
   level:
     root: WARN
-    io.agentkit: INFO
+    ai.gargantua: INFO

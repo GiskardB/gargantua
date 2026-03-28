@@ -195,11 +195,11 @@ This means:
 The following class demonstrates all four annotations working together on a single tool.
 
 ```java
-import io.agentkit.annotation.AgentTool;
-import io.agentkit.annotation.ToolRetry;
-import io.agentkit.annotation.RequiresApproval;
-import io.agentkit.annotation.CacheableToolResult;
-import io.agentkit.annotation.CacheScope;
+import ai.gargantua.annotation.AgentTool;
+import ai.gargantua.annotation.ToolRetry;
+import ai.gargantua.annotation.RequiresApproval;
+import ai.gargantua.annotation.CacheableToolResult;
+import ai.gargantua.annotation.CacheScope;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;

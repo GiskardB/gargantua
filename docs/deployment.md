@@ -40,7 +40,7 @@ docker build --target runtime-native -t my-agent:native .
 ```
 
 ### RuntimeHints
-AgentKitRuntimeHints registers reflection hints for records and resource patterns for skills. If you add custom records used in JSON serialization, register them:
+GargantuaRuntimeHints registers reflection hints for records and resource patterns for skills. If you add custom records used in JSON serialization, register them:
 
 ```java
 hints.reflection().registerType(MyRecord.class, MemberCategory.values());
@@ -98,7 +98,7 @@ All state is in Redis (working memory, HITL, tool cache) and MongoDB (episodic, 
 ## Environment Variables
 | Variable | Description | Default |
 |----------|-------------|---------|
-| MONGODB_URI | MongoDB connection | mongodb://localhost:27017/agentkit |
+| MONGODB_URI | MongoDB connection | mongodb://localhost:27017/gargantua |
 | REDIS_URL | Redis connection | redis://localhost:6379 |
 | OPENAI_API_KEY | OpenAI API key | — |
 | AZURE_OPENAI_KEY | Azure OpenAI key | — |

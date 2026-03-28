@@ -34,7 +34,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: agent
-          image: ghcr.io/agentkit/agent-boilerplate:latest
+          image: ghcr.ai/gargantua/agent-boilerplate:latest
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

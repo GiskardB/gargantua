@@ -62,7 +62,7 @@ Zero framework changes -- auto-discovered by Spring.
 ## Configuration
 
 ```yaml
-agentkit:
+gargantua:
   guardrails:
     input:
       enabled: true

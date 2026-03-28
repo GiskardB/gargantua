@@ -212,7 +212,7 @@ A Maven plugin is available for build-time validation of all `SKILL.md` files (b
 
 ```xml
 <plugin>
-    <groupId>io.agentkit</groupId>
+    <groupId>ai.gargantua</groupId>
     <artifactId>agent-skill-linter-maven-plugin</artifactId>
     <version>1.0.0</version>
     <executions>

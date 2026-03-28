@@ -46,7 +46,7 @@ Fetches all 3 layers in parallel via `CompletableFuture.allOf()`. Respects token
 ## Configuration
 
 ```yaml
-agentkit:
+gargantua:
   memory:
     working:
       max-messages: 20
@@ -63,11 +63,11 @@ agentkit:
 
 ## Agent Memory SDK -- Standalone Library
 
-The memory layer is a standalone Maven artifact (`io.agentkit:agent-memory-sdk`) usable in any Spring Boot project:
+The memory layer is a standalone Maven artifact (`ai.gargantua:agent-memory-sdk`) usable in any Spring Boot project:
 
 ```xml
 <dependency>
-    <groupId>io.agentkit</groupId>
+    <groupId>ai.gargantua</groupId>
     <artifactId>agent-memory-sdk</artifactId>
     <version>1.0.0</version>
 </dependency>
