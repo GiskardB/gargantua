@@ -32,13 +32,16 @@
        ═══════════════════════════════════════════════════════════════════ -->
   <repositories>
     <repository>
-      <id>github</id>
+      <id>github-gargantua</id>
+      <name>Gargantua GitHub Packages</name>
       <url>https://maven.pkg.github.com/giskardb/gargantua</url>
+      <snapshots><enabled>false</enabled></snapshots>
     </repository>
   </repositories>
   <pluginRepositories>
     <pluginRepository>
-      <id>github</id>
+      <id>github-gargantua</id>
+      <name>Gargantua GitHub Packages (plugins)</name>
       <url>https://maven.pkg.github.com/giskardb/gargantua</url>
     </pluginRepository>
   </pluginRepositories>

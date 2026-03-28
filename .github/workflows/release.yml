@@ -58,12 +58,17 @@ jobs:
         with:
           fetch-depth: 0  # Full history for changelog generation
 
-      - name: Set up JDK 21
+      - name: Set up JDK 21 + Maven settings for GitHub Packages
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
           cache: maven
+          # setup-java auto-generates ~/.m2/settings.xml with this server entry,
+          # authenticated via the GITHUB_TOKEN env var set in the deploy step.
+          server-id: github-gargantua
+          server-username: GITHUB_ACTOR
+          server-password: GITHUB_TOKEN
 
       # ── Determine version ──────────────────────────────────────────────────
       - name: Extract version
@@ -110,7 +115,7 @@ jobs:
           --batch-mode --no-transfer-progress
           -DskipTests
           -pl '!agent-example'
-          -DaltDeploymentRepository=github::default::https://maven.pkg.github.com/${{ github.repository }}
+          -DaltDeploymentRepository=github-gargantua::default::https://maven.pkg.github.com/${{ github.repository }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

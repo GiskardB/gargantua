@@ -155,8 +155,8 @@
        ═══════════════════════════════════════════════════════════════════════ -->
   <distributionManagement>
     <repository>
-      <id>github</id>
-      <name>GitHub Packages</name>
+      <id>github-gargantua</id>
+      <name>Gargantua GitHub Packages</name>
       <url>https://maven.pkg.github.com/giskardb/gargantua</url>
     </repository>
   </distributionManagement>

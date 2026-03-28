@@ -212,36 +212,55 @@ Gargantua is distributed as a set of Maven libraries. You don't clone this repo 
 | `agent-skill-linter-maven-plugin` | `ai.gargantua` | Build-time SKILL.md validation. |
 | `agent-archetype` | `ai.gargantua` | Maven archetype to scaffold new agent projects. |
 
-### Repository setup
+### Repository setup — GitHub Packages
 
-Gargantua is published on **GitHub Packages**. Add this repository to your `pom.xml`:
+Gargantua is published on **GitHub Packages**. Two configuration steps are needed:
+
+**Step A — Configure Maven authentication** (one-time setup)
+
+Create or edit `~/.m2/settings.xml`:
+
+```xml
+<settings xmlns="http://maven.apache.org/SETTINGS/1.2.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.2.0
+              https://maven.apache.org/xsd/settings-1.2.0.xsd">
+    <servers>
+        <server>
+            <id>github-gargantua</id>
+            <username>YOUR_GITHUB_USERNAME</username>
+            <password>YOUR_GITHUB_TOKEN</password>
+            <!-- Generate a Personal Access Token (classic) at:
+                 GitHub → Settings → Developer settings → Personal access tokens
+                 Required scope: read:packages -->
+        </server>
+    </servers>
+</settings>
+```
+
+**Step B — Add the repository to your project `pom.xml`**
 
 ```xml
 <repositories>
     <repository>
-        <id>github</id>
+        <id>github-gargantua</id>
+        <name>Gargantua GitHub Packages</name>
         <url>https://maven.pkg.github.com/giskardb/gargantua</url>
+        <snapshots><enabled>false</enabled></snapshots>
     </repository>
 </repositories>
 <pluginRepositories>
     <pluginRepository>
-        <id>github</id>
+        <id>github-gargantua</id>
+        <name>Gargantua GitHub Packages (plugins)</name>
         <url>https://maven.pkg.github.com/giskardb/gargantua</url>
     </pluginRepository>
 </pluginRepositories>
 ```
 
-> **Authentication required by GitHub Packages.** Add this to `~/.m2/settings.xml`:
-> ```xml
-> <servers>
->     <server>
->         <id>github</id>
->         <username>YOUR_GITHUB_USERNAME</username>
->         <password>YOUR_GITHUB_TOKEN</password> <!-- ghp_... with read:packages scope -->
->     </server>
-> </servers>
-> ```
-> Generate a token at: GitHub → Settings → Developer settings → Personal access tokens → `read:packages` scope.
+> The `<id>` must match between `settings.xml` and `pom.xml` (`github-gargantua`).
+>
+> If you used the Maven archetype to generate your project, the repository is **already configured** in the generated `pom.xml`.
 
 ### Typical dependency setup
 
