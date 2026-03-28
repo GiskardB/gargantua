@@ -37,7 +37,7 @@ public class InMemoryWorkingMemoryAdapter implements WorkingMemoryPort {
 
     @Override
     public void appendMessage(String sessionId, ChatMessage message) {
-        store.computeIfAbsent(sessionId, _ -> new ArrayList<>()).add(message);
+        store.computeIfAbsent(sessionId, key -> new ArrayList<>()).add(message);
         expiryTimes.put(sessionId, System.currentTimeMillis() + ttlMs);
     }
 

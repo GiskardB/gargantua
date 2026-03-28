@@ -29,6 +29,6 @@ public class InMemoryEpisodicMemoryAdapter implements EpisodicMemoryPort {
 
     @Override
     public void saveSummary(SessionSummary summary) {
-        store.computeIfAbsent(summary.userId(), _ -> new ArrayList<>()).add(summary);
+        store.computeIfAbsent(summary.userId(), key -> new ArrayList<>()).add(summary);
     }
 }

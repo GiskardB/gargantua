@@ -27,7 +27,7 @@ public class InMemoryKnowledgeMemoryAdapter implements KnowledgeMemoryPort {
 
     @Override
     public void upsertSegment(String userId, String segmentKey, String content) {
-        store.computeIfAbsent(userId, _ -> new ConcurrentHashMap<>())
+        store.computeIfAbsent(userId, key -> new ConcurrentHashMap<>())
                 .put(segmentKey, new KnowledgeSegment(userId, segmentKey, content, Instant.now(), "test"));
     }
 
