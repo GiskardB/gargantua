@@ -19,10 +19,10 @@ public interface SessionSummarizer {
     /**
      * Summarizes the given messages into a compact session summary.
      *
-     * @param sessionId the session being summarized
      * @param userId    the user who participated in the session
+     * @param sessionId the session being summarized
      * @param messages  all messages from the expired session
      * @return a summary suitable for episodic memory storage
      */
-    SessionSummary summarize(String sessionId, String userId, List<ChatMessage> messages);
+    SessionSummary summarize(String userId, String sessionId, List<ChatMessage> messages);
 }
