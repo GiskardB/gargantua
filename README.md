@@ -37,13 +37,33 @@ Built on Spring Boot 4.0.4 and LangChain4j 1.12.1.
 > ```
 > Data is lost on restart, but it's perfect for prototyping and demos. See [Embedded Mode](#embedded-mode) below.
 
-### 1. Generate the project from the archetype
+### 1. Configure Maven authentication (one-time)
+
+The archetype and framework JARs are on GitHub Packages, which requires authentication.
+Create `~/.m2/settings.xml` if you don't have one:
+
+```xml
+<settings>
+    <servers>
+        <server>
+            <id>github-gargantua</id>
+            <username>YOUR_GITHUB_USERNAME</username>
+            <password>YOUR_GITHUB_TOKEN</password>
+            <!-- Generate at: GitHub → Settings → Developer settings → Personal access tokens
+                 Required scope: read:packages -->
+        </server>
+    </servers>
+</settings>
+```
+
+### 2. Generate the project from the archetype
 
 ```bash
 mvn archetype:generate \
   -DarchetypeGroupId=ai.gargantua \
   -DarchetypeArtifactId=agent-archetype \
   -DarchetypeVersion=1.0.0 \
+  -DarchetypeRepository=https://maven.pkg.github.com/giskardb/gargantua \
   -DgroupId=com.mycompany \
   -DartifactId=my-agent \
   -Dversion=1.0.0 \
@@ -56,6 +76,7 @@ This generates a ready-to-run project:
 ```
 my-agent/
 ├── pom.xml                          -- depends on Gargantua libraries
+├── .env.example                     -- documented env vars template
 ├── Dockerfile                       -- multi-stage JVM build
 ├── docker-compose.yml               -- app + MongoDB + Redis
 ├── src/main/java/com/mycompany/
@@ -64,12 +85,13 @@ my-agent/
 │       └── SampleTool.java          -- example @AgentTool
 └── src/main/resources/
     ├── application.yml              -- full config with defaults
+    ├── application-embedded.yml     -- embedded mode (no Docker needed)
     └── skills/
         ├── default-skill/SKILL.md   -- fallback skill
         └── sample-skill/SKILL.md    -- example skill
 ```
 
-### 2. Start MongoDB and Redis
+### 3. Start MongoDB and Redis
 
 ```bash
 cd my-agent
@@ -80,9 +102,16 @@ docker compose up -d mongo redis
 > - MongoDB at `mongodb://localhost:27017` (configurable via `MONGODB_URI`)
 > - Redis at `redis://localhost:6379` (configurable via `REDIS_URL`)
 
-### 3. Configure your LLM provider and run
+> **Skip Docker entirely?** Use embedded mode — everything in-memory, zero infrastructure:
+> ```bash
+> LLM_PRIMARY_API_KEY=sk-... SPRING_PROFILES_ACTIVE=embedded mvn spring-boot:run
+> ```
+> Then jump directly to [Step 5](#5-test-it).
+
+### 4. Configure your LLM provider and run
 
 The only **mandatory** configuration is the LLM API key. Everything else has sensible defaults.
+You can also copy `.env.example` to `.env` and fill in your values.
 
 ```bash
 # ┌─────────────────────────────────────────────────────────┐
@@ -103,7 +132,7 @@ export LLM_PRIMARY_API_KEY=sk-...
 mvn spring-boot:run
 ```
 
-### 4. Test it
+### 5. Test it
 
 ```bash
 # Sync chat
@@ -131,7 +160,7 @@ open http://localhost:8080/swagger-ui
 open http://localhost:8080/docs
 ```
 
-### 5. Full Docker stack
+### 6. Full Docker stack
 
 ```bash
 docker compose up
