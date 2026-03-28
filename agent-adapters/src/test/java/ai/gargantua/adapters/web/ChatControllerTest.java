@@ -8,7 +8,9 @@ import ai.gargantua.core.orchestrator.RoutingMethod;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -24,6 +26,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(ChatController.class)
 class ChatControllerTest {
+
+    /** Minimal Spring Boot configuration so @WebMvcTest can bootstrap without a full app. */
+    @Configuration
+    @EnableAutoConfiguration
+    static class TestConfig {}
 
     @Autowired
     private MockMvc mockMvc;
