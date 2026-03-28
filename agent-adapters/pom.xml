@@ -41,7 +41,7 @@
     <!-- Web (needed for @WebMvcTest in tests + controller compilation) -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-web</artifactId>
+      <artifactId>spring-boot-starter-webmvc</artifactId>
     </dependency>
 
     <!-- Test -->
