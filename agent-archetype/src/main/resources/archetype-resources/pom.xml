@@ -26,6 +26,23 @@
     <gargantua.version>1.0.0</gargantua.version>
   </properties>
 
+  <!-- ═══════════════════════════════════════════════════════════════════
+       Gargantua GitHub Packages repository
+       Authentication: add server 'github' to ~/.m2/settings.xml with your GitHub token
+       ═══════════════════════════════════════════════════════════════════ -->
+  <repositories>
+    <repository>
+      <id>github</id>
+      <url>https://maven.pkg.github.com/giskardb/gargantua</url>
+    </repository>
+  </repositories>
+  <pluginRepositories>
+    <pluginRepository>
+      <id>github</id>
+      <url>https://maven.pkg.github.com/giskardb/gargantua</url>
+    </pluginRepository>
+  </pluginRepositories>
+
   <dependencies>
     <!-- Gargantua Agent Framework — includes everything -->
     <dependency>

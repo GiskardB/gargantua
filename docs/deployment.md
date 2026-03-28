@@ -1,5 +1,58 @@
 # Deployment
 
+## Publishing the Framework (for maintainers)
+
+### CI Pipeline
+
+Every push to `main` or PR triggers the CI workflow (`.github/workflows/ci.yml`):
+- Builds all modules on Java 21 and Java 25
+- Runs unit tests
+- Verifies `agent-core` has zero Spring dependencies
+- Verifies no `javax.*` imports exist
+
+### Release to GitHub Packages
+
+Create a version tag to trigger the release workflow (`.github/workflows/release.yml`):
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+This will:
+1. Build and test all modules
+2. Publish JARs to GitHub Packages (`https://maven.pkg.github.com/giskardb/gargantua`)
+3. Create a GitHub Release with changelog
+
+**Manual release** (with optional version override):
+- Go to Actions → Release → Run workflow
+- Optionally set a version and/or dry-run mode
+
+### Consuming the Framework
+
+Users add the GitHub Packages repository to `~/.m2/settings.xml`:
+```xml
+<servers>
+    <server>
+        <id>github</id>
+        <username>GITHUB_USERNAME</username>
+        <password>ghp_YOUR_TOKEN</password>
+    </server>
+</servers>
+```
+
+And to their `pom.xml`:
+```xml
+<repositories>
+    <repository>
+        <id>github</id>
+        <url>https://maven.pkg.github.com/giskardb/gargantua</url>
+    </repository>
+</repositories>
+```
+
+---
+
 ## Local Development — Docker Compose
 
 ### JVM mode (default, fast rebuild ~30s)

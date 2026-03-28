@@ -1,0 +1,182 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# Gargantua AI Agent Framework — Release & Publish to GitHub Packages
+#
+# Triggered by:
+#   1. Push of a version tag (e.g. v1.0.0, v1.2.3)
+#   2. Manual dispatch (workflow_dispatch)
+#
+# What it does:
+#   1. Builds all modules
+#   2. Runs all tests
+#   3. Publishes JARs to GitHub Packages Maven registry
+#   4. Creates a GitHub Release with changelog
+#
+# Consumer setup (in their pom.xml or settings.xml):
+#   <repository>
+#     <id>github</id>
+#     <url>https://maven.pkg.github.com/giskardb/gargantua</url>
+#   </repository>
+# ══════════════════════════════════════════════════════════════════════════════
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on v1.0.0, v1.2.3, etc.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. 1.0.0). Leave empty to use POM version.'
+        required: false
+        type: string
+      dry_run:
+        description: 'Dry run — build and test only, skip publish'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write    # For creating GitHub Releases
+  packages: write    # For publishing to GitHub Packages
+
+env:
+  MAVEN_OPTS: -Xmx1024m
+
+jobs:
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Step 1: Build, test, and publish
+  # ────────────────────────────────────────────────────────────────────────────
+  release:
+    name: Build, Test & Publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for changelog generation
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+
+      # ── Determine version ──────────────────────────────────────────────────
+      - name: Extract version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          elif [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Release version: ${VERSION}"
+
+      # ── Set version in all POMs if different from current ──────────────────
+      - name: Set version in POMs
+        if: steps.version.outputs.version != ''
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          mvn versions:set -DnewVersion="${VERSION}" --batch-mode --no-transfer-progress
+          mvn versions:commit --batch-mode --no-transfer-progress
+          echo "All POMs set to version: ${VERSION}"
+
+      # ── Build all framework modules ────────────────────────────────────────
+      - name: Build
+        run: >
+          mvn clean install -DskipTests
+          --batch-mode --no-transfer-progress
+          -pl '!agent-example'
+
+      # ── Run tests ──────────────────────────────────────────────────────────
+      - name: Test
+        run: >
+          mvn test
+          --batch-mode --no-transfer-progress
+          -pl '!agent-example'
+
+      # ── Publish to GitHub Packages ─────────────────────────────────────────
+      - name: Publish to GitHub Packages
+        if: ${{ !inputs.dry_run }}
+        run: >
+          mvn deploy
+          --batch-mode --no-transfer-progress
+          -DskipTests
+          -pl '!agent-example'
+          -DaltDeploymentRepository=github::default::https://maven.pkg.github.com/${{ github.repository }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Generate changelog ─────────────────────────────────────────────────
+      - name: Generate changelog
+        id: changelog
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          # Get commits since last tag
+          PREVIOUS_TAG=$(git tag --sort=-creatordate | head -2 | tail -1)
+          if [ -z "$PREVIOUS_TAG" ]; then
+            PREVIOUS_TAG=$(git rev-list --max-parents=0 HEAD)
+          fi
+          echo "## What's Changed" > changelog.md
+          echo "" >> changelog.md
+          git log ${PREVIOUS_TAG}..HEAD --pretty=format:"- %s (%an)" >> changelog.md
+          echo "" >> changelog.md
+          echo "---" >> changelog.md
+          echo "" >> changelog.md
+          echo "### Maven Coordinates" >> changelog.md
+          echo '```xml' >> changelog.md
+          echo '<dependency>' >> changelog.md
+          echo '    <groupId>ai.gargantua</groupId>' >> changelog.md
+          echo '    <artifactId>agent-spring-boot-starter</artifactId>' >> changelog.md
+          echo "    <version>${{ steps.version.outputs.version }}</version>" >> changelog.md
+          echo '</dependency>' >> changelog.md
+          echo '```' >> changelog.md
+          echo "" >> changelog.md
+          echo "### Quick Start" >> changelog.md
+          echo '```bash' >> changelog.md
+          echo 'mvn archetype:generate \' >> changelog.md
+          echo '  -DarchetypeGroupId=ai.gargantua \' >> changelog.md
+          echo '  -DarchetypeArtifactId=agent-archetype \' >> changelog.md
+          echo "  -DarchetypeVersion=${{ steps.version.outputs.version }}" >> changelog.md
+          echo '```' >> changelog.md
+          cat changelog.md
+
+      # ── Create GitHub Release ──────────────────────────────────────────────
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/') && !inputs.dry_run
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "Gargantua v${{ steps.version.outputs.version }}"
+          body_path: changelog.md
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Summary ────────────────────────────────────────────────────────────
+      - name: Summary
+        run: |
+          echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Dry run:** ${{ inputs.dry_run || 'false' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Published artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "| Artifact | GroupId |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| agent-core | ai.gargantua |" >> $GITHUB_STEP_SUMMARY
+          echo "| agent-memory-sdk | ai.gargantua |" >> $GITHUB_STEP_SUMMARY
+          echo "| agent-spring-boot-starter | ai.gargantua |" >> $GITHUB_STEP_SUMMARY
+          echo "| agent-adapters | ai.gargantua |" >> $GITHUB_STEP_SUMMARY
+          echo "| agent-mcp-server | ai.gargantua |" >> $GITHUB_STEP_SUMMARY
+          echo "| agent-shell | ai.gargantua |" >> $GITHUB_STEP_SUMMARY
+          echo "| agent-skill-linter-maven-plugin | ai.gargantua |" >> $GITHUB_STEP_SUMMARY
+          echo "| agent-archetype | ai.gargantua |" >> $GITHUB_STEP_SUMMARY

@@ -145,6 +145,22 @@
     </dependencies>
   </dependencyManagement>
 
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       Distribution — GitHub Packages Maven Registry
+       Consumers add this repository to their pom.xml or settings.xml:
+         <repository>
+           <id>github</id>
+           <url>https://maven.pkg.github.com/giskardb/gargantua</url>
+         </repository>
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <distributionManagement>
+    <repository>
+      <id>github</id>
+      <name>GitHub Packages</name>
+      <url>https://maven.pkg.github.com/giskardb/gargantua</url>
+    </repository>
+  </distributionManagement>
+
   <build>
     <pluginManagement>
       <plugins>
