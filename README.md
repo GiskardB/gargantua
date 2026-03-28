@@ -37,39 +37,22 @@ Built on Spring Boot 4.0.4 and LangChain4j 1.12.1.
 > ```
 > Data is lost on restart, but it's perfect for prototyping and demos. See [Embedded Mode](#embedded-mode) below.
 
-### 1. Configure Maven authentication (one-time)
-
-The archetype and framework JARs are on GitHub Packages, which requires authentication.
-Create `~/.m2/settings.xml` if you don't have one:
-
-```xml
-<settings>
-    <servers>
-        <server>
-            <id>github-gargantua</id>
-            <username>YOUR_GITHUB_USERNAME</username>
-            <password>YOUR_GITHUB_TOKEN</password>
-            <!-- Generate at: GitHub → Settings → Developer settings → Personal access tokens
-                 Required scope: read:packages -->
-        </server>
-    </servers>
-</settings>
-```
-
-### 2. Generate the project from the archetype
+### 1. Generate the project from the archetype
 
 ```bash
 mvn archetype:generate \
-  -DarchetypeGroupId=ai.gargantua \
+  -DarchetypeGroupId=com.github.giskardb.gargantua \
   -DarchetypeArtifactId=agent-archetype \
-  -DarchetypeVersion=1.0.0 \
-  -DarchetypeRepository=https://maven.pkg.github.com/giskardb/gargantua \
+  -DarchetypeVersion=v1.0.0 \
+  -DarchetypeRepository=https://jitpack.io \
   -DgroupId=com.mycompany \
   -DartifactId=my-agent \
   -Dversion=1.0.0 \
   -DagentName=MyAgent \
   -DinteractiveMode=false
 ```
+
+> No authentication needed — JitPack builds directly from the GitHub repository.
 
 This generates a ready-to-run project:
 
@@ -241,98 +224,91 @@ Gargantua is distributed as a set of Maven libraries. You don't clone this repo 
 | `agent-skill-linter-maven-plugin` | `ai.gargantua` | Build-time SKILL.md validation. |
 | `agent-archetype` | `ai.gargantua` | Maven archetype to scaffold new agent projects. |
 
-### Repository setup — GitHub Packages
+### Repository setup — JitPack (recommended)
 
-Gargantua is published on **GitHub Packages**. Two configuration steps are needed:
-
-**Step A — Configure Maven authentication** (one-time setup)
-
-Create or edit `~/.m2/settings.xml`:
-
-```xml
-<settings xmlns="http://maven.apache.org/SETTINGS/1.2.0"
-          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.2.0
-              https://maven.apache.org/xsd/settings-1.2.0.xsd">
-    <servers>
-        <server>
-            <id>github-gargantua</id>
-            <username>YOUR_GITHUB_USERNAME</username>
-            <password>YOUR_GITHUB_TOKEN</password>
-            <!-- Generate a Personal Access Token (classic) at:
-                 GitHub → Settings → Developer settings → Personal access tokens
-                 Required scope: read:packages -->
-        </server>
-    </servers>
-</settings>
-```
-
-**Step B — Add the repository to your project `pom.xml`**
+Gargantua is published via **[JitPack](https://jitpack.io)** — no authentication, no `settings.xml`, just add the repository:
 
 ```xml
 <repositories>
     <repository>
-        <id>github-gargantua</id>
-        <name>Gargantua GitHub Packages</name>
-        <url>https://maven.pkg.github.com/giskardb/gargantua</url>
-        <snapshots><enabled>false</enabled></snapshots>
+        <id>jitpack.io</id>
+        <url>https://jitpack.io</url>
     </repository>
 </repositories>
 <pluginRepositories>
     <pluginRepository>
-        <id>github-gargantua</id>
-        <name>Gargantua GitHub Packages (plugins)</name>
-        <url>https://maven.pkg.github.com/giskardb/gargantua</url>
+        <id>jitpack.io</id>
+        <url>https://jitpack.io</url>
     </pluginRepository>
 </pluginRepositories>
 ```
 
-> The `<id>` must match between `settings.xml` and `pom.xml` (`github-gargantua`).
+> JitPack uses the groupId `com.github.giskardb.gargantua` and versions match Git tags (e.g. `v1.0.0`).
 >
-> If you used the Maven archetype to generate your project, the repository is **already configured** in the generated `pom.xml`.
+> If you used the Maven archetype, the repository is **already configured** in the generated `pom.xml`.
 
-### Typical dependency setup
+<details>
+<summary>Alternative: GitHub Packages (requires authentication)</summary>
+
+Add to `~/.m2/settings.xml`:
+```xml
+<servers>
+    <server>
+        <id>github-gargantua</id>
+        <username>YOUR_GITHUB_USERNAME</username>
+        <password>YOUR_GITHUB_TOKEN</password><!-- read:packages scope -->
+    </server>
+</servers>
+```
+
+Add to `pom.xml`:
+```xml
+<repositories>
+    <repository>
+        <id>github-gargantua</id>
+        <url>https://maven.pkg.github.com/giskardb/gargantua</url>
+    </repository>
+</repositories>
+```
+With GitHub Packages, use groupId `ai.gargantua` and version `1.0.0` (no `v` prefix).
+</details>
+
+### Typical dependency setup (JitPack)
 
 ```xml
+<properties>
+    <gargantua.version>v1.0.0</gargantua.version>
+</properties>
+
+<repositories>
+    <repository>
+        <id>jitpack.io</id>
+        <url>https://jitpack.io</url>
+    </repository>
+</repositories>
+
 <dependencies>
     <!-- Core framework (includes starter + memory + core) -->
     <dependency>
-        <groupId>ai.gargantua</groupId>
+        <groupId>com.github.giskardb.gargantua</groupId>
         <artifactId>agent-spring-boot-starter</artifactId>
-        <version>1.0.0</version>
+        <version>${gargantua.version}</version>
     </dependency>
 
     <!-- REST API layer (controllers, admin endpoints, export) -->
     <dependency>
-        <groupId>ai.gargantua</groupId>
+        <groupId>com.github.giskardb.gargantua</groupId>
         <artifactId>agent-adapters</artifactId>
-        <version>1.0.0</version>
+        <version>${gargantua.version}</version>
     </dependency>
 
     <!-- Optional: MCP server gateway -->
     <dependency>
-        <groupId>ai.gargantua</groupId>
+        <groupId>com.github.giskardb.gargantua</groupId>
         <artifactId>agent-mcp-server</artifactId>
-        <version>1.0.0</version>
+        <version>${gargantua.version}</version>
     </dependency>
 </dependencies>
-
-<build>
-    <plugins>
-        <!-- Optional: SKILL.md linter at build time -->
-        <plugin>
-            <groupId>ai.gargantua</groupId>
-            <artifactId>agent-skill-linter-maven-plugin</artifactId>
-            <version>1.0.0</version>
-            <executions>
-                <execution>
-                    <phase>verify</phase>
-                    <goals><goal>lint</goal></goals>
-                </execution>
-            </executions>
-        </plugin>
-    </plugins>
-</build>
 ```
 
 ---

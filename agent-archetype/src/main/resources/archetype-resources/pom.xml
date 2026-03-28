@@ -23,47 +23,44 @@
 
   <properties>
     <java.version>21</java.version>
-    <gargantua.version>1.0.0</gargantua.version>
+    <gargantua.version>v1.0.0</gargantua.version>
   </properties>
 
   <!-- ═══════════════════════════════════════════════════════════════════
-       Gargantua GitHub Packages repository
-       Authentication: add server 'github' to ~/.m2/settings.xml with your GitHub token
+       JitPack repository — no authentication needed
+       Builds Gargantua directly from the GitHub repository
        ═══════════════════════════════════════════════════════════════════ -->
   <repositories>
     <repository>
-      <id>github-gargantua</id>
-      <name>Gargantua GitHub Packages</name>
-      <url>https://maven.pkg.github.com/giskardb/gargantua</url>
-      <snapshots><enabled>false</enabled></snapshots>
+      <id>jitpack.io</id>
+      <url>https://jitpack.io</url>
     </repository>
   </repositories>
   <pluginRepositories>
     <pluginRepository>
-      <id>github-gargantua</id>
-      <name>Gargantua GitHub Packages (plugins)</name>
-      <url>https://maven.pkg.github.com/giskardb/gargantua</url>
+      <id>jitpack.io</id>
+      <url>https://jitpack.io</url>
     </pluginRepository>
   </pluginRepositories>
 
   <dependencies>
     <!-- Gargantua Agent Framework — includes everything -->
     <dependency>
-      <groupId>ai.gargantua</groupId>
+      <groupId>com.github.giskardb.gargantua</groupId>
       <artifactId>agent-spring-boot-starter</artifactId>
       <version>${symbol_dollar}{gargantua.version}</version>
     </dependency>
 
     <!-- Gargantua REST controllers, skill registries, admin endpoints -->
     <dependency>
-      <groupId>ai.gargantua</groupId>
+      <groupId>com.github.giskardb.gargantua</groupId>
       <artifactId>agent-adapters</artifactId>
       <version>${symbol_dollar}{gargantua.version}</version>
     </dependency>
 
     <!-- MCP Server (optional — expose agent via MCP protocol) -->
     <dependency>
-      <groupId>ai.gargantua</groupId>
+      <groupId>com.github.giskardb.gargantua</groupId>
       <artifactId>agent-mcp-server</artifactId>
       <version>${symbol_dollar}{gargantua.version}</version>
     </dependency>
@@ -102,7 +99,7 @@
       </plugin>
       <!-- SKILL.md linter — validates skills at build time -->
       <plugin>
-        <groupId>ai.gargantua</groupId>
+        <groupId>com.github.giskardb.gargantua</groupId>
         <artifactId>agent-skill-linter-maven-plugin</artifactId>
         <version>${symbol_dollar}{gargantua.version}</version>
         <executions>
