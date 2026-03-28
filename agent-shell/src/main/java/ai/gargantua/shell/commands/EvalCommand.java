@@ -8,8 +8,8 @@ import ai.gargantua.core.skill.SkillMeta;
 import ai.gargantua.core.skill.SkillRegistry;
 import ai.gargantua.shell.renderer.StreamingRenderer;
 import ai.gargantua.shell.renderer.TableRenderer;
-import org.springframework.shell.command.annotation.Command;
-import org.springframework.shell.command.annotation.Option;
+import org.springframework.shell.core.command.annotation.Command;
+import org.springframework.shell.core.command.annotation.Option;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;

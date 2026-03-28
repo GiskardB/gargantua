@@ -3,7 +3,7 @@ package ai.gargantua.shell.commands;
 import ai.gargantua.shell.client.AgentClient;
 import ai.gargantua.shell.renderer.StreamingRenderer;
 import ai.gargantua.shell.renderer.TableRenderer;
-import org.springframework.shell.command.annotation.Command;
+import org.springframework.shell.core.command.annotation.Command;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;

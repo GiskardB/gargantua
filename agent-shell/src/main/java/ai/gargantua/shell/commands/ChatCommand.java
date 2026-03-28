@@ -5,7 +5,7 @@ import ai.gargantua.shell.client.AgentClient.ShellChatRequest;
 import ai.gargantua.shell.client.AgentClient.SseEvent;
 import ai.gargantua.shell.renderer.StreamingRenderer;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.shell.command.annotation.Command;
+import org.springframework.shell.core.command.annotation.Command;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
