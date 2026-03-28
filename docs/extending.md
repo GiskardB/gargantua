@@ -1,5 +1,17 @@
 # Extending the Framework
 
+## Before You Start
+
+Gargantua requires:
+1. **MongoDB** running (for episodic memory, chat history, knowledge, evals, costs)
+2. **Redis** running (for working memory, HITL approvals, tool cache, rate limits)
+3. **At least one LLM API key** set via `LLM_PRIMARY_API_KEY`
+
+Start MongoDB and Redis with Docker:
+```bash
+docker compose up -d mongo redis
+```
+
 ## Add a Custom Guardrail
 ```java
 @Component

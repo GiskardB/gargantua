@@ -43,10 +43,30 @@ Fetches all 3 layers in parallel via `CompletableFuture.allOf()`. Respects token
 2. **Episodic summaries** (truncated from oldest)
 3. **Knowledge segments** (truncated last)
 
+## Infrastructure Requirements
+
+The memory system requires **MongoDB** and **Redis** to be running:
+
+| Service | Used by | What happens if it's down |
+|---------|---------|--------------------------|
+| **Redis** | Working Memory | Agent will fail to start — working memory has no fallback |
+| **MongoDB** | Episodic Memory, Knowledge Memory | Agent will fail to start — no persistent storage available |
+
+Start both with Docker:
+```bash
+docker compose up -d mongo redis
+```
+
+The agent connects to:
+- MongoDB at `mongodb://localhost:27017` (configurable via `MONGODB_URI`)
+- Redis at `redis://localhost:6379` (configurable via `REDIS_URL`)
+
+No manual database setup, schema migration, or collection creation is needed — the framework creates everything on first use.
+
 ## Configuration
 
 ```yaml
-gargantua:
+agent:
   memory:
     working:
       max-messages: 20
@@ -56,7 +76,6 @@ gargantua:
       ttl-days: 365
     knowledge:
       max-segments: 10
-      max-tokens-per-segment: 400
     composer:
       max-context-tokens: 3000
 ```

@@ -16,9 +16,19 @@ Built on Spring Boot 4.0.4 and LangChain4j 1.12.1.
 
 ### Prerequisites
 
-- Java 21+
-- Maven 3.9+
-- Docker (for MongoDB + Redis)
+- **Java 21+** — the framework uses Virtual Threads (Project Loom)
+- **Maven 3.9+**
+- **Docker & Docker Compose** — for MongoDB and Redis
+
+> **Why MongoDB and Redis?**
+> Gargantua requires two infrastructure services that run alongside your agent:
+>
+> | Service | Why it's needed | What it stores |
+> |---------|----------------|----------------|
+> | **MongoDB** | Persistent storage | Episodic memory (session summaries), knowledge memory (user profiles), chat history, eval reports, cost tracking |
+> | **Redis** | Fast session storage + caching | Working memory (current conversation), HITL approval requests, tool output cache, rate limiting counters |
+>
+> Both start automatically via `docker compose`. No manual database setup, schema migration, or configuration is needed — the framework creates collections and keys on first use.
 
 ### 1. Generate the project from the archetype
 
@@ -52,27 +62,36 @@ my-agent/
         └── sample-skill/SKILL.md    -- example skill
 ```
 
-### 2. Start infrastructure
+### 2. Start MongoDB and Redis
 
 ```bash
 cd my-agent
 docker compose up -d mongo redis
 ```
 
+> Both services must be running before the agent starts. The agent connects to:
+> - MongoDB at `mongodb://localhost:27017` (configurable via `MONGODB_URI`)
+> - Redis at `redis://localhost:6379` (configurable via `REDIS_URL`)
+
 ### 3. Configure your LLM provider and run
 
+The only **mandatory** configuration is the LLM API key. Everything else has sensible defaults.
+
 ```bash
-# Required: primary LLM provider API key
+# ┌─────────────────────────────────────────────────────────┐
+# │ MANDATORY — at least one LLM provider API key          │
+# └─────────────────────────────────────────────────────────┘
 export LLM_PRIMARY_API_KEY=sk-...
 
-# Optional: choose provider and model (defaults: openai / gpt-4o)
-export LLM_PRIMARY_PROVIDER=openai        # openai | azure-openai | anthropic
-export LLM_PRIMARY_MODEL=gpt-4o
-
-# Optional: fallback provider (used when primary fails)
-export LLM_FALLBACK_API_KEY=sk-ant-...
-export LLM_FALLBACK_PROVIDER=anthropic
-export LLM_FALLBACK_MODEL=claude-sonnet-4-20250514
+# ┌─────────────────────────────────────────────────────────┐
+# │ OPTIONAL — defaults shown                               │
+# └─────────────────────────────────────────────────────────┘
+# export LLM_PRIMARY_PROVIDER=openai          # openai | azure-openai | anthropic
+# export LLM_PRIMARY_MODEL=gpt-4o            # model name
+# export LLM_PRIMARY_ENDPOINT=               # required only for azure-openai
+# export LLM_FALLBACK_API_KEY=               # auto-failover to fallback provider
+# export MONGODB_URI=mongodb://localhost:27017/my-agent
+# export REDIS_URL=redis://localhost:6379
 
 mvn spring-boot:run
 ```
