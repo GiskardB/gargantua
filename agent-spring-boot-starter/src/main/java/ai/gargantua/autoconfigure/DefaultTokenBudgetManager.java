@@ -59,7 +59,7 @@ public class DefaultTokenBudgetManager implements TokenBudgetManager {
         var remaining = maxTokens - fixedTokens;
 
         // Allocate references
-        var references = new ArrayList<>(request.references());
+        List<String> references = new ArrayList<>(request.references());
         var refTokens = references.stream().mapToInt(this::estimate).sum();
         if (refTokens > remaining / 3) {
             references = truncateList(references, remaining / 3, truncationLog, "references");
@@ -68,7 +68,7 @@ public class DefaultTokenBudgetManager implements TokenBudgetManager {
         remaining -= refTokens;
 
         // Allocate episodic summaries
-        var episodic = new ArrayList<>(request.episodicSummaries());
+        List<String> episodic = new ArrayList<>(request.episodicSummaries());
         var episodicTokens = episodic.stream().mapToInt(this::estimate).sum();
         if (episodicTokens > remaining / 2) {
             episodic = truncateList(episodic, remaining / 2, truncationLog, "episodic-summaries");
@@ -77,7 +77,7 @@ public class DefaultTokenBudgetManager implements TokenBudgetManager {
         remaining -= episodicTokens;
 
         // Allocate knowledge segments
-        var knowledge = new ArrayList<>(request.knowledge());
+        List<KnowledgeSegment> knowledge = new ArrayList<>(request.knowledge());
         var knowledgeTokens = knowledge.stream().mapToInt(k -> estimate(k.content())).sum();
         if (knowledgeTokens > remaining) {
             knowledge = truncateKnowledge(knowledge, remaining, truncationLog);

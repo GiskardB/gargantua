@@ -22,17 +22,17 @@ public class SkillMdParser {
      * Parse a SKILL.md file into a {@link SkillMeta} (frontmatter only).
      */
     public SkillMeta parseToMeta(String content, SkillSource source) {
-        Map<String, Object> frontmatter = extractFrontmatter(content);
+        var frontmatter = extractFrontmatter(content);
 
-        String name = getString(frontmatter, "name", "unnamed");
-        String description = getString(frontmatter, "description", "");
-        String version = getString(frontmatter, "version", "1.0.0");
+        var name = getString(frontmatter, "name", "unnamed");
+        var description = getString(frontmatter, "description", "");
+        var version = getString(frontmatter, "version", "1.0.0");
 
-        Map<String, Object> metadata = getMap(frontmatter, "metadata");
-        boolean active = getBoolean(metadata, "active", true);
-        String domain = getString(metadata, "domain", "general");
-        String outputSchema = getString(metadata, "output-schema", null);
-        boolean hasSchema = outputSchema != null && !outputSchema.isBlank();
+        var metadata = getMap(frontmatter, "metadata");
+        var active = getBoolean(metadata, "active", true);
+        var domain = getString(metadata, "domain", "general");
+        var outputSchema = getString(metadata, "output-schema", null);
+        var hasSchema = outputSchema != null && !outputSchema.isBlank();
 
         return new SkillMeta(name, description, version, active, hasSchema, domain, source);
     }
@@ -41,30 +41,30 @@ public class SkillMdParser {
      * Parse a SKILL.md file into a full {@link SkillCard} (frontmatter + body).
      */
     public SkillCard parseToCard(String content, SkillSource source) {
-        Map<String, Object> frontmatter = extractFrontmatter(content);
-        String body = extractBody(content);
+        var frontmatter = extractFrontmatter(content);
+        var body = extractBody(content);
 
-        String name = getString(frontmatter, "name", "unnamed");
-        String description = getString(frontmatter, "description", "");
-        String version = getString(frontmatter, "version", "1.0.0");
+        var name = getString(frontmatter, "name", "unnamed");
+        var description = getString(frontmatter, "description", "");
+        var version = getString(frontmatter, "version", "1.0.0");
 
-        String allowedToolsStr = getString(frontmatter, "allowed-tools", "");
-        List<String> allowedTools = allowedToolsStr.isBlank()
-                ? Collections.emptyList()
+        var allowedToolsStr = getString(frontmatter, "allowed-tools", "");
+        var allowedTools = allowedToolsStr.isBlank()
+                ? Collections.<String>emptyList()
                 : Arrays.asList(allowedToolsStr.split("\\s+"));
 
-        Map<String, Object> metadata = getMap(frontmatter, "metadata");
-        boolean active = getBoolean(metadata, "active", true);
-        String domain = getString(metadata, "domain", "general");
-        String outputSchema = getString(metadata, "output-schema", null);
-        boolean hasSchema = outputSchema != null && !outputSchema.isBlank();
-        Integer maxTokens = getInteger(metadata, "max-tokens");
-        Double temperature = getDouble(metadata, "temperature");
-        String preferredModel = getString(metadata, "preferred-model", null);
+        var metadata = getMap(frontmatter, "metadata");
+        var active = getBoolean(metadata, "active", true);
+        var domain = getString(metadata, "domain", "general");
+        var outputSchema = getString(metadata, "output-schema", null);
+        var hasSchema = outputSchema != null && !outputSchema.isBlank();
+        var maxTokens = getInteger(metadata, "max-tokens");
+        var temperature = getDouble(metadata, "temperature");
+        var preferredModel = getString(metadata, "preferred-model", null);
 
-        List<String> references = getStringList(frontmatter, "references");
+        var references = getStringList(frontmatter, "references");
 
-        SkillMeta meta = new SkillMeta(name, description, version, active, hasSchema, domain, source);
+        var meta = new SkillMeta(name, description, version, active, hasSchema, domain, source);
 
         return new SkillCard(
                 meta,
