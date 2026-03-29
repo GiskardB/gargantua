@@ -85,6 +85,7 @@ You can also toggle it at runtime via `POST /api/admin/guardrails/profanity-filt
 | 30 | TopicScope | Input |
 | 40 | PiiMasking | Input |
 | 50 | RateLimit | Input |
+| 5 | RbacGuardrail | Input |
 | **60+** | **Your custom guardrails** | Input |
 | 10 | PiiOutput | Output |
 | 20 | Disclaimer | Output |
@@ -522,6 +523,174 @@ agent:
 | `GET /api/admin/costs/by-skill?from=...&to=...` | Breakdown by skill |
 | `GET /api/admin/costs/by-user/{userId}?from=...&to=...` | Per-user consumption |
 | `GET /api/admin/costs/daily?from=...&to=...` | Daily time series (for dashboards) |
+
+---
+
+## RAG / Vector Store
+
+Skills can declare a knowledge base to enable retrieval-augmented generation. When a skill has `metadata.knowledge-base` set, the `RagEnricher` automatically queries the vector store and injects the most relevant documents into the system prompt. If a skill has no `knowledge-base`, there is zero overhead.
+
+### Declare a knowledge base in SKILL.md
+
+```yaml
+---
+name: hr-assistant
+description: Answers HR policy questions
+version: 1.0.0
+allowed-tools:
+  - lookupEmployee
+metadata:
+  active: true
+  knowledge-base: hr-docs         # Activates RAG for this skill
+  rag-max-results: 5              # Max documents to retrieve (default: 5)
+  rag-min-score: 0.3              # Minimum similarity score (default: 0.3)
+---
+```
+
+### Implement a custom VectorStorePort
+
+The framework provides `InMemoryVectorStore` for embedded mode. For production, implement `VectorStorePort` with your preferred vector database:
+
+```java
+import ai.gargantua.core.rag.VectorStorePort;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class VectorStoreConfig {
+
+    @Bean
+    public VectorStorePort vectorStore() {
+        return new PineconeVectorStore(pineconeClient);
+        // The framework's InMemoryVectorStore will NOT be registered
+    }
+}
+```
+
+`VectorStorePort` follows the same `@ConditionalOnMissingBean` pattern as all other adapters.
+
+---
+
+## RBAC & Multi-Tenancy
+
+### SecurityContext
+
+The `SecurityContext` is built from HTTP headers on every request:
+
+| Header | Field | Description |
+|--------|-------|-------------|
+| `X-User-Id` | `userId` | User identifier (already required) |
+| `X-Tenant-Id` | `tenantId` | Tenant identifier for data isolation |
+| `X-User-Roles` | `roles` | Comma-separated roles (e.g. `financial-advisor,viewer`) |
+
+### Restrict skills by role
+
+Add `allowed-roles` to SKILL.md frontmatter:
+
+```yaml
+metadata:
+  allowed-roles:
+    - financial-advisor
+    - super-admin
+```
+
+The `RbacGuardrail` (@Order 5) runs before all other guardrails and blocks users without a matching role. The `super-admin` role bypasses all restrictions.
+
+### Restrict tools by role
+
+Annotate tool methods with `@RequiresRole`:
+
+```java
+@AgentTool(description = "Transfers funds between accounts")
+@RequiresRole("financial-operator")
+public TransferResult transfer(String fromAccount, String toAccount, BigDecimal amount) {
+    return accountService.transfer(fromAccount, toAccount, amount);
+}
+```
+
+### Multi-tenancy data isolation
+
+When `X-Tenant-Id` is set, all storage keys (memory, chat history, audit trail) are automatically prefixed with the tenantId. This provides transparent data isolation between tenants without any changes to skill or tool code.
+
+---
+
+## A2A Protocol (Agent-to-Agent)
+
+Gargantua implements the [A2A protocol](https://google.github.io/A2A/) for agent-to-agent interoperability.
+
+### Agent Card discovery
+
+The Agent Card is served at two endpoints:
+- `GET /.well-known/agent.json` -- A2A standard well-known URI
+- `GET /api/capabilities` -- backward-compatible (same payload)
+
+The card advertises `supportedProtocols: ["a2a/1.0", "mcp/1.0"]` and lists all active skills.
+
+### JSON-RPC 2.0 endpoint
+
+`POST /a2a` accepts JSON-RPC 2.0 requests with methods: `tasks/send`, `tasks/get`, `tasks/cancel`.
+
+### Calling remote A2A agents
+
+Use `HttpA2AClient` to invoke other A2A-compatible agents:
+
+```java
+import ai.gargantua.core.a2a.HttpA2AClient;
+
+@Component
+public class MultiAgentTools {
+
+    private final HttpA2AClient researchAgent =
+        new HttpA2AClient("https://research-agent.example.com");
+
+    @AgentTool(description = "Delegates research to a specialized agent")
+    public String research(String query) {
+        return researchAgent.sendTask(query).output();
+    }
+}
+```
+
+The old `AgentCapabilities` type has been replaced by `AgentCard`.
+
+---
+
+## Audit Trail
+
+Every agent decision is captured as an immutable `AuditEvent` record, providing a complete decision log for compliance (SOC 2, GDPR) and debugging.
+
+### What is captured
+
+Each `AuditEvent` records: input message, routing decision, guardrails applied, tools called, output response, token usage, estimated cost, and duration.
+
+### Storage
+
+- **MongoAuditStore**: production adapter; writes to an append-only `audit_trail` MongoDB collection
+- **InMemoryAuditStore**: embedded mode; data lost on restart
+
+### Configuration
+
+```yaml
+agent:
+  audit:
+    enabled: true            # default: true
+    retention-days: 365      # default: 365
+```
+
+### Querying the audit trail
+
+```bash
+# By user
+curl "http://localhost:8080/api/admin/audit?userId=user-42&count=20"
+
+# By tenant
+curl "http://localhost:8080/api/admin/audit?tenantId=acme&count=50"
+
+# By session
+curl "http://localhost:8080/api/admin/audit?sessionId=sess_abc123"
+
+# By event ID
+curl "http://localhost:8080/api/admin/audit?eventId=evt_xyz789"
+```
 
 ---
 

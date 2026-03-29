@@ -15,6 +15,8 @@ All chat endpoints accept the following headers. Headers marked required will pr
 | `X-Session-Id` | Yes (for chat) | Identifies the conversation session. Generate a UUID or call `POST /api/agent/session/new`. |
 | `X-Dry-Run` | No | Set to `true` for dry-run mode (no persistence, no real tool calls). |
 | `X-Context-*` | No | Custom context attributes passed to ContextEnrichers. E.g. `X-Context-Language: it`. |
+| `X-Tenant-Id` | No | Tenant identifier for multi-tenancy. Enables automatic data isolation by tenantId prefix on all storage keys. |
+| `X-User-Roles` | No | Comma-separated list of user roles (e.g. `financial-advisor,viewer`). Used by RbacGuardrail to enforce `allowed-roles` on skills and `@RequiresRole` on tools. |
 | `X-Force-Skill` | No | Force a specific skill, bypassing routing. E.g. `X-Force-Skill: weather-skill`. |
 
 ---
@@ -166,6 +168,55 @@ curl -X POST http://localhost:8080/api/agent/approval/apr_7f3a9c \
 
 ---
 
+## A2A Protocol (Agent-to-Agent)
+
+### GET /.well-known/agent.json -- Agent Card
+
+Returns the A2A-standard Agent Card for discovery. This is the same payload as `GET /api/capabilities` (backward compatible) but served at the well-known URI per the A2A specification.
+
+```bash
+curl http://localhost:8080/.well-known/agent.json
+```
+
+**Response (200)**
+```json
+{
+  "agentId": "default-agent",
+  "displayName": "AI Agent",
+  "description": "AI Agent powered by Gargantua",
+  "supportedProtocols": ["a2a/1.0", "mcp/1.0"],
+  "skills": [{ "name": "weather-skill", "description": "..." }],
+  "available": true
+}
+```
+
+### POST /a2a -- JSON-RPC 2.0
+
+A2A-standard JSON-RPC 2.0 endpoint. Supports the following methods: `tasks/send`, `tasks/get`, `tasks/cancel`.
+
+```bash
+curl -X POST http://localhost:8080/a2a \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc": "2.0", "id": 1, "method": "tasks/send", "params": {"message": "What is the weather in Rome?"}}'
+```
+
+**Response (200)**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "taskId": "task_abc123",
+    "status": "completed",
+    "output": "The current weather in Rome is 22 C and sunny."
+  }
+}
+```
+
+Use `HttpA2AClient` to call remote A2A-compatible agents programmatically.
+
+---
+
 ## Agent Discovery
 
 ### GET /api/capabilities
@@ -266,6 +317,25 @@ All cost endpoints default to the last 30 days when `from`/`to` are omitted. Dat
 **Simulate request:** `{"message": "What is the weather?", "skillName": "weather-skill", "userId": "user-42"}`
 
 **Simulate response:** `{"selectedModel": "gpt-4o", "selectedProvider": "openai", "matchedRule": "domain-specialization", "confidence": 0.95}`
+
+### Audit Admin
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/admin/audit` | Query audit trail. Supports query params: `userId`, `tenantId`, `sessionId`, `eventId`, `count` (default 50). |
+
+Each `AuditEvent` is an immutable record capturing: input, routing decision, guardrails applied, tools called, output, token usage, estimated cost, and duration.
+
+**Example:**
+```bash
+curl "http://localhost:8080/api/admin/audit?userId=user-42&count=10"
+```
+
+**Config keys:**
+- `agent.audit.enabled` -- boolean, default `true`
+- `agent.audit.retention-days` -- integer, default `365`
+
+Storage: `MongoAuditStore` writes to an append-only `audit_trail` MongoDB collection. `InMemoryAuditStore` is used in embedded mode.
 
 ### Tool Cache Admin
 

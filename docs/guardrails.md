@@ -16,8 +16,8 @@ Guardrails follow the Chain of Responsibility pattern. Every guardrail is a Spri
                          INPUT PIPELINE
                          (stops at first BLOCK)
 
-  User ──> MaxLength ──> PromptInjection ──> TopicScope ──> PiiMasking ──> RateLimit ──> [custom] ──> LLM
-           @Order(10)    @Order(20)           @Order(30)     @Order(40)     @Order(50)    @Order(60+)
+  User ──> Rbac ──> MaxLength ──> PromptInjection ──> TopicScope ──> PiiMasking ──> RateLimit ──> [custom] ──> LLM
+           @Order(5)  @Order(10)    @Order(20)           @Order(30)     @Order(40)     @Order(50)    @Order(60+)
                                                                                                       |
                                                                                                       v
                          OUTPUT PIPELINE
@@ -30,6 +30,22 @@ Guardrails follow the Chain of Responsibility pattern. Every guardrail is a Spri
 Each input guardrail receives a `GuardrailInputContext` containing the user message, userId, sessionId, activated skill, and a mutable `attributes` map for inter-guardrail communication (e.g., PII maps). Each output guardrail receives a `GuardrailOutputContext` with the current response text and the same attributes from the input phase.
 
 ## Built-in Input Guardrails
+
+### RbacGuardrail (@Order 5)
+
+**What it does.** Checks that the current user has a role permitted by the activated skill's `metadata.allowed-roles` list. This is the **first** guardrail to run, ensuring unauthorized requests are rejected before any other processing.
+
+**When it triggers.** When the activated skill declares `allowed-roles` in its SKILL.md frontmatter and the user's `X-User-Roles` header does not contain any of the listed roles. The `super-admin` role bypasses all restrictions.
+
+**How roles are provided.** The `SecurityContext` is constructed from HTTP headers: `X-User-Id`, `X-Tenant-Id`, and `X-User-Roles` (comma-separated list).
+
+**Config key:**
+- `agent.guardrail.input.rbac-enabled` -- boolean, default `true`
+
+**Example.** Skill declares `allowed-roles: [financial-advisor, super-admin]` and user has roles `[viewer]`:
+```
+BLOCK: "User does not have required role for skill 'finance-skill'. Required: [financial-advisor, super-admin]"
+```
 
 ### MaxLength (@Order 10)
 
@@ -264,6 +280,9 @@ The full YAML below shows every guardrail config key with its default value. All
 agent:
   guardrail:
     input:
+      # RbacGuardrail
+      rbac-enabled: true                    # enable/disable role-based access control
+
       # MaxLength guardrail
       max-length-enabled: true              # enable/disable the max-length check
       max-length-chars: 10000               # character limit for user messages
@@ -314,6 +333,7 @@ Returns the full guardrail pipeline with each guardrail's name, type (INPUT or O
 ```json
 {
   "inputGuardrails": [
+    { "name": "rbac",               "type": "INPUT",  "enabled": true  },
     { "name": "max-length",        "type": "INPUT",  "enabled": true  },
     { "name": "prompt-injection",   "type": "INPUT",  "enabled": true  },
     { "name": "topic-scope",        "type": "INPUT",  "enabled": false },

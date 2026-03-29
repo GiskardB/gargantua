@@ -16,6 +16,9 @@ Agents need to remember past conversations (working memory), learn from previous
 ├─────────────────────────────────────────────┤
 │         Knowledge Memory (MongoDB)          │  Persistent user profile
 │         User preferences, profile data      │  Segment-based (key-value)
+├─────────────────────────────────────────────┤
+│         Vector Store (optional)             │  Skill-activated RAG layer
+│         VectorStorePort / InMemoryVectorStore│  Only loaded when skill declares knowledge-base
 └─────────────────────────────────────────────┘
 ```
 

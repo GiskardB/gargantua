@@ -48,7 +48,7 @@ mvn spring-boot:run
 #    Option A — curl
 curl -X POST http://localhost:8080/api/agent/chat \
   -H "Content-Type: application/json" \
-  -H "X-User-Id: me" -H "X-Session-Id: s1" \
+  -H "X-User-Id: me" -H "X-Session-Id: s1" -H "X-Tenant-Id: acme" \
   -d '{"message": "Hello, what can you do?"}'
 
 #    Option B — interactive shell (in a second terminal)
@@ -83,7 +83,9 @@ graph TB
         direction TB
 
         ROUTE["Hybrid Routing<br/><i>Semantic + LLM fallback</i>"]
+        RBAC["RBAC Guardrail<br/><i>Role check · Tenant isolation</i>"]
         GUARD_IN["Input Guardrails<br/><i>PII · Injection · Rate limit</i>"]
+        RAG["RAG Enricher<br/><i>VectorStore retrieval</i>"]
         ORCH["Orchestrator Engine<br/><i>Full pipeline coordination</i>"]
         LLM["Multi-Provider LLM<br/><i>OpenAI · Anthropic · Ollama<br/>Rule-based routing + failover</i>"]
         MEM["3-Layer Memory<br/><i>Working (Redis)<br/>Episodic + Knowledge (MongoDB)</i>"]
@@ -96,10 +98,12 @@ graph TB
         API["REST API<br/><i>/api/agent/chat</i>"]
         CLI["Agent Shell<br/><i>Interactive CLI</i>"]
         MCP["MCP Gateway<br/><i>Claude Desktop · Cursor</i>"]
+        A2A["A2A Protocol<br/><i>Agent-to-Agent interop</i>"]
         DOCS["Swagger + Redoc<br/><i>Auto-generated docs</i>"]
     end
 
     subgraph "Operations"
+        AUDIT["Audit Trail<br/><i>Immutable decision log</i>"]
         EVAL["Eval Framework<br/><i>LLM-as-Judge</i>"]
         COST["Cost Tracking<br/><i>Per skill · user · provider</i>"]
         OTEL["Observability<br/><i>OTel · Micrometer</i>"]
@@ -108,8 +112,10 @@ graph TB
 
     SKILL --> ROUTE
     TOOL --> ORCH
-    ROUTE --> ORCH
-    GUARD_IN --> ORCH
+    ROUTE --> RBAC
+    RBAC --> GUARD_IN
+    GUARD_IN --> RAG
+    RAG --> ORCH
     ORCH --> LLM
     ORCH --> MEM
     LLM --> GUARD_OUT
@@ -118,7 +124,9 @@ graph TB
     STREAM --> API
     STREAM --> CLI
     STREAM --> MCP
+    STREAM --> A2A
     API --> DOCS
+    ORCH --> AUDIT
     ORCH --> EVAL
     ORCH --> COST
     ORCH --> OTEL
@@ -411,7 +419,11 @@ With GitHub Packages, use groupId `ai.gargantua` and version `1.0.0` (no `v` pre
 - **@AgentTool** with `@ToolRetry`, `@RequiresApproval`, `@CacheableToolResult`
 - **Hybrid routing** -- semantic (all-MiniLM-L6-v2, in-process) + LLM fallback
 - **3-layer memory** -- working (Redis) + episodic (MongoDB) + knowledge (MongoDB)
-- **Guardrail pipeline** -- PII masking, prompt injection, rate limiting, custom guardrails via `@Order`
+- **RAG / Vector Store** -- skills declare `knowledge-base` in SKILL.md; RagEnricher auto-injects retrieved documents; pluggable VectorStorePort
+- **RBAC + Multi-Tenancy** -- role-based access control via `allowed-roles` and `@RequiresRole`; automatic tenant data isolation via `X-Tenant-Id`
+- **A2A Protocol** -- Agent-to-Agent interop via `/.well-known/agent.json` discovery and JSON-RPC 2.0 `POST /a2a`; HttpA2AClient for calling remote agents
+- **Audit Trail** -- immutable AuditEvent log of every agent decision; MongoAuditStore (append-only); admin query API
+- **Guardrail pipeline** -- RBAC, PII masking, prompt injection, rate limiting, custom guardrails via `@Order`
 - **SSE streaming + sync** endpoints
 - **Human-in-the-Loop** approval flow with TTL
 - **Structured output** with JSON Schema validation + auto-retry
@@ -492,6 +504,8 @@ gargantua/
 
 | Method | Path | Description |
 |--------|------|-------------|
+| `GET` | `/.well-known/agent.json` | A2A Agent Card (standard discovery) |
+| `POST` | `/a2a` | A2A JSON-RPC 2.0 (tasks/send, tasks/get, tasks/cancel) |
 | `POST` | `/api/agent/chat` | Sync chat |
 | `POST` | `/api/agent/chat/stream` | SSE streaming chat |
 | `POST` | `/api/agent/session/new` | Create session |
@@ -510,6 +524,7 @@ gargantua/
 | `GET` | `/api/admin/costs/summary` | Cost summary |
 | `GET` | `/api/admin/llm/rules` | LLM routing rules |
 | `POST` | `/api/admin/llm/simulate` | Simulate LLM routing |
+| `GET` | `/api/admin/audit` | Query audit trail (by user, tenant, session, eventId, count) |
 | `GET` | `/swagger-ui` | Swagger UI |
 | `GET` | `/docs` | Redoc documentation |
 
@@ -580,6 +595,9 @@ All storage uses in-memory ConcurrentHashMaps. Data is lost on restart.
 | **Routing** | | |
 | `ROUTING_STRATEGY` | Skill routing: `hybrid`, `semantic`, `llm` | `hybrid` |
 | `ROUTING_THRESHOLD` | Semantic similarity threshold (0.0 -- 1.0) | `0.82` |
+| **Audit** | | |
+| `AGENT_AUDIT_ENABLED` | Enable immutable audit trail | `true` |
+| `AGENT_AUDIT_RETENTION_DAYS` | How long to retain audit events | `365` |
 
 ---
 
