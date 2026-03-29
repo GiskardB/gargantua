@@ -153,35 +153,54 @@ docker compose exec ollama ollama pull phi4-mini
 
 > **Skip Docker entirely?** Use embedded mode — everything in-memory, zero infrastructure:
 > ```bash
-> LLM_PRIMARY_API_KEY=sk-... SPRING_PROFILES_ACTIVE=embedded mvn spring-boot:run
+> LLM_PRIMARY_PROVIDER=openai LLM_PRIMARY_MODEL=gpt-4o LLM_PRIMARY_API_KEY=sk-... \
+>   SPRING_PROFILES_ACTIVE=embedded mvn spring-boot:run
 > ```
 > Then jump directly to [Step 5](#5-test-it).
 
 ### 4. Configure your LLM provider and run
 
-The only **mandatory** configuration is the LLM API key. Everything else has sensible defaults.
-You can also copy `.env.example` to `.env` and fill in your values.
+The agent needs to know **which LLM provider to use** and **how to authenticate**.
+Copy `.env.example` to `.env` and fill in your values, or export the variables directly:
 
 ```bash
-# ┌─────────────────────────────────────────────────────────┐
-# │ MANDATORY — at least one LLM provider API key          │
-# └─────────────────────────────────────────────────────────┘
-export LLM_PRIMARY_API_KEY=sk-...
+# ┌─────────────────────────────────────────────────────────────────┐
+# │ STEP A — Choose your LLM provider                              │
+# │                                                                 │
+# │ Supported providers:                                            │
+# │   openai        → OpenAI (gpt-4o, gpt-4o-mini, ...)           │
+# │   anthropic     → Anthropic (claude-sonnet-4, claude-haiku, …) │
+# │   azure-openai  → Azure OpenAI (requires endpoint)             │
+# └─────────────────────────────────────────────────────────────────┘
+export LLM_PRIMARY_PROVIDER=openai        # which provider to use
+export LLM_PRIMARY_MODEL=gpt-4o           # which model from that provider
 
-# ┌─────────────────────────────────────────────────────────┐
-# │ OPTIONAL — defaults shown                               │
-# └─────────────────────────────────────────────────────────┘
-# export LLM_PRIMARY_PROVIDER=openai          # openai | azure-openai | anthropic
-# export LLM_PRIMARY_MODEL=gpt-4o            # model name
-# export LLM_PRIMARY_ENDPOINT=               # required only for azure-openai
-# export LLM_FALLBACK_API_KEY=               # auto-failover to fallback provider
-# export MONGODB_URI=mongodb://localhost:27017/my-agent
-# export REDIS_URL=redis://localhost:6379
+# ┌─────────────────────────────────────────────────────────────────┐
+# │ STEP B — Set the API key for that provider                      │
+# │                                                                 │
+# │   OpenAI:    sk-... (from platform.openai.com/api-keys)        │
+# │   Anthropic: sk-ant-... (from console.anthropic.com)           │
+# │   Azure:     your Azure OpenAI resource key                    │
+# └─────────────────────────────────────────────────────────────────┘
+export LLM_PRIMARY_API_KEY=sk-your-key-here
 
-# Routing model runs locally via Ollama by default (started by docker compose).
+# ┌─────────────────────────────────────────────────────────────────┐
+# │ STEP C (only for Azure OpenAI) — Set the endpoint               │
+# └─────────────────────────────────────────────────────────────────┘
+# export LLM_PRIMARY_ENDPOINT=https://my-resource.openai.azure.com
+
+# ┌─────────────────────────────────────────────────────────────────┐
+# │ OPTIONAL — Fallback provider (auto-failover on primary failure) │
+# └─────────────────────────────────────────────────────────────────┘
+# export LLM_FALLBACK_PROVIDER=anthropic
+# export LLM_FALLBACK_MODEL=claude-sonnet-4-20250514
+# export LLM_FALLBACK_API_KEY=sk-ant-...
+
+# Routing model (skill routing, session summaries, eval judge)
+# runs locally via Ollama by default — zero API cost.
 # Override only if you want to use a cloud provider for routing:
-# export LLM_ROUTING_PROVIDER=ollama         # ollama | openai | anthropic
-# export LLM_ROUTING_MODEL=phi4-mini         # local model name
+# export LLM_ROUTING_PROVIDER=ollama
+# export LLM_ROUTING_MODEL=phi4-mini
 # export LLM_ROUTING_ENDPOINT=http://localhost:11434
 
 mvn spring-boot:run
@@ -492,6 +511,8 @@ gargantua/
 Run an agent with **zero infrastructure** — no Docker, no MongoDB, no Redis:
 
 ```bash
+export LLM_PRIMARY_PROVIDER=openai
+export LLM_PRIMARY_MODEL=gpt-4o
 export LLM_PRIMARY_API_KEY=sk-...
 SPRING_PROFILES_ACTIVE=embedded mvn spring-boot:run
 ```
@@ -530,11 +551,11 @@ All storage uses in-memory ConcurrentHashMaps. Data is lost on restart.
 | `MONGODB_URI` | MongoDB connection string | `mongodb://localhost:27017/gargantua` |
 | `REDIS_URL` | Redis connection URL | `redis://localhost:6379` |
 | `SERVER_PORT` | HTTP server port | `8080` |
-| **Primary LLM** | | |
-| `LLM_PRIMARY_PROVIDER` | LLM provider: `openai`, `azure-openai`, `anthropic` | `openai` |
-| `LLM_PRIMARY_MODEL` | Model name (e.g. `gpt-4o`, `claude-sonnet-4-20250514`) | `gpt-4o` |
-| `LLM_PRIMARY_API_KEY` | API key for the primary provider | **(required)** |
-| `LLM_PRIMARY_ENDPOINT` | Base URL / endpoint (required for `azure-openai`) | provider default |
+| **Primary LLM** | Choose a provider, a model, and set the API key — all three are needed | |
+| `LLM_PRIMARY_PROVIDER` | Which LLM service: `openai`, `azure-openai`, `anthropic` | `openai` |
+| `LLM_PRIMARY_MODEL` | Which model from that provider (e.g. `gpt-4o`, `claude-sonnet-4-20250514`) | `gpt-4o` |
+| `LLM_PRIMARY_API_KEY` | API key for the chosen provider (OpenAI: `sk-...`, Anthropic: `sk-ant-...`) | **(required)** |
+| `LLM_PRIMARY_ENDPOINT` | Base URL (required **only** for `azure-openai`) | provider default |
 | `LLM_PRIMARY_TEMPERATURE` | Sampling temperature (0.0 -- 1.0) | `0.7` |
 | `LLM_PRIMARY_MAX_TOKENS` | Max tokens in LLM response | `1000` |
 | **Fallback LLM** | Used automatically when primary provider fails | |
