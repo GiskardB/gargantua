@@ -1,14 +1,54 @@
 # Gargantua -- AI Agent Framework
 
-A **distributable** Java 21 framework for building autonomous AI agents.
-Built on Spring Boot 4.0.4 and LangChain4j 1.12.1.
+**Build production-ready AI agents in Java. Write a skill file and a tool class. Ship.**
+
+Gargantua gives you everything you need to go from idea to deployed AI agent: multi-provider LLM orchestration, semantic skill routing, 3-layer persistent memory, guardrails pipeline, streaming, human-in-the-loop approvals, eval framework, cost tracking, and Kubernetes manifests. All as Maven dependencies — add them to your project and start building.
+
+Built on Java 21, Spring Boot 4.0.4, and LangChain4j 1.12.1.
+
+---
+
+## Try it in 60 seconds
+
+> Requires: Java 21+, Maven, an OpenAI/Anthropic API key. No Docker needed.
+
+```bash
+# 1. Generate a new agent project
+mvn archetype:generate \
+  -DarchetypeGroupId=com.github.giskardb.gargantua \
+  -DarchetypeArtifactId=agent-archetype \
+  -DarchetypeVersion=v1.0.0 \
+  -DarchetypeRepository=https://jitpack.io \
+  -DgroupId=com.mycompany -DartifactId=my-agent \
+  -Dversion=1.0.0 -DagentName=MyAgent -DinteractiveMode=false
+
+# 2. Run it (embedded mode — no Docker, everything in-memory)
+cd my-agent
+LLM_PRIMARY_PROVIDER=openai \
+LLM_PRIMARY_MODEL=gpt-4o \
+LLM_PRIMARY_API_KEY=sk-your-key \
+SPRING_PROFILES_ACTIVE=embedded \
+mvn spring-boot:run
+
+# 3. Talk to your agent
+curl -X POST http://localhost:8080/api/agent/chat \
+  -H "Content-Type: application/json" \
+  -H "X-User-Id: me" -H "X-Session-Id: s1" \
+  -d '{"message": "Hello, what can you do?"}'
+```
+
+That's a running agent with skill routing, guardrails, memory, streaming, and a REST API. Read on to add your own tools and skills.
+
+---
+
+## How it works
 
 **You write two things:**
 
-1. A `SKILL.md` file that declares what your agent can do
-2. A `@AgentTool` class that implements the actual logic
+1. A `SKILL.md` file — declares what your agent can do, how it behaves, and which tools it can use
+2. A `@AgentTool` class — implements the actual actions (API calls, database queries, business logic)
 
-**Everything else is provided out-of-the-box** as library dependencies: orchestration, routing, 3-layer memory, streaming, guardrails, HITL, eval, cost tracking, CLI, MCP gateway, and more.
+**Gargantua handles everything else:**
 
 ```mermaid
 graph TB
@@ -71,32 +111,17 @@ graph TB
 
 ---
 
-## Quick Start -- Create a New Agent
+## Full Setup Guide
+
+The "60 seconds" quickstart uses **embedded mode** (everything in-memory, no Docker). For production use with persistent memory, chat history, and local routing model, follow this full setup.
 
 ### Prerequisites
 
 - **Java 21+** — the framework uses Virtual Threads (Project Loom)
 - **Maven 3.9+**
-- **Docker & Docker Compose** — for MongoDB and Redis *(not needed in embedded mode)*
+- **Docker & Docker Compose** — for MongoDB, Redis, and Ollama
 
-> **Why MongoDB and Redis?**
-> In production, Gargantua uses two infrastructure services:
->
-> | Service | Why it's needed | What it stores |
-> |---------|----------------|----------------|
-> | **MongoDB** | Persistent storage | Episodic memory (session summaries), knowledge memory (user profiles), chat history, eval reports, cost tracking |
-> | **Redis** | Fast session storage + caching | Working memory (current conversation), HITL approval requests, tool output cache, rate limiting counters |
->
-> Both start via `docker compose`. No manual schema setup needed.
->
-> **Want to skip Docker entirely?** Use **embedded mode** — everything runs in-memory:
-> ```bash
-> export LLM_PRIMARY_API_KEY=sk-...
-> SPRING_PROFILES_ACTIVE=embedded mvn spring-boot:run
-> ```
-> Data is lost on restart, but it's perfect for prototyping and demos. See [Embedded Mode](#embedded-mode) below.
-
-### 1. Generate the project from the archetype
+### 1. Generate the project
 
 ```bash
 mvn archetype:generate \
@@ -111,16 +136,14 @@ mvn archetype:generate \
   -DinteractiveMode=false
 ```
 
-> No authentication needed — JitPack builds directly from the GitHub repository.
-
-This generates a ready-to-run project:
+This generates:
 
 ```
 my-agent/
-├── pom.xml                          -- depends on Gargantua libraries
+├── pom.xml                          -- depends on Gargantua engine
 ├── .env.example                     -- documented env vars template
 ├── Dockerfile                       -- multi-stage JVM build
-├── docker-compose.yml               -- app + MongoDB + Redis
+├── docker-compose.yml               -- app + MongoDB + Redis + Ollama
 ├── src/main/java/com/mycompany/
 │   ├── MyAgentApplication.java      -- @SpringBootApplication
 │   └── tools/
@@ -133,111 +156,64 @@ my-agent/
         └── sample-skill/SKILL.md    -- example skill
 ```
 
-### 3. Start infrastructure (MongoDB + Redis + Ollama)
+### 2. Start infrastructure
 
 ```bash
 cd my-agent
 docker compose up -d mongo redis ollama
-```
 
-After the first start, pull the routing model into Ollama (one-time):
-
-```bash
+# Pull the local routing model (one-time, after first start)
 docker compose exec ollama ollama pull phi4-mini
 ```
 
-> The agent connects to:
-> - MongoDB at `mongodb://localhost:27017` (configurable via `MONGODB_URI`)
-> - Redis at `redis://localhost:6379` (configurable via `REDIS_URL`)
-> - Ollama at `http://localhost:11434` (used for skill routing and session summaries — zero API cost)
+| Service | What it does | Port |
+|---------|-------------|------|
+| **MongoDB** | Stores chat history, session summaries, user profiles, eval reports, costs | 27017 |
+| **Redis** | Session memory, HITL approvals, tool cache, rate limits | 6379 |
+| **Ollama** | Local routing model (zero API cost for skill routing and session summaries) | 11434 |
 
-> **Skip Docker entirely?** Use embedded mode — everything in-memory, zero infrastructure:
-> ```bash
-> LLM_PRIMARY_PROVIDER=openai LLM_PRIMARY_MODEL=gpt-4o LLM_PRIMARY_API_KEY=sk-... \
->   SPRING_PROFILES_ACTIVE=embedded mvn spring-boot:run
-> ```
-> Then jump directly to [Step 5](#5-test-it).
+### 3. Configure your LLM provider
 
-### 4. Configure your LLM provider and run
-
-The agent needs to know **which LLM provider to use** and **how to authenticate**.
-Copy `.env.example` to `.env` and fill in your values, or export the variables directly:
+Copy `.env.example` to `.env` and fill in 3 values:
 
 ```bash
-# ┌─────────────────────────────────────────────────────────────────┐
-# │ STEP A — Choose your LLM provider                              │
-# │                                                                 │
-# │ Supported providers:                                            │
-# │   openai        → OpenAI (gpt-4o, gpt-4o-mini, ...)           │
-# │   anthropic     → Anthropic (claude-sonnet-4, claude-haiku, …) │
-# │   azure-openai  → Azure OpenAI (requires endpoint)             │
-# └─────────────────────────────────────────────────────────────────┘
-export LLM_PRIMARY_PROVIDER=openai        # which provider to use
-export LLM_PRIMARY_MODEL=gpt-4o           # which model from that provider
+cp .env.example .env
+```
 
-# ┌─────────────────────────────────────────────────────────────────┐
-# │ STEP B — Set the API key for that provider                      │
-# │                                                                 │
-# │   OpenAI:    sk-... (from platform.openai.com/api-keys)        │
-# │   Anthropic: sk-ant-... (from console.anthropic.com)           │
-# │   Azure:     your Azure OpenAI resource key                    │
-# └─────────────────────────────────────────────────────────────────┘
+```bash
+# 1. Choose a provider: openai | anthropic | azure-openai
+export LLM_PRIMARY_PROVIDER=openai
+
+# 2. Choose a model from that provider
+export LLM_PRIMARY_MODEL=gpt-4o
+
+# 3. Set the API key
+#    OpenAI:    sk-...        (from platform.openai.com/api-keys)
+#    Anthropic: sk-ant-...    (from console.anthropic.com)
+#    Azure:     your resource key + set LLM_PRIMARY_ENDPOINT
 export LLM_PRIMARY_API_KEY=sk-your-key-here
+```
 
-# ┌─────────────────────────────────────────────────────────────────┐
-# │ STEP C (only for Azure OpenAI) — Set the endpoint               │
-# └─────────────────────────────────────────────────────────────────┘
-# export LLM_PRIMARY_ENDPOINT=https://my-resource.openai.azure.com
+### 4. Run
 
-# ┌─────────────────────────────────────────────────────────────────┐
-# │ OPTIONAL — Fallback provider (auto-failover on primary failure) │
-# └─────────────────────────────────────────────────────────────────┘
-# export LLM_FALLBACK_PROVIDER=anthropic
-# export LLM_FALLBACK_MODEL=claude-sonnet-4-20250514
-# export LLM_FALLBACK_API_KEY=sk-ant-...
-
-# Routing model (skill routing, session summaries, eval judge)
-# runs locally via Ollama by default — zero API cost.
-# Override only if you want to use a cloud provider for routing:
-# export LLM_ROUTING_PROVIDER=ollama
-# export LLM_ROUTING_MODEL=phi4-mini
-# export LLM_ROUTING_ENDPOINT=http://localhost:11434
-
+```bash
 mvn spring-boot:run
 ```
 
-### 5. Test it
+### 5. Test
 
 ```bash
-# Sync chat
+# Chat with your agent
 curl -X POST http://localhost:8080/api/agent/chat \
   -H "Content-Type: application/json" \
-  -H "X-User-Id: user1" \
-  -H "X-Session-Id: sess1" \
+  -H "X-User-Id: user1" -H "X-Session-Id: sess1" \
   -d '{"message": "Hello, what can you do?"}'
 
-# SSE streaming
-curl -N -X POST http://localhost:8080/api/agent/chat/stream \
-  -H "Content-Type: application/json" \
-  -H "X-User-Id: user1" \
-  -H "X-Session-Id: sess1" \
-  -H "Accept: text/event-stream" \
-  -d '{"message": "Look up the meaning of life"}'
-
-# Capabilities
+# See what skills are available
 curl http://localhost:8080/api/capabilities
 
-# Swagger UI
+# Interactive docs
 open http://localhost:8080/swagger-ui
-
-# Redoc
-open http://localhost:8080/docs
-```
-
-### 6. Full Docker stack
-
-```bash
-docker compose up
 ```
 
 ---
