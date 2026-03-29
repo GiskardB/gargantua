@@ -294,7 +294,7 @@ The dry-run response includes a full execution trace: which skill was selected, 
 
 ## MCP Server
 
-Expose your agent as an [MCP](https://modelcontextprotocol.io/) server so that Claude Desktop, Cursor, or other MCP clients can call it as a tool.
+Expose your agent as an [MCP](https://modelcontextprotocol.io/) server so that Claude Desktop, Cursor, VS Code, or other MCP-compatible clients can call it as a tool.
 
 ### Enable
 
@@ -302,11 +302,33 @@ Expose your agent as an [MCP](https://modelcontextprotocol.io/) server so that C
 agent:
   mcp:
     enabled: true
-    mode: gateway        # gateway (recommended) | transparent
+    mode: gateway            # gateway (recommended) | transparent
+    server:
+      name: my-agent
+      version: 1.0.0
     transport:
       type: sse
       path: /mcp
 ```
+
+### Gateway mode (default)
+
+One MCP tool: `chat`. The client sends a message, the agent routes it through the full pipeline (guardrails, routing, memory, tools) and returns the response.
+
+```
+MCP Client → tool: chat(message, sessionId?, skillName?) → OrchestratorEngine → response
+```
+
+### Transparent mode
+
+Exposes fine-grained primitives for advanced integrations:
+
+| MCP primitive | What it maps to |
+|---------------|-----------------|
+| Tool `invoke_skill` | OrchestratorEngine with forceSkill |
+| Resource `gargantua://capabilities` | CapabilitiesService |
+| Resource `gargantua://skill/{name}` | SkillRegistry (description only, no system prompt) |
+| Prompt `use-skill` | SKILL.md body as prompt template |
 
 ### Connect Claude Desktop
 
@@ -323,9 +345,121 @@ Add to your `claude_desktop_config.json`:
 }
 ```
 
-After restarting Claude Desktop, a `chat` tool appears — it sends messages through the full Gargantua pipeline (guardrails, routing, memory, tools).
+After restarting Claude Desktop, a `chat` tool appears in the tool list.
 
-See [MCP Server docs](mcp-server.md) for gateway vs transparent mode details.
+### SSE endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/mcp/sse` | SSE initialization stream |
+| `POST` | `/mcp/message` | JSON-RPC 2.0 messages from client |
+
+The path prefix is configurable via `agent.mcp.transport.path`.
+
+### Security
+
+```yaml
+agent:
+  mcp:
+    security:
+      require-api-key: true
+      api-key: ${MCP_API_KEY}
+```
+
+When enabled, the client must send `Authorization: Bearer <key>` on the SSE connection.
+
+### MCP client + server coexistence
+
+The agent can simultaneously:
+- **Be an MCP server** (this feature) — invoked by Claude Desktop, other agents
+- **Be an MCP client** (`langchain4j-mcp` in the starter) — calling external MCP servers as tools
+
+Both directions work at the same time.
+
+---
+
+## Interactive CLI (Agent Shell)
+
+The Agent Shell is a command-line interface built on Spring Shell 4.0.1 for interacting with your agent from the terminal. Useful for development, debugging, and running evals.
+
+### Start the shell
+
+```bash
+# Embedded mode — runs the full agent in-process (needs MongoDB + Redis or embedded profile)
+java -jar agent-shell/target/agent-shell-1.0.0.jar
+
+# Remote mode — connects to a running agent via HTTP
+java -jar agent-shell/target/agent-shell-1.0.0.jar \
+  --agent.shell.mode=remote \
+  --agent.shell.remote.url=http://localhost:8080
+
+# Single message — non-interactive (for scripts and CI)
+java -jar agent-shell/target/agent-shell-1.0.0.jar chat --message "Hello"
+```
+
+### Chat command
+
+Start an interactive conversation:
+
+```
+agent:shell> chat
+
+You: What's the weather in Rome?
+
+[routing: weather-skill (semantic, 0.94)] [tools: getWeather]
+Agent: The weather in Rome is currently sunny with 22°C (72°F).
+[487ms | in: 134 tok | out: 42 tok | $0.0004]
+
+You: \exit
+```
+
+Special commands inside the chat session:
+
+| Command | Action |
+|---------|--------|
+| `\exit` or `\q` | Return to shell prompt |
+| `\new` | Start a new session (fresh memory) |
+| `\dry` | Toggle dry-run mode on/off |
+| `\skill <name>` | Force the next message to use a specific skill |
+| `\history` | Show last 10 messages |
+| `\info` | Show session info (skills used, total tokens, cost) |
+| `\clear` | Clear the terminal screen |
+
+### Other commands
+
+```bash
+# Skills
+skill list                        # Table of all skills with status, version, domain
+skill show weather-skill          # Show skill detail
+skill reload                      # Hot reload skills from filesystem
+
+# Sessions
+session new                       # Create a new session
+session list                      # List recent sessions
+session resume <sessionId>        # Resume a previous session
+
+# Evals
+eval run --skill weather-skill    # Run eval suite for one skill
+eval run --all                    # Run all eval suites
+
+# Costs
+cost summary --days 7             # Cost breakdown for the last 7 days
+```
+
+### Configuration
+
+```yaml
+agent:
+  shell:
+    mode: embedded           # embedded | remote
+    user-id: dev-user        # Default userId for shell sessions
+    show-meta: true          # Show routing info after each response
+    show-timing: true        # Show duration and token counts
+    ansi: auto               # auto | always | never — ANSI color support
+    remote:
+      url: http://localhost:8080
+      timeout-ms: 30000
+```
 
 ---
 

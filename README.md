@@ -460,13 +460,12 @@ gargantua/
 | Tools & Annotations | [docs/tools-and-annotations.md](docs/tools-and-annotations.md) |
 | Memory System | [docs/memory-system.md](docs/memory-system.md) |
 | Guardrails | [docs/guardrails.md](docs/guardrails.md) |
-| API Reference | [docs/api-reference.md](docs/api-reference.md) |
-| CLI (Agent Shell) | [docs/cli-agent-shell.md](docs/cli-agent-shell.md) |
 | LLM Configuration & Routing | [docs/llm-configuration.md](docs/llm-configuration.md) |
 | Eval Framework | [docs/eval-framework.md](docs/eval-framework.md) |
+| API Reference | [docs/api-reference.md](docs/api-reference.md) |
+| Extending (CLI, MCP, Dry-Run, Cost, History) | [docs/extending.md](docs/extending.md) |
 | Deployment (Docker, K8s, GraalVM) | [docs/deployment.md](docs/deployment.md) |
-| MCP Server | [docs/mcp-server.md](docs/mcp-server.md) |
-| Extending the Framework | [docs/extending.md](docs/extending.md) |
+| Architecture Diagrams | [docs/architecture-diagrams.md](docs/architecture-diagrams.md) |
 
 ---
 
