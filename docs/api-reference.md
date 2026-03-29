@@ -139,13 +139,7 @@ curl -X POST http://localhost:8080/api/agent/session/new
 
 Resolves a pending human-in-the-loop approval request.
 
-**Flow:**
-1. Client sends a chat message via `/api/agent/chat/stream`.
-2. The agent decides to call a sensitive tool (e.g., `sendEmail`).
-3. The stream emits an `approval_required` event with a `requestId`.
-4. A human reviewer calls this endpoint with `APPROVED` or `DENIED`.
-5. If approved, the agent executes the tool and the stream resumes. If denied, the agent responds without the tool.
-6. Approval requests expire after a configurable timeout (default: 5 minutes). Calling after expiry returns `410 Gone`.
+**Flow:** The streaming endpoint emits an `approval_required` event with a `requestId` when a sensitive tool needs human sign-off. The stream pauses until this endpoint is called. If approved, the tool executes and the stream resumes. If denied, the agent responds without the tool. Requests expire after a configurable timeout (default 5 min); calling after expiry returns `410 Gone`.
 
 **Request body**
 
@@ -189,17 +183,15 @@ curl http://localhost:8080/api/capabilities
   "displayName": "AI Agent",
   "description": "AI Agent powered by AgentKit",
   "available": true,
-  "skills": [
-    {
-      "name": "weather-skill",
-      "description": "Provides current weather and forecasts",
-      "domain": "weather",
-      "version": "1.0.0",
-      "active": true,
-      "hasSchema": true,
-      "allowedTools": ["getWeather", "getForecast"]
-    }
-  ],
+  "skills": [{
+    "name": "weather-skill",
+    "description": "Provides current weather and forecasts",
+    "domain": "weather",
+    "version": "1.0.0",
+    "active": true,
+    "hasSchema": true,
+    "allowedTools": ["getWeather", "getForecast"]
+  }],
   "timestamp": "2026-03-29T10:15:30Z"
 }
 ```
@@ -208,63 +200,17 @@ curl http://localhost:8080/api/capabilities
 
 ## Chat History & Export
 
-These endpoints require MongoDB. They are conditionally registered when `MongoTemplate` is available.
+These endpoints require MongoDB. They are conditionally registered when `MongoTemplate` is available. All list endpoints support `page` (default `0`) and `size` query parameters for pagination.
 
-### GET /api/agent/chat/sessions/{userId}
-
-Returns a paginated list of sessions for a user, ordered by most recent activity.
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `page` | `0` | Page number (zero-based). |
-| `size` | `20` | Number of sessions per page. |
-
-### GET /api/agent/chat/history/{userId}/{sessionId}
-
-Returns paginated messages for a specific session, ordered chronologically.
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `page` | `0` | Page number (zero-based). |
-| `size` | `50` | Number of messages per page. |
-
-### GET /api/agent/chat/history/{userId}/search?q={query}
-
-Full-text search across a user's entire chat history.
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `q` | (required) | Search query string. |
-| `page` | `0` | Page number. |
-| `size` | `20` | Results per page. |
-
-### DELETE /api/agent/chat/history/{userId}/{sessionId}
-
-Deletes a specific session and all its messages.
-**Response:** `{"status": "deleted", "sessionId": "..."}`
-
-### DELETE /api/agent/chat/history/{userId}
-
-GDPR-compliant deletion of all sessions and messages for a user.
-**Response:** `{"status": "deleted", "userId": "..."}`
-
-### GET /api/agent/chat/export/{userId}/{sessionId}
-
-Exports a single session as a downloadable file.
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `format` | `json` | Export format: `json`, `txt`, or `md`. |
-
-### GET /api/agent/chat/export/{userId}
-
-Exports all of a user's messages within a date range.
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `format` | `json` | Export format. |
-| `from` | (none) | Start date (ISO-8601, e.g. `2026-01-01T00:00:00Z`). |
-| `to` | (none) | End date (ISO-8601). |
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/agent/chat/sessions/{userId}` | List sessions for a user, ordered by most recent. Default size: 20. |
+| GET | `/api/agent/chat/history/{userId}/{sessionId}` | Get messages for a session, ordered chronologically. Default size: 50. |
+| GET | `/api/agent/chat/history/{userId}/search?q={query}` | Full-text search across a user's chat history. Default size: 20. |
+| DELETE | `/api/agent/chat/history/{userId}/{sessionId}` | Delete a session and all its messages. |
+| DELETE | `/api/agent/chat/history/{userId}` | GDPR-compliant deletion of all sessions and messages for a user. |
+| GET | `/api/agent/chat/export/{userId}/{sessionId}?format=json` | Export a session. Formats: `json`, `txt`, `md`. |
+| GET | `/api/agent/chat/export/{userId}?format=json&from=...&to=...` | Export all user messages in a date range (ISO-8601). |
 
 ---
 
