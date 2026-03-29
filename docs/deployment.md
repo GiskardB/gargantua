@@ -42,7 +42,7 @@ This will:
 
 <dependency>
     <groupId>com.github.giskardb.gargantua</groupId>
-    <artifactId>agent-spring-boot-starter</artifactId>
+    <artifactId>agent-engine</artifactId>
     <version>v1.0.0</version>
 </dependency>
 ```

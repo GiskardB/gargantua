@@ -11,9 +11,9 @@
     <version>1.0.0</version>
   </parent>
 
-  <artifactId>agent-spring-boot-starter</artifactId>
-  <name>Agent Spring Boot Starter</name>
-  <description>Auto-configuration starter for the AI Agent framework</description>
+  <artifactId>agent-engine</artifactId>
+  <name>Agent Engine</name>
+  <description>Core engine: orchestrator, guardrails, routing, memory, REST API, admin endpoints, skill registries</description>
 
   <dependencies>
     <!-- Internal -->
@@ -109,15 +109,47 @@
       <artifactId>opentelemetry-exporter-otlp</artifactId>
     </dependency>
 
+    <!-- Spring Data -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-redis</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-mongodb</artifactId>
+    </dependency>
+
+    <!-- API Documentation -->
+    <dependency>
+      <groupId>org.springdoc</groupId>
+      <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+    </dependency>
+
     <!-- Test -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- WebMvc test slice — @WebMvcTest, MockMvc (Spring Boot 4 modular starter) -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-webmvc-test</artifactId>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>org.wiremock</groupId>
       <artifactId>wiremock-standalone</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>mongodb</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>junit-jupiter</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>

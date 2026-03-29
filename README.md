@@ -289,8 +289,7 @@ Gargantua is distributed as a set of Maven libraries. You don't clone this repo 
 |----------|---------|-------------|
 | `agent-core` | `ai.gargantua` | Pure domain: records, interfaces, annotations. Zero Spring deps. |
 | `agent-memory-sdk` | `ai.gargantua` | Standalone 3-layer memory (Redis + MongoDB). Reusable in any project. |
-| `agent-spring-boot-starter` | `ai.gargantua` | Auto-configuration, guardrails, routing, orchestrator, tool registry. |
-| `agent-adapters` | `ai.gargantua` | REST controllers, skill registries, admin endpoints. |
+| `agent-engine` | `ai.gargantua` | Auto-configuration, guardrails, routing, orchestrator, tool registry, REST controllers, skill registries, admin endpoints. |
 | `agent-mcp-server` | `ai.gargantua` | MCP Server gateway (optional). |
 | `agent-shell` | `ai.gargantua` | Interactive CLI -- Spring Shell 4. |
 | `agent-skill-linter-maven-plugin` | `ai.gargantua` | Build-time SKILL.md validation. |
@@ -360,17 +359,10 @@ With GitHub Packages, use groupId `ai.gargantua` and version `1.0.0` (no `v` pre
 </repositories>
 
 <dependencies>
-    <!-- Core framework (includes starter + memory + core) -->
+    <!-- Core engine: orchestrator, guardrails, routing, memory, REST API, admin endpoints, skill registries -->
     <dependency>
         <groupId>com.github.giskardb.gargantua</groupId>
-        <artifactId>agent-spring-boot-starter</artifactId>
-        <version>${gargantua.version}</version>
-    </dependency>
-
-    <!-- REST API layer (controllers, admin endpoints, export) -->
-    <dependency>
-        <groupId>com.github.giskardb.gargantua</groupId>
-        <artifactId>agent-adapters</artifactId>
+        <artifactId>agent-engine</artifactId>
         <version>${gargantua.version}</version>
     </dependency>
 
@@ -438,8 +430,7 @@ With GitHub Packages, use groupId `ai.gargantua` and version `1.0.0` (no `v` pre
 gargantua/
 ├── agent-core/                      -- Pure domain: records, interfaces, annotations
 ├── agent-memory-sdk/                -- Standalone memory library (Redis + MongoDB)
-├── agent-spring-boot-starter/       -- Auto-configuration, orchestrator, guardrails, routing
-├── agent-adapters/                  -- REST controllers, skill registries, repositories
+├── agent-engine/                    -- Core engine: auto-configuration, orchestrator, guardrails, routing, REST controllers, skill registries
 ├── agent-mcp-server/                -- MCP Server gateway (optional)
 ├── agent-example/                   -- Reference agent (weather/search tools)
 ├── agent-shell/                     -- Interactive CLI (Spring Shell 4)

@@ -139,7 +139,7 @@ jobs:
           echo '```xml' >> changelog.md
           echo '<dependency>' >> changelog.md
           echo '    <groupId>ai.gargantua</groupId>' >> changelog.md
-          echo '    <artifactId>agent-spring-boot-starter</artifactId>' >> changelog.md
+          echo '    <artifactId>agent-engine</artifactId>' >> changelog.md
           echo "    <version>${{ steps.version.outputs.version }}</version>" >> changelog.md
           echo '</dependency>' >> changelog.md
           echo '```' >> changelog.md
@@ -179,8 +179,7 @@ jobs:
           echo "|----------|---------|" >> $GITHUB_STEP_SUMMARY
           echo "| agent-core | ai.gargantua |" >> $GITHUB_STEP_SUMMARY
           echo "| agent-memory-sdk | ai.gargantua |" >> $GITHUB_STEP_SUMMARY
-          echo "| agent-spring-boot-starter | ai.gargantua |" >> $GITHUB_STEP_SUMMARY
-          echo "| agent-adapters | ai.gargantua |" >> $GITHUB_STEP_SUMMARY
+          echo "| agent-engine | ai.gargantua |" >> $GITHUB_STEP_SUMMARY
           echo "| agent-mcp-server | ai.gargantua |" >> $GITHUB_STEP_SUMMARY
           echo "| agent-shell | ai.gargantua |" >> $GITHUB_STEP_SUMMARY
           echo "| agent-skill-linter-maven-plugin | ai.gargantua |" >> $GITHUB_STEP_SUMMARY

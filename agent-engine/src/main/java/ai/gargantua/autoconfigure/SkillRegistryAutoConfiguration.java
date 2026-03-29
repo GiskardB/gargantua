@@ -7,7 +7,7 @@ import org.springframework.context.annotation.Bean;
 
 /**
  * Auto-configuration for skill registry components.
- * The actual SkillRegistry implementations are provided by the agent-adapters module.
+ * The actual SkillRegistry implementations are provided within the agent-engine module.
  */
 @AutoConfiguration
 @EnableConfigurationProperties(AgentProperties.class)

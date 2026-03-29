@@ -19,7 +19,7 @@
     <!-- Internal -->
     <dependency>
       <groupId>ai.gargantua</groupId>
-      <artifactId>agent-spring-boot-starter</artifactId>
+      <artifactId>agent-engine</artifactId>
     </dependency>
 
     <!-- MCP -->

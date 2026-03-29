@@ -305,9 +305,7 @@ graph TD
 
     MEMORY[agent-memory-sdk<br/><i>Redis + MongoDB memory adapters</i>]
 
-    STARTER[agent-spring-boot-starter<br/><i>Auto-config, orchestrator, guardrails, routing</i>]
-
-    ADAPTERS[agent-adapters<br/><i>REST controllers, skill registries</i>]
+    ENGINE[agent-engine<br/><i>Auto-config, orchestrator, guardrails, routing, REST controllers, skill registries</i>]
 
     MCP[agent-mcp-server<br/><i>MCP protocol gateway</i>]
 
@@ -320,21 +318,18 @@ graph TD
     ARCHETYPE[agent-archetype<br/><i>Maven archetype for new projects</i>]
 
     MEMORY --> CORE
-    STARTER --> CORE
-    STARTER --> MEMORY
-    ADAPTERS --> STARTER
-    MCP --> STARTER
-    SHELL --> STARTER
-    SHELL --> ADAPTERS
+    ENGINE --> CORE
+    ENGINE --> MEMORY
+    MCP --> ENGINE
+    SHELL --> ENGINE
     LINTER --> CORE
 
-    EXAMPLE -.->|uses as dependency| ADAPTERS
+    EXAMPLE -.->|uses as dependency| ENGINE
     EXAMPLE -.->|uses as dependency| MCP
 
     style CORE fill:#e1f5fe
     style MEMORY fill:#e8f5e9
-    style STARTER fill:#fff3e0
-    style ADAPTERS fill:#fce4ec
+    style ENGINE fill:#fff3e0
     style EXAMPLE fill:#f3e5f5,stroke-dasharray: 5 5
     style ARCHETYPE fill:#f3e5f5,stroke-dasharray: 5 5
 ```

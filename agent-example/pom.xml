@@ -33,17 +33,10 @@
          Gargantua Framework — the only dependencies you need to build an agent
          ═══════════════════════════════════════════════════════════════════ -->
 
-    <!-- Core auto-configuration: orchestrator, guardrails, routing, memory, tools -->
+    <!-- Core engine: orchestrator, guardrails, routing, memory, REST API, admin endpoints, skill registries -->
     <dependency>
       <groupId>ai.gargantua</groupId>
-      <artifactId>agent-spring-boot-starter</artifactId>
-      <version>${gargantua.version}</version>
-    </dependency>
-
-    <!-- REST controllers, admin endpoints, skill registries, repositories -->
-    <dependency>
-      <groupId>ai.gargantua</groupId>
-      <artifactId>agent-adapters</artifactId>
+      <artifactId>agent-engine</artifactId>
       <version>${gargantua.version}</version>
     </dependency>
 
