@@ -1,15 +1,18 @@
 package ai.gargantua.adapters.web;
 
-import ai.gargantua.core.capabilities.AgentCapabilities;
+import ai.gargantua.core.a2a.AgentCard;
 import ai.gargantua.core.skill.SkillCard;
 import ai.gargantua.core.skill.SkillMeta;
 import ai.gargantua.core.skill.SkillRegistry;
 import ai.gargantua.core.skill.SkillSource;
+import ai.gargantua.autoconfigure.AgentCardService;
+import ai.gargantua.autoconfigure.AgentProperties;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.ResponseEntity;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -22,8 +25,81 @@ import static org.mockito.Mockito.when;
 class CapabilitiesControllerTest {
 
     @Test
-    @DisplayName("GET /api/capabilities returns capabilities with Cache-Control header")
-    void getCapabilitiesReturnsCacheControlHeader() {
+    @DisplayName("GET /.well-known/agent.json returns A2A Agent Card with Cache-Control header")
+    void wellKnownAgentJsonReturnsAgentCard() {
+        AgentCardService agentCardService = buildAgentCardService();
+
+        var controller = new CapabilitiesController(agentCardService, null);
+
+        var request = mockRequest();
+        ResponseEntity<AgentCard> response = controller.wellKnownAgentJson(request);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertNotNull(response.getBody());
+        assertEquals("Test Agent", response.getBody().name());
+        assertEquals(1, response.getBody().skills().size());
+        assertEquals("code-review", response.getBody().skills().get(0).id());
+        assertTrue(response.getHeaders().get("Cache-Control").contains("max-age=60"));
+    }
+
+    @Test
+    @DisplayName("GET /api/capabilities returns A2A Agent Card (backward compat)")
+    void capabilitiesEndpointReturnsAgentCard() {
+        AgentCardService agentCardService = buildAgentCardService();
+
+        var controller = new CapabilitiesController(agentCardService, null);
+
+        var request = mockRequest();
+        ResponseEntity<AgentCard> response = controller.getCapabilities(request);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertNotNull(response.getBody());
+        assertEquals("Test Agent", response.getBody().name());
+        assertTrue(response.getBody().supportedProtocols().contains("a2a/1.0"));
+    }
+
+    @Test
+    @DisplayName("POST /a2a with unknown method returns JSON-RPC error")
+    void unknownMethodReturnsError() {
+        AgentCardService agentCardService = buildAgentCardService();
+
+        var controller = new CapabilitiesController(agentCardService, null);
+
+        Map<String, Object> jsonRpc = Map.of(
+                "jsonrpc", "2.0",
+                "method", "unknown/method",
+                "id", 1
+        );
+
+        ResponseEntity<Map<String, Object>> response = controller.handleA2A(jsonRpc);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertNotNull(response.getBody());
+        assertTrue(response.getBody().containsKey("error"));
+    }
+
+    @Test
+    @DisplayName("POST /a2a tasks/send without orchestrator returns error")
+    void taskSendWithoutOrchestratorReturnsError() {
+        AgentCardService agentCardService = buildAgentCardService();
+
+        var controller = new CapabilitiesController(agentCardService, null);
+
+        Map<String, Object> jsonRpc = Map.of(
+                "jsonrpc", "2.0",
+                "method", "tasks/send",
+                "id", 1,
+                "params", Map.of("message", "Hello")
+        );
+
+        ResponseEntity<Map<String, Object>> response = controller.handleA2A(jsonRpc);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertNotNull(response.getBody());
+        assertTrue(response.getBody().containsKey("error"));
+    }
+
+    private AgentCardService buildAgentCardService() {
         SkillRegistry registry = mock(SkillRegistry.class);
 
         SkillMeta meta = new SkillMeta(
@@ -36,15 +112,21 @@ class CapabilitiesControllerTest {
         when(registry.listMeta()).thenReturn(List.of(meta));
         when(registry.load(anyString())).thenReturn(card);
 
-        var controller = new CapabilitiesController(registry, "test-agent", "Test Agent");
-        ResponseEntity<AgentCapabilities> response = controller.getCapabilities();
+        AgentProperties properties = new AgentProperties();
+        properties.getApi().setDisplayName("Test Agent");
+        properties.getApi().setAgentId("test-agent");
+        properties.getApi().setDescription("A test agent");
+        properties.getApi().setVersion("1.0.0");
 
-        assertEquals(200, response.getStatusCode().value());
-        assertNotNull(response.getBody());
-        assertEquals("test-agent", response.getBody().agentId());
-        assertTrue(response.getBody().available());
-        assertEquals(1, response.getBody().capabilities().size());
-        assertEquals("code-review", response.getBody().capabilities().get(0).skillId());
-        assertTrue(response.getHeaders().get("Cache-Control").contains("max-age=60"));
+        return new AgentCardService(properties, registry);
+    }
+
+    private jakarta.servlet.http.HttpServletRequest mockRequest() {
+        var request = mock(jakarta.servlet.http.HttpServletRequest.class);
+        when(request.getScheme()).thenReturn("http");
+        when(request.getServerName()).thenReturn("localhost");
+        when(request.getServerPort()).thenReturn(8080);
+        when(request.getContextPath()).thenReturn("");
+        return request;
     }
 }

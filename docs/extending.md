@@ -326,7 +326,7 @@ Exposes fine-grained primitives for advanced integrations:
 | MCP primitive | What it maps to |
 |---------------|-----------------|
 | Tool `invoke_skill` | OrchestratorEngine with forceSkill |
-| Resource `gargantua://capabilities` | CapabilitiesService |
+| Resource `gargantua://capabilities` | AgentCardService |
 | Resource `gargantua://skill/{name}` | SkillRegistry (description only, no system prompt) |
 | Prompt `use-skill` | SKILL.md body as prompt template |
 
