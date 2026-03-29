@@ -19,7 +19,7 @@ sequenceDiagram
     Client->>Controller: POST /api/agent/chat/stream
     Controller->>Guard_In: checkInput(message)
 
-    Note over Guard_In: MaxLength → PromptInjection → PII Masking → RateLimit
+    Note over Guard_In: Rbac → MaxLength → PromptInjection → PII Masking → RateLimit
 
     alt Guardrail BLOCK
         Guard_In-->>Controller: BLOCKED (reason)
@@ -232,12 +232,22 @@ sequenceDiagram
 sequenceDiagram
     participant Engine as OrchestratorEngine
     participant Pipeline as GuardrailPipeline
+    participant G0 as RbacGuardrail<br/>@Order(5)
     participant G1 as MaxLength<br/>@Order(10)
     participant G2 as PromptInjection<br/>@Order(20)
     participant G3 as PII Masking<br/>@Order(40)
     participant GN as Custom Guardrail<br/>@Order(60)
 
     Engine->>Pipeline: checkInput(context)
+
+    Pipeline->>G0: check(ctx)
+    alt User lacks required role
+        G0-->>Pipeline: BLOCK("missing role")
+        Pipeline-->>Engine: BLOCKED
+        Note over Engine: Stop — return error to client
+    else Roles OK or no restriction
+        G0-->>Pipeline: PASS
+    end
 
     Pipeline->>G1: check(ctx)
     G1-->>Pipeline: PASS
