@@ -139,7 +139,10 @@ nginx.ingress.kubernetes.io/proxy-buffering: "off"
 ```
 
 ### Why Pods Are Stateless
-All state is in Redis (working memory, HITL, tool cache) and MongoDB (episodic, knowledge, history, evals, costs). No session affinity needed.
+All state is in Redis (working memory, HITL, tool cache) and MongoDB (episodic, knowledge, history, evals, costs, audit trail). No session affinity needed.
+
+### Audit Trail for Compliance
+The audit trail (`AGENT_AUDIT_ENABLED=true` by default) writes an immutable `AuditEvent` for every agent decision to the `audit_trail` MongoDB collection. This append-only log captures input, routing, guardrails, tools, output, tokens, cost, and duration -- suitable for SOC 2 and GDPR compliance requirements. Set `AGENT_AUDIT_RETENTION_DAYS` to control retention (default 365). Query audit events via `GET /api/admin/audit`.
 
 ### Sizing Reference
 | Env | Replicas | CPU req/limit | RAM req/limit |
@@ -170,6 +173,8 @@ All state is in Redis (working memory, HITL, tool cache) and MongoDB (episodic, 
 | `LLM_ROUTING_ENDPOINT` | Routing model endpoint (Ollama URL when local) | `http://localhost:11434` |
 | `LLM_ROUTING_API_KEY` | Routing model API key (not needed for Ollama) | *(optional)* |
 | `ROUTING_STRATEGY` | Skill routing: `hybrid` / `semantic` / `llm` | `hybrid` |
+| `AGENT_AUDIT_ENABLED` | Enable immutable audit trail | `true` |
+| `AGENT_AUDIT_RETENTION_DAYS` | How long to retain audit events | `365` |
 | `SPRING_PROFILES_ACTIVE` | Spring profile | `dev` |
 
 ## Health Probes

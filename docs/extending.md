@@ -80,12 +80,12 @@ You can also toggle it at runtime via `POST /api/admin/guardrails/profanity-filt
 
 | Order | Guardrail | Type |
 |-------|-----------|------|
+| 5 | RbacGuardrail | Input |
 | 10 | MaxLength | Input |
 | 20 | PromptInjection | Input |
 | 30 | TopicScope | Input |
 | 40 | PiiMasking | Input |
 | 50 | RateLimit | Input |
-| 5 | RbacGuardrail | Input |
 | **60+** | **Your custom guardrails** | Input |
 | 10 | PiiOutput | Output |
 | 20 | Disclaimer | Output |

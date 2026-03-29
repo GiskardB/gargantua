@@ -315,7 +315,7 @@ graph TD
 
     MEMORY[agent-memory-sdk<br/><i>Redis + MongoDB memory adapters</i>]
 
-    ENGINE[agent-engine<br/><i>Auto-config, orchestrator, guardrails, routing, REST controllers, skill registries</i>]
+    ENGINE[agent-engine<br/><i>Auto-config, orchestrator, guardrails,<br/>routing, RBAC, RAG, A2A, audit,<br/>REST controllers, skill registries</i>]
 
     MCP[agent-mcp-server<br/><i>MCP protocol gateway</i>]
 
@@ -342,4 +342,34 @@ graph TD
     style ENGINE fill:#fff3e0
     style EXAMPLE fill:#f3e5f5,stroke-dasharray: 5 5
     style ARCHETYPE fill:#f3e5f5,stroke-dasharray: 5 5
+```
+
+## 9. A2A Protocol — Agent-to-Agent Interaction
+
+```mermaid
+sequenceDiagram
+    participant Remote as Remote Agent / Client
+    participant WK as /.well-known/agent.json
+    participant A2A as POST /a2a
+    participant Engine as OrchestratorEngine
+    participant Local as Local Agent
+    participant HttpClient as HttpA2AClient
+    participant ExtAgent as External A2A Agent
+
+    Note over Remote,A2A: Inbound: this agent is called by a remote agent
+
+    Remote->>WK: GET /.well-known/agent.json
+    WK-->>Remote: AgentCard (skills, supportedProtocols: [a2a/1.0, mcp/1.0])
+
+    Remote->>A2A: JSON-RPC 2.0 {method: "tasks/send", params: {message: "..."}}
+    A2A->>Engine: route + execute (full pipeline)
+    Engine-->>A2A: AgentResponse
+    A2A-->>Remote: {jsonrpc: "2.0", result: {taskId, status, output}}
+
+    Note over Local,ExtAgent: Outbound: this agent calls a remote A2A agent
+
+    Local->>HttpClient: sendTask("research query")
+    HttpClient->>ExtAgent: POST /a2a {method: "tasks/send", params: {...}}
+    ExtAgent-->>HttpClient: {result: {taskId, status, output}}
+    HttpClient-->>Local: TaskResult
 ```
