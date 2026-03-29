@@ -50,7 +50,7 @@ public class ChatCommand {
         sessionId = agentClient.newSession();
         renderer.printChatHeader(sessionId, userId, dryRun);
 
-        Scanner scanner = new Scanner(System.in);
+        var scanner = new Scanner(System.in);
         while (true) {
             renderer.printToken("agent> ");
             if (!scanner.hasNextLine()) {
@@ -128,26 +128,25 @@ public class ChatCommand {
                 }
                 renderer.printChatHeader(sessionId, userId, dryRun);
             }
-            case "\\help" -> {
-                renderer.println("Available commands:");
-                renderer.println("  \\exit     - Exit the chat session");
-                renderer.println("  \\new      - Start a new session");
-                renderer.println("  \\dry      - Toggle dry run mode");
-                renderer.println("  \\skill <name> - Force a specific skill (empty to clear)");
-                renderer.println("  \\history  - Show message history");
-                renderer.println("  \\info     - Show session info");
-                renderer.println("  \\clear    - Clear screen");
-                renderer.println("  \\help     - Show this help");
-            }
+            case "\\help" -> renderer.println("""
+                    Available commands:
+                      \\exit     - Exit the chat session
+                      \\new      - Start a new session
+                      \\dry      - Toggle dry run mode
+                      \\skill <name> - Force a specific skill (empty to clear)
+                      \\history  - Show message history
+                      \\info     - Show session info
+                      \\clear    - Clear screen
+                      \\help     - Show this help""");
             default -> renderer.printError("Unknown command: " + cmd + ". Type \\help for available commands.");
         }
         return false;
     }
 
     private void sendMessage(String message) {
-        long startTime = System.currentTimeMillis();
+        var startTime = System.currentTimeMillis();
 
-        ShellChatRequest request = new ShellChatRequest(
+        var request = new ShellChatRequest(
                 message, sessionId, userId, dryRun, forceSkill);
 
         agentClient.stream(request, event -> handleEvent(event, startTime));

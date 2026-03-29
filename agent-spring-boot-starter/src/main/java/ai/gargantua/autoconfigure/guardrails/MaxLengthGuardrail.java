@@ -40,7 +40,8 @@ public class MaxLengthGuardrail implements InputGuardrail {
         int maxChars = agentProperties.getGuardrail().getInput().getMaxLengthChars();
         if (ctx.userMessage() != null && ctx.userMessage().length() > maxChars) {
             return GuardrailResult.block(name(),
-                    "Message exceeds maximum length of " + maxChars + " characters (was " + ctx.userMessage().length() + ")");
+                    "Message exceeds maximum length of %d characters (was %d)"
+                            .formatted(maxChars, ctx.userMessage().length()));
         }
         return GuardrailResult.pass(name());
     }

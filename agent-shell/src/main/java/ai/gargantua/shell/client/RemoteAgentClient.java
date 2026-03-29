@@ -25,7 +25,7 @@ public class RemoteAgentClient implements AgentClient {
             @Value("${agent.shell.remote.api-key:}") String apiKey,
             @Value("${agent.shell.remote.timeout-ms:30000}") int timeoutMs) {
 
-        RestClient.Builder builder = RestClient.builder()
+        var builder = RestClient.builder()
                 .baseUrl(baseUrl);
 
         if (apiKey != null && !apiKey.isBlank()) {
@@ -38,7 +38,7 @@ public class RemoteAgentClient implements AgentClient {
     @Override
     public void stream(ShellChatRequest request, Consumer<SseEvent> eventConsumer) {
         try {
-            Map<String, Object> body = Map.of(
+            var body = Map.of(
                     "message", request.message(),
                     "sessionId", request.sessionId() != null ? request.sessionId() : "",
                     "userId", request.userId() != null ? request.userId() : "",
@@ -48,7 +48,7 @@ public class RemoteAgentClient implements AgentClient {
 
             // Simplified: sends POST and treats response as a single text block.
             // A production implementation would use WebClient for real SSE streaming.
-            String responseText = restClient.post()
+            var responseText = restClient.post()
                     .uri("/api/agent/chat")
                     .body(body)
                     .retrieve()
@@ -68,7 +68,7 @@ public class RemoteAgentClient implements AgentClient {
     @Override
     public void resolveApproval(String requestId, String decision) {
         try {
-            Map<String, String> body = Map.of(
+            var body = Map.of(
                     "requestId", requestId,
                     "decision", decision
             );

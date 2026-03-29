@@ -35,14 +35,11 @@ public class StreamingRenderer {
     }
 
     private boolean resolveAnsi(String mode) {
-        if ("true".equalsIgnoreCase(mode) || "on".equalsIgnoreCase(mode)) {
-            return true;
-        }
-        if ("false".equalsIgnoreCase(mode) || "off".equalsIgnoreCase(mode)) {
-            return false;
-        }
-        // auto: detect from console
-        return System.console() != null;
+        return switch (mode.toLowerCase()) {
+            case "true", "on" -> true;
+            case "false", "off" -> false;
+            default -> System.console() != null; // auto: detect from console
+        };
     }
 
     public boolean isAnsiEnabled() {

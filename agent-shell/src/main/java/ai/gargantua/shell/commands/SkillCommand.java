@@ -32,13 +32,13 @@ public class SkillCommand {
 
     @Command(name = {"skill", "list"}, description = "List all available skills in table format")
     public String list() {
-        List<SkillMeta> skills = skillRegistry.listMeta();
+        var skills = skillRegistry.listMeta();
         if (skills.isEmpty()) {
             return "No skills registered.";
         }
 
-        List<String> headers = List.of("Name", "Version", "Domain", "Source", "Active", "Schema");
-        List<List<String>> rows = new ArrayList<>();
+        var headers = List.of("Name", "Version", "Domain", "Source", "Active", "Schema");
+        var rows = new ArrayList<List<String>>();
 
         for (SkillMeta meta : skills) {
             rows.add(List.of(
@@ -56,21 +56,32 @@ public class SkillCommand {
 
     @Command(name = {"skill", "show"}, description = "Show detailed information about a specific skill")
     public String show(String name) {
-        SkillCard card = skillRegistry.load(name);
+        var card = skillRegistry.load(name);
         if (card == null) {
             return "Skill not found: " + name;
         }
 
-        StringBuilder sb = new StringBuilder();
-        sb.append("=== Skill: ").append(card.meta().name()).append(" ===\n");
-        sb.append("Version:        ").append(card.meta().version()).append('\n');
-        sb.append("Domain:         ").append(card.meta().domain()).append('\n');
-        sb.append("Source:         ").append(card.meta().source()).append('\n');
-        sb.append("Active:         ").append(card.meta().active()).append('\n');
-        sb.append("Has Schema:     ").append(card.meta().hasSchema()).append('\n');
-        sb.append("Max Tokens:     ").append(card.maxTokens() != null ? card.maxTokens() : "default").append('\n');
-        sb.append("Temperature:    ").append(card.temperature() != null ? card.temperature() : "default").append('\n');
-        sb.append("Preferred Model:").append(card.preferredModel() != null ? card.preferredModel() : "default").append('\n');
+        var sb = new StringBuilder();
+        sb.append("""
+                === Skill: %s ===
+                Version:        %s
+                Domain:         %s
+                Source:         %s
+                Active:         %s
+                Has Schema:     %s
+                Max Tokens:     %s
+                Temperature:    %s
+                Preferred Model:%s
+                """.formatted(
+                card.meta().name(),
+                card.meta().version(),
+                card.meta().domain(),
+                card.meta().source(),
+                card.meta().active(),
+                card.meta().hasSchema(),
+                card.maxTokens() != null ? card.maxTokens() : "default",
+                card.temperature() != null ? card.temperature() : "default",
+                card.preferredModel() != null ? card.preferredModel() : "default"));
 
         if (card.allowedTools() != null && !card.allowedTools().isEmpty()) {
             sb.append("Allowed Tools:  ").append(String.join(", ", card.allowedTools())).append('\n');

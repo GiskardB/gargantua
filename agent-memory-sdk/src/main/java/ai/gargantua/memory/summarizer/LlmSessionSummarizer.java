@@ -24,7 +24,7 @@ public class LlmSessionSummarizer implements SessionSummarizer {
                 messages.size(), userId, sessionId);
 
         String summary = messages.stream()
-                .map(m -> m.role() + ": " + m.content())
+                .map(m -> "%s: %s".formatted(m.role(), m.content()))
                 .collect(Collectors.joining("\n"));
 
         // Extract simple key topics from unique user messages (first 5 words of each)

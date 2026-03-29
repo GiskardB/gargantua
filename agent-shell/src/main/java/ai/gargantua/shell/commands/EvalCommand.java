@@ -48,7 +48,7 @@ public class EvalCommand {
             return "Please specify --skill <name> or --all";
         }
 
-        List<String> skillNames = new ArrayList<>();
+        var skillNames = new ArrayList<String>();
         if (all) {
             for (SkillMeta meta : skillRegistry.listMeta()) {
                 if (meta.active()) {
@@ -62,14 +62,14 @@ public class EvalCommand {
             skillNames.add(skillName);
         }
 
-        StringBuilder output = new StringBuilder();
-        List<String> headers = List.of("Skill", "Status", "Details");
-        List<List<String>> rows = new ArrayList<>();
+        var output = new StringBuilder();
+        var headers = List.of("Skill", "Status", "Details");
+        var rows = new ArrayList<List<String>>();
 
         for (String name : skillNames) {
             renderer.printInfo("Evaluating skill: " + name + "...");
             try {
-                AgentRequest request = AgentRequest.builder()
+                var request = AgentRequest.builder()
                         .message("__eval__")
                         .sessionId(UUID.randomUUID().toString())
                         .userId("eval-runner")
@@ -77,7 +77,7 @@ public class EvalCommand {
                         .dryRunContext(DryRunContext.inactive())
                         .build();
 
-                AgentResponse response = orchestrator.invoke(request);
+                var response = orchestrator.invoke(request);
                 rows.add(List.of(
                         name,
                         "COMPLETED",

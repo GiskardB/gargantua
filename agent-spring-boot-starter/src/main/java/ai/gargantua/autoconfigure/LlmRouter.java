@@ -35,12 +35,12 @@ public class LlmRouter {
      * Evaluates rules sorted by priority (lowest first). Returns primary alias if no rule matches.
      */
     public String resolve(LlmRoutingContext ctx) {
-        List<AgentProperties.RoutingRule> rules = properties.getLlm().getRoutingRules();
+        var rules = properties.getLlm().getRoutingRules();
         if (rules == null || rules.isEmpty()) {
             return properties.getLlm().getPrimaryAlias();
         }
 
-        List<AgentProperties.RoutingRule> sorted = rules.stream()
+        var sorted = rules.stream()
                 .filter(AgentProperties.RoutingRule::isEnabled)
                 .sorted(Comparator.comparingInt(AgentProperties.RoutingRule::getPriority))
                 .toList();
@@ -64,7 +64,7 @@ public class LlmRouter {
      * - "userTier" -> matches user tier
      */
     boolean matchesRule(AgentProperties.RoutingRule rule, LlmRoutingContext ctx) {
-        Map<String, Object> condition = rule.getCondition();
+        var condition = rule.getCondition();
         if (condition == null || condition.isEmpty()) {
             return false;
         }

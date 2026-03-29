@@ -40,23 +40,20 @@ public class DisclaimerInjectorGuardrail implements OutputGuardrail {
 
     @Override
     public GuardrailOutputResult process(GuardrailOutputContext ctx) {
-        String response = ctx.rawResponse();
-        if (response == null) {
-            response = "";
-        }
+        var response = ctx.rawResponse() != null ? ctx.rawResponse() : "";
 
-        String disclaimerText = agentProperties.getGuardrail().getOutput().getDisclaimerText();
-        List<String> disclaimerDomains = agentProperties.getGuardrail().getOutput().getDisclaimerDomains();
+        var disclaimerText = agentProperties.getGuardrail().getOutput().getDisclaimerText();
+        var disclaimerDomains = agentProperties.getGuardrail().getOutput().getDisclaimerDomains();
 
         // If specific domains are configured, only add disclaimer for matching skills
         if (disclaimerDomains != null && !disclaimerDomains.isEmpty()) {
-            String skillDomain = ctx.activatedSkill() != null ? ctx.activatedSkill().domain() : "";
+            var skillDomain = ctx.activatedSkill() != null ? ctx.activatedSkill().domain() : "";
             if (!disclaimerDomains.contains(skillDomain)) {
                 return new GuardrailOutputResult(GuardrailVerdict.PASS, response, null, name());
             }
         }
 
-        String withDisclaimer = response + "\n\n---\n" + disclaimerText;
+        var withDisclaimer = "%s\n\n---\n%s".formatted(response, disclaimerText);
         return new GuardrailOutputResult(GuardrailVerdict.PASS, withDisclaimer, null, name());
     }
 }

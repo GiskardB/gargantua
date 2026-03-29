@@ -49,7 +49,7 @@ public class TopicScopeGuardrail implements InputGuardrail {
             String lower = ctx.userMessage().toLowerCase();
             for (String topic : blockedTopics) {
                 if (lower.contains(topic.toLowerCase())) {
-                    return GuardrailResult.block(name(), "Blocked topic detected: " + topic);
+                    return GuardrailResult.block(name(), "Blocked topic detected: %s".formatted(topic));
                 }
             }
         }

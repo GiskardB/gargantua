@@ -40,8 +40,8 @@ public class SessionCommand {
 
     @Command(name = {"session", "new"}, description = "Create a new chat session")
     public String newSession() {
-        String sessionId = agentClient.newSession();
-        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        var sessionId = agentClient.newSession();
+        var timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         sessions.put(sessionId, new SessionInfo(sessionId, timestamp, 0));
         activeSessionId = sessionId;
         return "New session created: " + sessionId;
@@ -53,8 +53,8 @@ public class SessionCommand {
             return "No sessions. Use 'session new' to create one.";
         }
 
-        List<String> headers = List.of("Session ID", "Created", "Messages", "Active");
-        List<List<String>> rows = new ArrayList<>();
+        var headers = List.of("Session ID", "Created", "Messages", "Active");
+        var rows = new ArrayList<List<String>>();
 
         for (SessionInfo info : sessions.values()) {
             rows.add(List.of(
@@ -72,7 +72,7 @@ public class SessionCommand {
     public String resume(String sessionId) {
         if (!sessions.containsKey(sessionId)) {
             // Allow resuming sessions that weren't tracked locally
-            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            var timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
             sessions.put(sessionId, new SessionInfo(sessionId, timestamp, 0));
         }
         activeSessionId = sessionId;

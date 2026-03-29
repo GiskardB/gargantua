@@ -93,14 +93,14 @@ public class SemanticRoutingService {
      * Simple cosine similarity using term overlap (placeholder for real embeddings).
      */
     double cosineSimilarity(String[] tokensA, String[] tokensB) {
-        Map<String, Integer> freqA = termFrequency(tokensA);
-        Map<String, Integer> freqB = termFrequency(tokensB);
+        var freqA = termFrequency(tokensA);
+        var freqB = termFrequency(tokensB);
 
         double dotProduct = 0;
         double normA = 0;
         double normB = 0;
 
-        for (Map.Entry<String, Integer> e : freqA.entrySet()) {
+        for (var e : freqA.entrySet()) {
             int a = e.getValue();
             int b = freqB.getOrDefault(e.getKey(), 0);
             dotProduct += a * b;
@@ -115,8 +115,8 @@ public class SemanticRoutingService {
     }
 
     private Map<String, Integer> termFrequency(String[] tokens) {
-        Map<String, Integer> freq = new HashMap<>();
-        for (String token : tokens) {
+        var freq = new HashMap<String, Integer>();
+        for (var token : tokens) {
             freq.merge(token, 1, Integer::sum);
         }
         return freq;

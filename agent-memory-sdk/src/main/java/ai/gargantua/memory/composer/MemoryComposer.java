@@ -67,7 +67,7 @@ public class MemoryComposer {
 
         // Calculate token usage per layer
         int workingTokens = estimateTokens(workingMessages.stream()
-                .map(m -> m.role() + ": " + m.content())
+                .map(m -> "%s: %s".formatted(m.role(), m.content()))
                 .toList());
         int episodicTokens = estimateTokens(episodicSummaries.stream()
                 .map(SessionSummary::summary)

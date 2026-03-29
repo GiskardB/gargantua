@@ -94,25 +94,25 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
         long startTime = System.currentTimeMillis();
 
         // 1. Extract dry-run context
-        DryRunContext dryRunContext = request.dryRunContext() != null
+        var dryRunContext = request.dryRunContext() != null
                 ? request.dryRunContext()
                 : DryRunContext.inactive();
-        boolean isDryRun = dryRunContext.active();
+        var isDryRun = dryRunContext.active();
 
         // 2. Input guardrails
-        Map<String, Object> inputAttributes = new HashMap<>();
+        var inputAttributes = new HashMap<String, Object>();
         if (request.contextAttributes() != null) {
             inputAttributes.putAll(request.contextAttributes());
         }
 
-        GuardrailInputContext inputCtx = new GuardrailInputContext(
+        var inputCtx = new GuardrailInputContext(
                 request.message(),
                 request.userId(),
                 request.sessionId(),
                 null, // skill not yet resolved
                 inputAttributes
         );
-        GuardrailPipelineResult inputResult = guardrailPipeline.checkInput(inputCtx);
+        var inputResult = guardrailPipeline.checkInput(inputCtx);
         if (inputResult.blocked()) {
             throw new GuardrailBlockedException(
                     inputResult.blockedBy(),
@@ -122,7 +122,7 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
         }
 
         // 3. List available skills
-        List<SkillMeta> skills = skillRegistry != null ? skillRegistry.listMeta() : List.of();
+        var skills = skillRegistry != null ? skillRegistry.listMeta() : List.<SkillMeta>of();
 
         // 4. Route to skill
         RoutingResult routingResult;
@@ -142,16 +142,16 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
             }
         } else {
             // No skill registry available, use a minimal skill card
-            SkillMeta meta = new SkillMeta(routingResult.skillName(), "", "1.0.0",
+            var meta = new SkillMeta(routingResult.skillName(), "", "1.0.0",
                     true, false, "general", ai.gargantua.core.skill.SkillSource.FILESYSTEM);
             skillCard = new SkillCard(meta, "", List.of(), null, List.of(), null, null, null);
         }
 
         // 6. Compose memory (placeholder - empty memory)
-        ComposedMemory memory = new ComposedMemory(List.of(), List.of(), List.of(), 0);
+        var memory = new ComposedMemory(List.of(), List.of(), List.of(), 0);
 
         // 7. Build prompt
-        EnricherContext enricherContext = new EnricherContext(
+        var enricherContext = new EnricherContext(
                 request.userId(),
                 request.sessionId(),
                 skillCard.meta().name(),
@@ -159,15 +159,15 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
                 request.message(),
                 Map.of()
         );
-        String systemPrompt = promptBuilder.build(skillCard, memory, enricherContext);
+        var systemPrompt = promptBuilder.build(skillCard, memory, enricherContext);
 
         // 8. Token budget allocation
-        List<String> toolDescriptions = toolRegistry.getFilteredTools(skillCard.allowedTools())
+        var toolDescriptions = toolRegistry.getFilteredTools(skillCard.allowedTools())
                 .stream()
                 .map(ToolDefinition::description)
                 .toList();
 
-        BudgetRequest budgetRequest = new BudgetRequest(
+        var budgetRequest = new BudgetRequest(
                 systemPrompt,
                 "",
                 skillCard.references() != null ? skillCard.references() : List.of(),
@@ -177,10 +177,10 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
                 request.message(),
                 properties.getMemory().getComposer().getMaxContextTokens()
         );
-        BudgetAllocation allocation = tokenBudgetManager.allocate(budgetRequest);
+        var allocation = tokenBudgetManager.allocate(budgetRequest);
 
         // 9. LLM call (placeholder)
-        LlmRoutingContext llmCtx = new LlmRoutingContext(
+        var llmCtx = new LlmRoutingContext(
                 request.userId(),
                 request.sessionId(),
                 skillCard.meta().name(),
@@ -194,7 +194,7 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
                 request.contextAttributes() != null ? request.contextAttributes() : Map.of()
         );
 
-        String rawResponse = llmProviderFactory.generate(
+        var rawResponse = llmProviderFactory.generate(
                 allocation.systemPrompt(),
                 request.message(),
                 skillCard,
@@ -202,14 +202,14 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
         );
 
         // 10. Output guardrails
-        GuardrailOutputContext outputCtx = new GuardrailOutputContext(
+        var outputCtx = new GuardrailOutputContext(
                 rawResponse,
                 request.userId(),
                 request.sessionId(),
                 skillCard.meta(),
                 inputAttributes
         );
-        String processedResponse = guardrailPipeline.processOutput(outputCtx);
+        var processedResponse = guardrailPipeline.processOutput(outputCtx);
 
         // 11. Persist memory (skip in dry-run)
         if (!isDryRun) {

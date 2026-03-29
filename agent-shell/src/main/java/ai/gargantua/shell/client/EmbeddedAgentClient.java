@@ -28,11 +28,11 @@ public class EmbeddedAgentClient implements AgentClient {
     @Override
     public void stream(ShellChatRequest request, Consumer<SseEvent> eventConsumer) {
         try {
-            DryRunContext dryRunContext = request.dryRun()
+            var dryRunContext = request.dryRun()
                     ? DryRunContext.active(Map.of())
                     : DryRunContext.inactive();
 
-            AgentRequest agentRequest = AgentRequest.builder()
+            var agentRequest = AgentRequest.builder()
                     .message(request.message())
                     .sessionId(request.sessionId())
                     .userId(request.userId())
@@ -40,7 +40,7 @@ public class EmbeddedAgentClient implements AgentClient {
                     .dryRunContext(dryRunContext)
                     .build();
 
-            AgentResponse response = orchestrator.invoke(agentRequest);
+            var response = orchestrator.invoke(agentRequest);
 
             // Emit tool call events
             if (response.toolsCalled() != null) {

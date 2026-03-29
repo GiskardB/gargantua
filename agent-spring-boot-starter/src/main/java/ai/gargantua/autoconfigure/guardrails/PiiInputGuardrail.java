@@ -54,15 +54,15 @@ public class PiiInputGuardrail implements InputGuardrail {
             return GuardrailResult.pass(name());
         }
 
-        Map<String, String> piiMap = new HashMap<>();
-        String masked = ctx.userMessage();
+        var piiMap = new HashMap<String, String>();
+        var masked = ctx.userMessage();
         int counter = 0;
 
         // Mask emails
         Matcher emailMatcher = EMAIL_PATTERN.matcher(masked);
         while (emailMatcher.find()) {
-            String original = emailMatcher.group();
-            String placeholder = "[EMAIL_" + counter + "]";
+            var original = emailMatcher.group();
+            var placeholder = "[EMAIL_%d]".formatted(counter);
             piiMap.put(placeholder, original);
             masked = masked.replace(original, placeholder);
             counter++;
@@ -71,8 +71,8 @@ public class PiiInputGuardrail implements InputGuardrail {
         // Mask IBANs
         Matcher ibanMatcher = IBAN_PATTERN.matcher(masked);
         while (ibanMatcher.find()) {
-            String original = ibanMatcher.group();
-            String placeholder = "[IBAN_" + counter + "]";
+            var original = ibanMatcher.group();
+            var placeholder = "[IBAN_%d]".formatted(counter);
             piiMap.put(placeholder, original);
             masked = masked.replace(original, placeholder);
             counter++;
@@ -81,8 +81,8 @@ public class PiiInputGuardrail implements InputGuardrail {
         // Mask phones
         Matcher phoneMatcher = PHONE_PATTERN.matcher(masked);
         while (phoneMatcher.find()) {
-            String original = phoneMatcher.group();
-            String placeholder = "[PHONE_" + counter + "]";
+            var original = phoneMatcher.group();
+            var placeholder = "[PHONE_%d]".formatted(counter);
             piiMap.put(placeholder, original);
             masked = masked.replace(original, placeholder);
             counter++;

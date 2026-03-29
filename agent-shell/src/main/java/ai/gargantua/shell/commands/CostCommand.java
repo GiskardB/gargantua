@@ -41,16 +41,16 @@ public class CostCommand {
             return "No requests recorded yet. Start a chat session to track costs.";
         }
 
-        StringBuilder sb = new StringBuilder();
+        var sb = new StringBuilder();
         sb.append("=== Cost Summary ===\n\n");
 
         // Per-skill breakdown
-        List<String> headers = List.of("Skill", "Requests", "Input Tokens", "Output Tokens", "Total Tokens");
-        List<List<String>> rows = new ArrayList<>();
+        var headers = List.of("Skill", "Requests", "Input Tokens", "Output Tokens", "Total Tokens");
+        var rows = new ArrayList<List<String>>();
 
-        for (Map.Entry<String, SkillCostAccumulator> entry : costBySkill.entrySet()) {
-            SkillCostAccumulator acc = entry.getValue();
-            long total = acc.inputTokens.get() + acc.outputTokens.get();
+        for (var entry : costBySkill.entrySet()) {
+            var acc = entry.getValue();
+            var total = acc.inputTokens.get() + acc.outputTokens.get();
             rows.add(List.of(
                     entry.getKey(),
                     String.valueOf(acc.requests.get()),
@@ -63,12 +63,15 @@ public class CostCommand {
         sb.append(tableRenderer.renderTable(headers, rows));
 
         // Totals
-        long totalIn = totalInputTokens.get();
-        long totalOut = totalOutputTokens.get();
-        sb.append("\nTotal Requests:      ").append(totalRequests.get()).append('\n');
-        sb.append("Total Input Tokens:  ").append(totalIn).append('\n');
-        sb.append("Total Output Tokens: ").append(totalOut).append('\n');
-        sb.append("Total Tokens:        ").append(totalIn + totalOut).append('\n');
+        var totalIn = totalInputTokens.get();
+        var totalOut = totalOutputTokens.get();
+        sb.append("""
+
+                Total Requests:      %d
+                Total Input Tokens:  %d
+                Total Output Tokens: %d
+                Total Tokens:        %d
+                """.formatted(totalRequests.get(), totalIn, totalOut, totalIn + totalOut));
 
         return sb.toString();
     }

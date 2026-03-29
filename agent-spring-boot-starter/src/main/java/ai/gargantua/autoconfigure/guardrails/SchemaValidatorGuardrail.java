@@ -88,18 +88,18 @@ public class SchemaValidatorGuardrail implements OutputGuardrail {
                 return new GuardrailOutputResult(GuardrailVerdict.PASS, response, null, name());
             }
 
-            String errorDetails = errors.stream()
+            var errorDetails = errors.stream()
                     .map(ValidationMessage::getMessage)
                     .collect(Collectors.joining("; "));
             log.warn("Schema validation failed: {}", errorDetails);
 
             return new GuardrailOutputResult(GuardrailVerdict.BLOCK, response,
-                    "Schema validation failed: " + errorDetails, name());
+                    "Schema validation failed: %s".formatted(errorDetails), name());
 
         } catch (Exception e) {
             log.error("Error during schema validation", e);
             return new GuardrailOutputResult(GuardrailVerdict.PASS, response,
-                    "Schema validation error: " + e.getMessage(), name());
+                    "Schema validation error: %s".formatted(e.getMessage()), name());
         }
     }
 
