@@ -38,7 +38,7 @@ import java.util.Map;
 
 /**
  * Default implementation of {@link OrchestratorEngine} that executes the full
- * 12-step agent invocation pipeline:
+ * 13-step agent invocation pipeline:
  *
  * <ol>
  *   <li>Extract dry-run context</li>
@@ -53,6 +53,7 @@ import java.util.Map;
  *   <li>Run output guardrails (PII redaction, disclaimer injection, schema validation)</li>
  *   <li>Persist memory (skip in dry-run mode)</li>
  *   <li>Build and return the response with metadata</li>
+ *   <li>Record audit trail event (if auditing is enabled)</li>
  * </ol>
  *
  * @see OrchestratorEngine
@@ -266,7 +267,7 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
         int inputTokens = tokenBudgetManager.estimate(request.message());
         int outputTokens = tokenBudgetManager.estimate(processedResponse);
 
-        return new AgentResponse(
+        var response = new AgentResponse(
                 processedResponse,
                 effectiveSessionId,
                 routingResult.skillName(),
@@ -280,5 +281,16 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
                 durationMs,
                 isDryRun
         );
+
+        // 13. Record audit trail
+        if (auditService != null) {
+            try {
+                auditService.recordRequest(request, response, routingResult, inputResult.results());
+            } catch (Exception e) {
+                log.warn("Failed to record audit event: {}", e.getMessage());
+            }
+        }
+
+        return response;
     }
 }

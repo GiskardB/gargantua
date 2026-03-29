@@ -1,11 +1,13 @@
 package ai.gargantua.autoconfigure;
 
+import ai.gargantua.core.audit.AuditStore;
 import ai.gargantua.core.hitl.ApprovalStore;
 import ai.gargantua.core.memory.EpisodicMemoryPort;
 import ai.gargantua.core.memory.KnowledgeMemoryPort;
 import ai.gargantua.core.memory.WorkingMemoryPort;
 import ai.gargantua.core.rag.VectorStorePort;
 import ai.gargantua.memory.adapters.inmemory.InMemoryApprovalStore;
+import ai.gargantua.memory.adapters.inmemory.InMemoryAuditStore;
 import ai.gargantua.memory.adapters.inmemory.InMemoryEpisodicMemoryAdapter;
 import ai.gargantua.memory.adapters.inmemory.InMemoryKnowledgeMemoryAdapter;
 import ai.gargantua.memory.adapters.inmemory.InMemoryVectorStore;
@@ -79,5 +81,12 @@ public class EmbeddedProfileAutoConfiguration {
     public VectorStorePort inMemoryVectorStore() {
         log.info("Using in-memory vector store (keyword-based, not for production)");
         return new InMemoryVectorStore();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(AuditStore.class)
+    public AuditStore inMemoryAuditStore() {
+        log.info("Using in-memory audit store (data will be lost on restart)");
+        return new InMemoryAuditStore();
     }
 }

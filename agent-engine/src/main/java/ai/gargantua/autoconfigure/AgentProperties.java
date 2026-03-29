@@ -33,6 +33,7 @@ public class AgentProperties {
     private Enrichers enrichers = new Enrichers();
     private Mcp mcp = new Mcp();
     private Skillsjars skillsjars = new Skillsjars();
+    private Audit audit = new Audit();
 
     // --- getters and setters ---
 
@@ -86,6 +87,9 @@ public class AgentProperties {
 
     public Skillsjars getSkillsjars() { return skillsjars; }
     public void setSkillsjars(Skillsjars skillsjars) { this.skillsjars = skillsjars; }
+
+    public Audit getAudit() { return audit; }
+    public void setAudit(Audit audit) { this.audit = audit; }
 
     // ==================== Nested classes ====================
 
@@ -565,5 +569,16 @@ public class AgentProperties {
 
         public Map<String, String> getToolMappings() { return toolMappings; }
         public void setToolMappings(Map<String, String> toolMappings) { this.toolMappings = toolMappings; }
+    }
+
+    public static class Audit {
+        private boolean enabled = true;
+        private int retentionDays = 365;
+
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
+
+        public int getRetentionDays() { return retentionDays; }
+        public void setRetentionDays(int retentionDays) { this.retentionDays = retentionDays; }
     }
 }
