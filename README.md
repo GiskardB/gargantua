@@ -10,7 +10,7 @@ Built on Java 21, Spring Boot 4.0.4, and LangChain4j 1.12.1.
 
 ## Try it in 60 seconds
 
-> Requires: Java 21+, Maven, an OpenAI/Anthropic API key. No Docker needed.
+> Requires: Java 21+, Maven, an OpenAI or Anthropic API key. No Docker needed.
 
 ```bash
 # 1. Generate a new agent project
@@ -27,14 +27,36 @@ cd my-agent
 LLM_PRIMARY_PROVIDER=openai \
 LLM_PRIMARY_MODEL=gpt-4o \
 LLM_PRIMARY_API_KEY=sk-your-key \
+LLM_PRIMARY_ENDPOINT=https://api.openai.com/v1 \
 SPRING_PROFILES_ACTIVE=embedded \
 mvn spring-boot:run
+#
+# Using Anthropic instead?
+#   LLM_PRIMARY_PROVIDER=anthropic
+#   LLM_PRIMARY_MODEL=claude-sonnet-4-20250514
+#   LLM_PRIMARY_API_KEY=sk-ant-your-key
+#   LLM_PRIMARY_ENDPOINT=https://api.anthropic.com
+#
+# Using Azure OpenAI?
+#   LLM_PRIMARY_PROVIDER=azure-openai
+#   LLM_PRIMARY_MODEL=gpt-4o
+#   LLM_PRIMARY_API_KEY=your-azure-key
+#   LLM_PRIMARY_ENDPOINT=https://your-resource.openai.azure.com
 
-# 3. Talk to your agent
+# 3. Talk to your agent (pick one)
+
+#    Option A — curl
 curl -X POST http://localhost:8080/api/agent/chat \
   -H "Content-Type: application/json" \
   -H "X-User-Id: me" -H "X-Session-Id: s1" \
   -d '{"message": "Hello, what can you do?"}'
+
+#    Option B — interactive shell (in a second terminal)
+java -jar agent-shell/target/agent-shell-1.0.0.jar
+#    Then type: chat
+#    You: Hello, what can you do?
+#    Agent: I can help you with...
+#    You: \exit
 ```
 
 That's a running agent with skill routing, guardrails, memory, streaming, and a REST API. Read on to add your own tools and skills.
@@ -190,8 +212,14 @@ export LLM_PRIMARY_MODEL=gpt-4o
 # 3. Set the API key
 #    OpenAI:    sk-...        (from platform.openai.com/api-keys)
 #    Anthropic: sk-ant-...    (from console.anthropic.com)
-#    Azure:     your resource key + set LLM_PRIMARY_ENDPOINT
+#    Azure:     your resource key
 export LLM_PRIMARY_API_KEY=sk-your-key-here
+
+# 4. Set the endpoint
+#    OpenAI:    https://api.openai.com/v1          (default)
+#    Anthropic: https://api.anthropic.com           (default)
+#    Azure:     https://your-resource.openai.azure.com  (REQUIRED)
+export LLM_PRIMARY_ENDPOINT=https://api.openai.com/v1
 ```
 
 ### 4. Run
@@ -203,11 +231,16 @@ mvn spring-boot:run
 ### 5. Test
 
 ```bash
-# Chat with your agent
+# Option A — curl
 curl -X POST http://localhost:8080/api/agent/chat \
   -H "Content-Type: application/json" \
   -H "X-User-Id: user1" -H "X-Session-Id: sess1" \
   -d '{"message": "Hello, what can you do?"}'
+
+# Option B — interactive shell (in a second terminal)
+java -jar agent-shell/target/agent-shell-1.0.0.jar
+# Type: chat
+# Then talk to your agent interactively. Type \exit to quit.
 
 # See what skills are available
 curl http://localhost:8080/api/capabilities
@@ -531,7 +564,7 @@ All storage uses in-memory ConcurrentHashMaps. Data is lost on restart.
 | `LLM_PRIMARY_PROVIDER` | Which LLM service: `openai`, `azure-openai`, `anthropic` | `openai` |
 | `LLM_PRIMARY_MODEL` | Which model from that provider (e.g. `gpt-4o`, `claude-sonnet-4-20250514`) | `gpt-4o` |
 | `LLM_PRIMARY_API_KEY` | API key for the chosen provider (OpenAI: `sk-...`, Anthropic: `sk-ant-...`) | **(required)** |
-| `LLM_PRIMARY_ENDPOINT` | Base URL (required **only** for `azure-openai`) | provider default |
+| `LLM_PRIMARY_ENDPOINT` | Provider API endpoint. Required for `azure-openai`. Defaults: OpenAI `https://api.openai.com/v1`, Anthropic `https://api.anthropic.com` | provider default |
 | `LLM_PRIMARY_TEMPERATURE` | Sampling temperature (0.0 -- 1.0) | `0.7` |
 | `LLM_PRIMARY_MAX_TOKENS` | Max tokens in LLM response | `1000` |
 | **Fallback LLM** | Used automatically when primary provider fails | |
