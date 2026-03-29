@@ -144,7 +144,7 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
             // No skill registry available, use a minimal skill card
             var meta = new SkillMeta(routingResult.skillName(), "", "1.0.0",
                     true, false, "general", ai.gargantua.core.skill.SkillSource.FILESYSTEM);
-            skillCard = new SkillCard(meta, "", List.of(), null, List.of(), null, null, null);
+            skillCard = new SkillCard(meta, "", List.of(), null, List.of(), null, null, null, null);
         }
 
         // 6. Compose memory (placeholder - empty memory)

@@ -31,7 +31,7 @@ class CapabilitiesControllerTest {
                 true, true, "engineering", SkillSource.FILESYSTEM);
         SkillCard card = new SkillCard(
                 meta, "You are a code reviewer.", List.of("read_file"),
-                null, List.of(), 4096, 0.3, null);
+                null, List.of(), 4096, 0.3, null, null);
 
         when(registry.listMeta()).thenReturn(List.of(meta));
         when(registry.load(anyString())).thenReturn(card);

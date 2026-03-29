@@ -1,5 +1,7 @@
 package ai.gargantua.core.skill;
 
+import ai.gargantua.core.rag.RagConfig;
+
 import java.util.List;
 
 /**
@@ -18,6 +20,7 @@ import java.util.List;
  * @param maxTokens      per-skill override for max output tokens (null = use global default)
  * @param temperature    per-skill override for LLM temperature (null = use global default)
  * @param preferredModel per-skill LLM model alias (null = use LLM router)
+ * @param ragConfig      RAG configuration if skill declares knowledge-base (null = no RAG)
  *
  * @see SkillMeta
  * @see SkillRegistry
@@ -30,6 +33,7 @@ public record SkillCard(
         List<String> references,
         Integer maxTokens,
         Double temperature,
-        String preferredModel
+        String preferredModel,
+        RagConfig ragConfig
 ) {
 }

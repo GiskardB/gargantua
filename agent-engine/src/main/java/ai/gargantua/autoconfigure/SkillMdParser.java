@@ -1,5 +1,6 @@
 package ai.gargantua.autoconfigure;
 
+import ai.gargantua.core.rag.RagConfig;
 import ai.gargantua.core.skill.SkillCard;
 import ai.gargantua.core.skill.SkillMeta;
 import ai.gargantua.core.skill.SkillSource;
@@ -64,6 +65,19 @@ public class SkillMdParser {
 
         var references = getStringList(frontmatter, "references");
 
+        // RAG configuration from metadata
+        var knowledgeBase = getString(metadata, "knowledge-base", null);
+        RagConfig ragConfig = null;
+        if (knowledgeBase != null && !knowledgeBase.isBlank()) {
+            var ragMaxResults = getInteger(metadata, "rag-max-results");
+            var ragMinScore = getDouble(metadata, "rag-min-score");
+            ragConfig = new RagConfig(
+                    knowledgeBase,
+                    ragMaxResults != null ? ragMaxResults : 5,
+                    ragMinScore != null ? ragMinScore : 0.3
+            );
+        }
+
         var meta = new SkillMeta(name, description, version, active, hasSchema, domain, source);
 
         return new SkillCard(
@@ -74,7 +88,8 @@ public class SkillMdParser {
                 references,
                 maxTokens,
                 temperature,
-                preferredModel
+                preferredModel,
+                ragConfig
         );
     }
 
