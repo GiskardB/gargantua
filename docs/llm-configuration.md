@@ -19,9 +19,10 @@ agent:
       model: ${LLM_FALLBACK_MODEL:claude-sonnet-4-20250514}
       api-key: ${LLM_FALLBACK_API_KEY:}
     routing-model:
-      provider: ${LLM_ROUTING_PROVIDER:openai}
-      model: ${LLM_ROUTING_MODEL:gpt-4o-mini}
-      api-key: ${LLM_ROUTING_API_KEY:${LLM_PRIMARY_API_KEY:}}
+      provider: ${LLM_ROUTING_PROVIDER:ollama}
+      model: ${LLM_ROUTING_MODEL:phi4-mini}
+      api-key: ${LLM_ROUTING_API_KEY:}
+      endpoint: ${LLM_ROUTING_ENDPOINT:http://localhost:11434}
       temperature: 0.0
       max-tokens: 50
 ```
@@ -32,7 +33,7 @@ The only **mandatory** value is `LLM_PRIMARY_API_KEY`. Everything else has sensi
 |------|---------|---------|
 | **Primary** | Main model for all agent conversations | `openai` / `gpt-4o` |
 | **Fallback** | Auto-failover when primary fails (timeout, 5xx, rate limit). Backed by Resilience4j circuit breaker. | `anthropic` / `claude-sonnet-4-20250514` |
-| **Routing** | Cheap/fast model used internally for skill routing, session summaries, eval judge, topic scope guardrail | `openai` / `gpt-4o-mini` |
+| **Routing** | Cheap/fast model used internally for skill routing, session summaries, eval judge, topic scope guardrail. Runs locally via Ollama by default (zero API cost). | `ollama` / `phi4-mini` |
 
 ## Advanced Setup (model catalog + routing rules)
 
@@ -57,8 +58,9 @@ agent:
     primary: gpt-4o
     fallback: claude-sonnet
     routing-model:
-      provider: openai
-      model: gpt-4o-mini
+      provider: ollama
+      model: phi4-mini
+      endpoint: http://localhost:11434
       temperature: 0.0
 ```
 

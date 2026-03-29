@@ -5,11 +5,17 @@
 Gargantua requires:
 1. **MongoDB** running (for episodic memory, chat history, knowledge, evals, costs)
 2. **Redis** running (for working memory, HITL approvals, tool cache, rate limits)
-3. **At least one LLM API key** set via `LLM_PRIMARY_API_KEY`
+3. **Ollama** running (for local routing model — skill routing, session summaries, eval judge — zero API cost)
+4. **At least one LLM API key** set via `LLM_PRIMARY_API_KEY`
 
-Start MongoDB and Redis with Docker:
+Start MongoDB, Redis, and Ollama with Docker:
 ```bash
-docker compose up -d mongo redis
+docker compose up -d mongo redis ollama
+```
+
+After the first start, pull the routing model into Ollama (one-time):
+```bash
+docker compose exec ollama ollama pull phi4-mini
 ```
 
 ## Add a Custom Guardrail

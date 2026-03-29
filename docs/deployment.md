@@ -58,17 +58,17 @@ See the [Repository setup section in README](../README.md#repository-setup--jitp
 
 ### JVM mode (default, fast rebuild ~30s)
 ```bash
-docker compose up agent-jvm mongo redis
+docker compose up agent-jvm mongo redis ollama
 ```
 
 ### GraalVM Native (startup < 100ms, build ~5min)
 ```bash
-docker compose --profile native up agent-native mongo redis
+docker compose --profile native up agent-native mongo redis ollama
 ```
 
 ### Infrastructure only (for running app from IDE)
 ```bash
-docker compose up mongo redis
+docker compose up mongo redis ollama
 ```
 
 ## Dockerfile — Multi-Stage Build
@@ -165,9 +165,10 @@ All state is in Redis (working memory, HITL, tool cache) and MongoDB (episodic, 
 | `LLM_FALLBACK_PROVIDER` | Fallback provider (on primary failure) | `anthropic` |
 | `LLM_FALLBACK_MODEL` | Fallback model | `claude-sonnet-4-20250514` |
 | `LLM_FALLBACK_API_KEY` | Fallback API key | *(optional)* |
-| `LLM_ROUTING_PROVIDER` | Routing model provider (cheap) | `openai` |
-| `LLM_ROUTING_MODEL` | Routing model name | `gpt-4o-mini` |
-| `LLM_ROUTING_API_KEY` | Routing model API key | same as primary |
+| `LLM_ROUTING_PROVIDER` | Routing model provider (local via Ollama by default) | `ollama` |
+| `LLM_ROUTING_MODEL` | Routing model name | `phi4-mini` |
+| `LLM_ROUTING_ENDPOINT` | Routing model endpoint (Ollama URL when local) | `http://localhost:11434` |
+| `LLM_ROUTING_API_KEY` | Routing model API key (not needed for Ollama) | *(optional)* |
 | `ROUTING_STRATEGY` | Skill routing: `hybrid` / `semantic` / `llm` | `hybrid` |
 | `SPRING_PROFILES_ACTIVE` | Spring profile | `dev` |
 

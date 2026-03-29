@@ -10,6 +10,65 @@ Built on Spring Boot 4.0.4 and LangChain4j 1.12.1.
 
 **Everything else is provided out-of-the-box** as library dependencies: orchestration, routing, 3-layer memory, streaming, guardrails, HITL, eval, cost tracking, CLI, MCP gateway, and more.
 
+```mermaid
+graph TB
+    subgraph "What YOU write"
+        SKILL["SKILL.md<br/><i>Behavior, routing hints,<br/>allowed tools</i>"]
+        TOOL["@AgentTool<br/><i>Your business logic<br/>(Java methods)</i>"]
+    end
+
+    subgraph "What GARGANTUA provides"
+        direction TB
+
+        ROUTE["Hybrid Routing<br/><i>Semantic + LLM fallback</i>"]
+        GUARD_IN["Input Guardrails<br/><i>PII · Injection · Rate limit</i>"]
+        ORCH["Orchestrator Engine<br/><i>Full pipeline coordination</i>"]
+        LLM["Multi-Provider LLM<br/><i>OpenAI · Anthropic · Ollama<br/>Rule-based routing + failover</i>"]
+        MEM["3-Layer Memory<br/><i>Working (Redis)<br/>Episodic + Knowledge (MongoDB)</i>"]
+        GUARD_OUT["Output Guardrails<br/><i>PII · Disclaimer · Schema</i>"]
+        STREAM["SSE Streaming<br/><i>Real-time token delivery</i>"]
+        HITL["Human-in-the-Loop<br/><i>@RequiresApproval</i>"]
+    end
+
+    subgraph "What CLIENTS consume"
+        API["REST API<br/><i>/api/agent/chat</i>"]
+        CLI["Agent Shell<br/><i>Interactive CLI</i>"]
+        MCP["MCP Gateway<br/><i>Claude Desktop · Cursor</i>"]
+        DOCS["Swagger + Redoc<br/><i>Auto-generated docs</i>"]
+    end
+
+    subgraph "Operations"
+        EVAL["Eval Framework<br/><i>LLM-as-Judge</i>"]
+        COST["Cost Tracking<br/><i>Per skill · user · provider</i>"]
+        OTEL["Observability<br/><i>OTel · Micrometer</i>"]
+        K8S["Kubernetes<br/><i>Kustomize · Helm · KEDA</i>"]
+    end
+
+    SKILL --> ROUTE
+    TOOL --> ORCH
+    ROUTE --> ORCH
+    GUARD_IN --> ORCH
+    ORCH --> LLM
+    ORCH --> MEM
+    LLM --> GUARD_OUT
+    GUARD_OUT --> STREAM
+    ORCH --> HITL
+    STREAM --> API
+    STREAM --> CLI
+    STREAM --> MCP
+    API --> DOCS
+    ORCH --> EVAL
+    ORCH --> COST
+    ORCH --> OTEL
+
+    style SKILL fill:#4CAF50,color:#fff,stroke:#388E3C
+    style TOOL fill:#4CAF50,color:#fff,stroke:#388E3C
+    style API fill:#2196F3,color:#fff,stroke:#1565C0
+    style CLI fill:#2196F3,color:#fff,stroke:#1565C0
+    style MCP fill:#2196F3,color:#fff,stroke:#1565C0
+    style DOCS fill:#2196F3,color:#fff,stroke:#1565C0
+```
+
 ---
 
 ## Quick Start -- Create a New Agent

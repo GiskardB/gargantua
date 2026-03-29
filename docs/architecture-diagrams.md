@@ -79,7 +79,7 @@ sequenceDiagram
     participant Engine as OrchestratorEngine
     participant Semantic as SemanticRoutingService
     participant Embed as Embedding Model<br/>(all-MiniLM-L6-v2)
-    participant LLM_Route as LLM Routing<br/>(gpt-4o-mini)
+    participant LLM_Route as LLM Routing<br/>(Ollama / phi4-mini)
     participant Registry as SkillRegistry
 
     Engine->>Registry: listMeta() [from Caffeine cache]
@@ -269,7 +269,7 @@ sequenceDiagram
     participant Admin as Admin / CI
     participant Runner as EvalRunner
     participant Engine as OrchestratorEngine
-    participant Judge as Judge LLM<br/>(gpt-4o-mini)
+    participant Judge as Judge LLM<br/>(Ollama / phi4-mini)
     participant Repo as EvalReportRepository<br/>(MongoDB)
 
     Admin->>Runner: POST /api/admin/evals/run/weather-skill
