@@ -24,8 +24,8 @@ public class EvalsPresentRule implements LintRule {
 
     @Override
     public Optional<SkillLintResult> check(SkillLintInput input) {
-        File evalsDir = new File(input.skillDir(), "evals");
-        File evalsJson = new File(input.skillDir(), "evals.json");
+        var evalsDir = new File(input.skillDir(), "evals");
+        var evalsJson = new File(input.skillDir(), "evals.json");
 
         if (!evalsDir.isDirectory() && !evalsJson.isFile()) {
             return Optional.of(new SkillLintResult(

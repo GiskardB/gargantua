@@ -50,16 +50,16 @@ public class FilesystemSkillRegistry implements SkillRegistry {
         if (cachedMeta != null) {
             return cachedMeta;
         }
-        List<SkillMeta> result = new ArrayList<>();
+        var result = new ArrayList<SkillMeta>();
         try {
-            String pattern = skillPath.endsWith("/")
+            var pattern = skillPath.endsWith("/")
                     ? skillPath + "**/SKILL.md"
                     : skillPath + "/**/SKILL.md";
-            Resource[] resources = resourcePatternResolver.getResources(pattern);
-            for (Resource resource : resources) {
-                try (InputStream is = resource.getInputStream()) {
-                    String content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-                    SkillMeta meta = skillMdParser.parseFrontmatter(content, SkillSource.FILESYSTEM);
+            var resources = resourcePatternResolver.getResources(pattern);
+            for (var resource : resources) {
+                try (var is = resource.getInputStream()) {
+                    var content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                    var meta = skillMdParser.parseFrontmatter(content, SkillSource.FILESYSTEM);
                     result.add(meta);
                 } catch (IOException e) {
                     log.warn("Failed to parse skill file: {}", resource.getDescription(), e);
@@ -75,15 +75,15 @@ public class FilesystemSkillRegistry implements SkillRegistry {
     @Override
     public SkillCard load(String skillName) {
         try {
-            String pattern = skillPath.endsWith("/")
-                    ? skillPath + skillName + "/SKILL.md"
-                    : skillPath + "/" + skillName + "/SKILL.md";
-            Resource[] resources = resourcePatternResolver.getResources(pattern);
+            var pattern = skillPath.endsWith("/")
+                    ? "%s%s/SKILL.md".formatted(skillPath, skillName)
+                    : "%s/%s/SKILL.md".formatted(skillPath, skillName);
+            var resources = resourcePatternResolver.getResources(pattern);
             if (resources.length == 0) {
                 throw new SkillNotFoundException(skillName);
             }
-            try (InputStream is = resources[0].getInputStream()) {
-                String content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+            try (var is = resources[0].getInputStream()) {
+                var content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
                 return skillMdParser.parseFull(content, SkillSource.FILESYSTEM);
             }
         } catch (IOException e) {

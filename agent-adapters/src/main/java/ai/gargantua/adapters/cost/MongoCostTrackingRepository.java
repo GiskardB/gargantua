@@ -34,7 +34,7 @@ public class MongoCostTrackingRepository {
     }
 
     public List<Map> findSummary(Instant from, Instant to) {
-        Aggregation aggregation = Aggregation.newAggregation(
+        var aggregation = Aggregation.newAggregation(
                 Aggregation.match(Criteria.where("timestamp").gte(from).lte(to)),
                 Aggregation.group("skillName", "provider")
                         .sum("inputTokens").as("totalInputTokens")
@@ -42,12 +42,12 @@ public class MongoCostTrackingRepository {
                         .sum("estimatedCostUsd").as("totalCostUsd")
                         .count().as("requestCount")
         );
-        AggregationResults<Map> results = mongoTemplate.aggregate(aggregation, COLLECTION, Map.class);
+        var results = mongoTemplate.aggregate(aggregation, COLLECTION, Map.class);
         return results.getMappedResults();
     }
 
     public List<TokenUsageDocument> findByUser(String userId, Instant from, Instant to) {
-        Query query = new Query(
+        var query = new Query(
                 Criteria.where("userId").is(userId)
                         .and("timestamp").gte(from).lte(to)
         );
@@ -55,7 +55,7 @@ public class MongoCostTrackingRepository {
     }
 
     public List<Map> findBySkill(Instant from, Instant to) {
-        Aggregation aggregation = Aggregation.newAggregation(
+        var aggregation = Aggregation.newAggregation(
                 Aggregation.match(Criteria.where("timestamp").gte(from).lte(to)),
                 Aggregation.group("skillName")
                         .sum("inputTokens").as("totalInputTokens")
@@ -64,12 +64,12 @@ public class MongoCostTrackingRepository {
                         .count().as("requestCount")
                         .avg("durationMs").as("avgDurationMs")
         );
-        AggregationResults<Map> results = mongoTemplate.aggregate(aggregation, COLLECTION, Map.class);
+        var results = mongoTemplate.aggregate(aggregation, COLLECTION, Map.class);
         return results.getMappedResults();
     }
 
     public List<Map> findDaily(Instant from, Instant to) {
-        Aggregation aggregation = Aggregation.newAggregation(
+        var aggregation = Aggregation.newAggregation(
                 Aggregation.match(Criteria.where("timestamp").gte(from).lte(to)),
                 Aggregation.project()
                         .and("timestamp").dateAsFormattedString("%Y-%m-%d").as("day")
@@ -83,7 +83,7 @@ public class MongoCostTrackingRepository {
                         .count().as("requestCount"),
                 Aggregation.sort(org.springframework.data.domain.Sort.Direction.ASC, "_id")
         );
-        AggregationResults<Map> results = mongoTemplate.aggregate(aggregation, COLLECTION, Map.class);
+        var results = mongoTemplate.aggregate(aggregation, COLLECTION, Map.class);
         return results.getMappedResults();
     }
 

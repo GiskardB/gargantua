@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.StringJoiner;
 
 /**
  * REST endpoint for exporting chat history in various formats (JSON, Markdown).
@@ -58,17 +59,17 @@ public class ChatExportController {
             case "txt" -> ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN_VALUE)
                     .header(HttpHeaders.CONTENT_DISPOSITION,
-                            "attachment; filename=\"chat-" + sessionId + ".txt\"")
+                            "attachment; filename=\"chat-%s.txt\"".formatted(sessionId))
                     .body(formatAsText(messages));
             case "md" -> ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN_VALUE)
                     .header(HttpHeaders.CONTENT_DISPOSITION,
-                            "attachment; filename=\"chat-" + sessionId + ".md\"")
+                            "attachment; filename=\"chat-%s.md\"".formatted(sessionId))
                     .body(formatAsMarkdown(messages, sessionId));
             default -> ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                     .header(HttpHeaders.CONTENT_DISPOSITION,
-                            "attachment; filename=\"chat-" + sessionId + ".json\"")
+                            "attachment; filename=\"chat-%s.json\"".formatted(sessionId))
                     .body(formatAsJson(messages));
         };
     }
@@ -100,44 +101,35 @@ public class ChatExportController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"export-" + userId + ".json\"")
+                        "attachment; filename=\"export-%s.json\"".formatted(userId))
                 .body(formatAsJson(messages));
     }
 
     private String formatAsText(List<ChatMessage> messages) {
-        StringBuilder sb = new StringBuilder();
-        for (ChatMessage msg : messages) {
-            sb.append("[").append(msg.timestamp()).append("] ")
-                    .append(msg.role().toUpperCase()).append(": ")
-                    .append(msg.content()).append("\n\n");
+        var sb = new StringBuilder();
+        for (var msg : messages) {
+            sb.append("[%s] %s: %s\n\n".formatted(msg.timestamp(), msg.role().toUpperCase(), msg.content()));
         }
         return sb.toString();
     }
 
     private String formatAsMarkdown(List<ChatMessage> messages, String sessionId) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("# Chat Export - Session ").append(sessionId).append("\n\n");
-        for (ChatMessage msg : messages) {
-            String label = "user".equals(msg.role()) ? "**User**" : "**Assistant**";
-            sb.append("### ").append(label).append(" (").append(msg.timestamp()).append(")\n\n");
-            sb.append(msg.content()).append("\n\n---\n\n");
+        var sb = new StringBuilder("# Chat Export - Session %s\n\n".formatted(sessionId));
+        for (var msg : messages) {
+            var label = "user".equals(msg.role()) ? "**User**" : "**Assistant**";
+            sb.append("### %s (%s)\n\n%s\n\n---\n\n".formatted(label, msg.timestamp(), msg.content()));
         }
         return sb.toString();
     }
 
     private String formatAsJson(List<ChatMessage> messages) {
-        StringBuilder sb = new StringBuilder("[");
-        for (int i = 0; i < messages.size(); i++) {
-            ChatMessage msg = messages.get(i);
-            sb.append("{\"role\":\"").append(msg.role())
-                    .append("\",\"content\":\"").append(escapeJson(msg.content()))
-                    .append("\",\"timestamp\":\"").append(msg.timestamp()).append("\"}");
-            if (i < messages.size() - 1) {
-                sb.append(",");
-            }
+        var joiner = new StringJoiner(",", "[", "]");
+        for (var msg : messages) {
+            joiner.add("""
+                    {"role":"%s","content":"%s","timestamp":"%s"}"""
+                    .formatted(msg.role(), escapeJson(msg.content()), msg.timestamp()));
         }
-        sb.append("]");
-        return sb.toString();
+        return joiner.toString();
     }
 
     private String escapeJson(String text) {

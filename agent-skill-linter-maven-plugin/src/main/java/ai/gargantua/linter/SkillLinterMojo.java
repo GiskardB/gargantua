@@ -50,8 +50,8 @@ public class SkillLinterMojo extends AbstractMojo {
             return;
         }
 
-        SkillLinter linter = new SkillLinter(rules);
-        List<SkillLintResult> results = linter.lint(skillsDirectory);
+        var linter = new SkillLinter(rules);
+        var results = linter.lint(skillsDirectory);
 
         if (results.isEmpty()) {
             getLog().info("All skills passed linting.");
@@ -61,8 +61,8 @@ public class SkillLinterMojo extends AbstractMojo {
         boolean hasErrors = false;
         boolean hasWarnings = false;
 
-        for (SkillLintResult result : results) {
-            String msg = "[%s] %s: %s (%s:%d)"
+        for (var result : results) {
+            var msg = "[%s] %s: %s (%s:%d)"
                     .formatted(result.level(), result.rule(), result.message(),
                                result.file(), result.line());
 

@@ -28,7 +28,7 @@ public class SearchTool {
     @AgentTool(description = "Search the web for information on a given query")
     public SearchResult searchWeb(String query) {
         // Mock implementation returning hardcoded search results
-        List<SearchResultItem> items = List.of(
+        var items = List.of(
                 new SearchResultItem(
                         "Result 1 for: " + query,
                         "https://example.com/result1",

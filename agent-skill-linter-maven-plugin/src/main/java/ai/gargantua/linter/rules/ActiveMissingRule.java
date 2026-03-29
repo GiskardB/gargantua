@@ -24,7 +24,7 @@ public class ActiveMissingRule implements LintRule {
     @Override
     @SuppressWarnings("unchecked")
     public Optional<SkillLintResult> check(SkillLintInput input) {
-        Object metadata = input.frontmatter().get("metadata");
+        var metadata = input.frontmatter().get("metadata");
         if (metadata instanceof Map<?, ?> metaMap) {
             if (metaMap.containsKey("active")) {
                 return Optional.empty();

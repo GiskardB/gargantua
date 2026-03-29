@@ -29,9 +29,9 @@ public class CompositeSkillRegistry implements SkillRegistry {
 
     @Override
     public List<SkillMeta> listMeta() {
-        Map<String, SkillMeta> merged = new LinkedHashMap<>();
-        for (SkillRegistry registry : registries) {
-            for (SkillMeta meta : registry.listMeta()) {
+        var merged = new LinkedHashMap<String, SkillMeta>();
+        for (var registry : registries) {
+            for (var meta : registry.listMeta()) {
                 merged.putIfAbsent(meta.name(), meta);
             }
         }
@@ -40,8 +40,8 @@ public class CompositeSkillRegistry implements SkillRegistry {
 
     @Override
     public SkillCard load(String skillName) {
-        for (SkillRegistry registry : registries) {
-            Optional<SkillMeta> meta = registry.findMeta(skillName);
+        for (var registry : registries) {
+            var meta = registry.findMeta(skillName);
             if (meta.isPresent()) {
                 return registry.load(skillName);
             }
@@ -51,13 +51,11 @@ public class CompositeSkillRegistry implements SkillRegistry {
 
     @Override
     public Optional<SkillMeta> findMeta(String skillName) {
-        for (SkillRegistry registry : registries) {
-            Optional<SkillMeta> meta = registry.findMeta(skillName);
-            if (meta.isPresent()) {
-                return meta;
-            }
-        }
-        return Optional.empty();
+        return registries.stream()
+                .map(registry -> registry.findMeta(skillName))
+                .filter(Optional::isPresent)
+                .findFirst()
+                .orElse(Optional.empty());
     }
 
     @Override

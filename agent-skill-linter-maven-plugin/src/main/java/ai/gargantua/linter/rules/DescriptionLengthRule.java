@@ -24,7 +24,7 @@ public class DescriptionLengthRule implements LintRule {
 
     @Override
     public Optional<SkillLintResult> check(SkillLintInput input) {
-        Object desc = input.frontmatter().get("description");
+        var desc = input.frontmatter().get("description");
         if (desc != null && desc.toString().length() > MAX_LENGTH) {
             return Optional.of(new SkillLintResult(
                     input.skillName(),

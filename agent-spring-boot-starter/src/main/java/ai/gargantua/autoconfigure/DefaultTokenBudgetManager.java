@@ -41,26 +41,26 @@ public class DefaultTokenBudgetManager implements TokenBudgetManager {
 
     @Override
     public BudgetAllocation allocate(BudgetRequest request) {
-        int maxTokens = request.maxContextTokens();
-        List<String> truncationLog = new ArrayList<>();
+        var maxTokens = request.maxContextTokens();
+        var truncationLog = new ArrayList<String>();
 
         // Fixed costs: system prompt + user message + tool descriptions
-        int systemTokens = estimate(request.systemPrompt());
-        int userTokens = estimate(request.userMessage());
-        int enricherTokens = estimate(request.enrichedContext());
-        int toolTokens = request.toolDescriptions().stream().mapToInt(this::estimate).sum();
+        var systemTokens = estimate(request.systemPrompt());
+        var userTokens = estimate(request.userMessage());
+        var enricherTokens = estimate(request.enrichedContext());
+        var toolTokens = request.toolDescriptions().stream().mapToInt(this::estimate).sum();
 
-        int fixedTokens = systemTokens + userTokens + enricherTokens + toolTokens;
+        var fixedTokens = systemTokens + userTokens + enricherTokens + toolTokens;
 
         if (fixedTokens > maxTokens) {
             throw new TokenBudgetExceededException(fixedTokens, maxTokens);
         }
 
-        int remaining = maxTokens - fixedTokens;
+        var remaining = maxTokens - fixedTokens;
 
         // Allocate references
-        List<String> references = new ArrayList<>(request.references());
-        int refTokens = references.stream().mapToInt(this::estimate).sum();
+        var references = new ArrayList<>(request.references());
+        var refTokens = references.stream().mapToInt(this::estimate).sum();
         if (refTokens > remaining / 3) {
             references = truncateList(references, remaining / 3, truncationLog, "references");
             refTokens = references.stream().mapToInt(this::estimate).sum();
@@ -68,8 +68,8 @@ public class DefaultTokenBudgetManager implements TokenBudgetManager {
         remaining -= refTokens;
 
         // Allocate episodic summaries
-        List<String> episodic = new ArrayList<>(request.episodicSummaries());
-        int episodicTokens = episodic.stream().mapToInt(this::estimate).sum();
+        var episodic = new ArrayList<>(request.episodicSummaries());
+        var episodicTokens = episodic.stream().mapToInt(this::estimate).sum();
         if (episodicTokens > remaining / 2) {
             episodic = truncateList(episodic, remaining / 2, truncationLog, "episodic-summaries");
             episodicTokens = episodic.stream().mapToInt(this::estimate).sum();
@@ -77,16 +77,16 @@ public class DefaultTokenBudgetManager implements TokenBudgetManager {
         remaining -= episodicTokens;
 
         // Allocate knowledge segments
-        List<KnowledgeSegment> knowledge = new ArrayList<>(request.knowledge());
-        int knowledgeTokens = knowledge.stream().mapToInt(k -> estimate(k.content())).sum();
+        var knowledge = new ArrayList<>(request.knowledge());
+        var knowledgeTokens = knowledge.stream().mapToInt(k -> estimate(k.content())).sum();
         if (knowledgeTokens > remaining) {
             knowledge = truncateKnowledge(knowledge, remaining, truncationLog);
             knowledgeTokens = knowledge.stream().mapToInt(k -> estimate(k.content())).sum();
         }
         remaining -= knowledgeTokens;
 
-        int estimatedTotal = maxTokens - remaining;
-        boolean wasTruncated = !truncationLog.isEmpty();
+        var estimatedTotal = maxTokens - remaining;
+        var wasTruncated = !truncationLog.isEmpty();
 
         if (wasTruncated) {
             log.info("Token budget truncation applied: {}", truncationLog);
@@ -107,12 +107,12 @@ public class DefaultTokenBudgetManager implements TokenBudgetManager {
     }
 
     private List<String> truncateList(List<String> items, int maxTokens, List<String> log, String label) {
-        List<String> result = new ArrayList<>();
-        int used = 0;
-        for (String item : items) {
-            int cost = estimate(item);
+        var result = new ArrayList<String>();
+        var used = 0;
+        for (var item : items) {
+            var cost = estimate(item);
             if (used + cost > maxTokens) {
-                log.add("Truncated " + label + ": kept " + result.size() + "/" + items.size());
+                log.add("Truncated %s: kept %d/%d".formatted(label, result.size(), items.size()));
                 break;
             }
             result.add(item);
@@ -123,12 +123,12 @@ public class DefaultTokenBudgetManager implements TokenBudgetManager {
 
     private List<KnowledgeSegment> truncateKnowledge(List<KnowledgeSegment> items, int maxTokens,
                                                       List<String> log) {
-        List<KnowledgeSegment> result = new ArrayList<>();
-        int used = 0;
-        for (KnowledgeSegment item : items) {
-            int cost = estimate(item.content());
+        var result = new ArrayList<KnowledgeSegment>();
+        var used = 0;
+        for (var item : items) {
+            var cost = estimate(item.content());
             if (used + cost > maxTokens) {
-                log.add("Truncated knowledge: kept " + result.size() + "/" + items.size());
+                log.add("Truncated knowledge: kept %d/%d".formatted(result.size(), items.size()));
                 break;
             }
             result.add(item);

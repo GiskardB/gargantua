@@ -65,13 +65,8 @@ public class CostCommand {
         // Totals
         var totalIn = totalInputTokens.get();
         var totalOut = totalOutputTokens.get();
-        sb.append("""
-
-                Total Requests:      %d
-                Total Input Tokens:  %d
-                Total Output Tokens: %d
-                Total Tokens:        %d
-                """.formatted(totalRequests.get(), totalIn, totalOut, totalIn + totalOut));
+        sb.append("\nTotal Requests:      %d\nTotal Input Tokens:  %d\nTotal Output Tokens: %d\nTotal Tokens:        %d\n"
+                .formatted(totalRequests.get(), totalIn, totalOut, totalIn + totalOut));
 
         return sb.toString();
     }

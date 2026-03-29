@@ -47,13 +47,13 @@ public class ClasspathSkillsJarRegistry implements SkillRegistry {
         if (cachedMeta != null) {
             return cachedMeta;
         }
-        List<SkillMeta> result = new ArrayList<>();
+        var result = new ArrayList<SkillMeta>();
         try {
-            Resource[] resources = resourcePatternResolver.getResources(CLASSPATH_PATTERN);
-            for (Resource resource : resources) {
-                try (InputStream is = resource.getInputStream()) {
-                    String content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-                    SkillMeta meta = skillMdParser.parseFrontmatter(content, SkillSource.CLASSPATH_JAR);
+            var resources = resourcePatternResolver.getResources(CLASSPATH_PATTERN);
+            for (var resource : resources) {
+                try (var is = resource.getInputStream()) {
+                    var content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                    var meta = skillMdParser.parseFrontmatter(content, SkillSource.CLASSPATH_JAR);
                     result.add(meta);
                 } catch (IOException e) {
                     log.warn("Failed to parse classpath skill: {}", resource.getDescription(), e);
@@ -69,13 +69,13 @@ public class ClasspathSkillsJarRegistry implements SkillRegistry {
     @Override
     public SkillCard load(String skillName) {
         try {
-            String pattern = "classpath*:META-INF/skills/" + skillName + "/SKILL.md";
-            Resource[] resources = resourcePatternResolver.getResources(pattern);
+            var pattern = "classpath*:META-INF/skills/%s/SKILL.md".formatted(skillName);
+            var resources = resourcePatternResolver.getResources(pattern);
             if (resources.length == 0) {
                 throw new SkillNotFoundException(skillName);
             }
-            try (InputStream is = resources[0].getInputStream()) {
-                String content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+            try (var is = resources[0].getInputStream()) {
+                var content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
                 return skillMdParser.parseFull(content, SkillSource.CLASSPATH_JAR);
             }
         } catch (IOException e) {

@@ -40,7 +40,7 @@ public class RedisApprovalStore implements ApprovalStore {
     @Override
     public void savePending(String requestId, ApprovalRequest request, Duration ttl) {
         try {
-            String json = objectMapper.writeValueAsString(request);
+            var json = objectMapper.writeValueAsString(request);
             redisTemplate.opsForValue().set(KEY_PREFIX + requestId, json, ttl);
             log.debug("Saved pending approval: {}", requestId);
         } catch (JsonProcessingException e) {
@@ -50,7 +50,7 @@ public class RedisApprovalStore implements ApprovalStore {
 
     @Override
     public Optional<ApprovalRequest> getPending(String requestId) {
-        String json = redisTemplate.opsForValue().get(KEY_PREFIX + requestId);
+        var json = redisTemplate.opsForValue().get(KEY_PREFIX + requestId);
         if (json == null) {
             return Optional.empty();
         }
@@ -65,7 +65,7 @@ public class RedisApprovalStore implements ApprovalStore {
     @Override
     public void resolve(String requestId, ApprovalDecision decision) {
         try {
-            String json = objectMapper.writeValueAsString(decision);
+            var json = objectMapper.writeValueAsString(decision);
             redisTemplate.opsForValue().set(KEY_PREFIX + requestId + DECISION_SUFFIX, json);
             redisTemplate.delete(KEY_PREFIX + requestId);
             log.debug("Resolved approval: {} -> {}", requestId, decision.decision());

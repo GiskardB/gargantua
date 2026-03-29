@@ -71,8 +71,8 @@ public class WeatherTool {
             throw new IllegalArgumentException("days must be between 1 and 5");
         }
         // Mock implementation returning hardcoded forecast data
-        LocalDate today = LocalDate.now();
-        List<ForecastDay> forecastDays = IntStream.range(0, days)
+        var today = LocalDate.now();
+        var forecastDays = IntStream.range(0, days)
                 .mapToObj(i -> new ForecastDay(
                         today.plusDays(i + 1).toString(),
                         25.0 - i,

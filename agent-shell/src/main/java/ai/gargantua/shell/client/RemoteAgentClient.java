@@ -86,7 +86,7 @@ public class RemoteAgentClient implements AgentClient {
     @Override
     public String newSession() {
         try {
-            String sessionId = restClient.post()
+            var sessionId = restClient.post()
                     .uri("/api/agent/session")
                     .retrieve()
                     .body(String.class);

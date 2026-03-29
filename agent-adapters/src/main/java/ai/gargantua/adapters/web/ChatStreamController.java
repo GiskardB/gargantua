@@ -61,11 +61,11 @@ public class ChatStreamController {
 
         Flux.defer(() -> {
             try {
-                DryRunContext dryRunContext = dryRun
+                var dryRunContext = dryRun
                         ? DryRunContext.active(Map.of())
                         : DryRunContext.inactive();
 
-                AgentRequest agentRequest = AgentRequest.builder()
+                var agentRequest = AgentRequest.builder()
                         .message(request.message())
                         .userId(userId)
                         .sessionId(sessionId)
@@ -74,20 +74,23 @@ public class ChatStreamController {
 
                 sink.tryEmitNext(ServerSentEvent.<String>builder()
                         .event("token")
-                        .data("{\"status\":\"processing\"}")
+                        .data("""
+                                {"status":"processing"}""")
                         .build());
 
-                AgentResponse response = orchestratorEngine.invoke(agentRequest);
+                var response = orchestratorEngine.invoke(agentRequest);
 
                 if (response.toolsCalled() != null) {
-                    for (String tool : response.toolsCalled()) {
+                    for (var tool : response.toolsCalled()) {
                         sink.tryEmitNext(ServerSentEvent.<String>builder()
                                 .event("tool_call")
-                                .data("{\"tool\":\"" + tool + "\"}")
+                                .data("""
+                                        {"tool":"%s"}""".formatted(tool))
                                 .build());
                         sink.tryEmitNext(ServerSentEvent.<String>builder()
                                 .event("tool_result")
-                                .data("{\"tool\":\"" + tool + "\",\"status\":\"completed\"}")
+                                .data("""
+                                        {"tool":"%s","status":"completed"}""".formatted(tool))
                                 .build());
                     }
                 }
@@ -99,18 +102,18 @@ public class ChatStreamController {
 
                 sink.tryEmitNext(ServerSentEvent.<String>builder()
                         .event("done")
-                        .data("{\"sessionId\":\"" + response.sessionId()
-                                + "\",\"skillUsed\":\"" + response.skillUsed()
-                                + "\",\"totalTokens\":" + response.totalTokens()
-                                + ",\"durationMs\":" + response.durationMs()
-                                + "}")
+                        .data("""
+                                {"sessionId":"%s","skillUsed":"%s","totalTokens":%d,"durationMs":%d}"""
+                                .formatted(response.sessionId(), response.skillUsed(),
+                                        response.totalTokens(), response.durationMs()))
                         .build());
 
             } catch (Exception e) {
                 log.error("Error during streaming chat", e);
                 sink.tryEmitNext(ServerSentEvent.<String>builder()
                         .event("error")
-                        .data("{\"error\":\"" + e.getMessage().replace("\"", "\\\"") + "\"}")
+                        .data("""
+                                {"error":"%s"}""".formatted(e.getMessage().replace("\"", "\\\"")))
                         .build());
             } finally {
                 sink.tryEmitComplete();

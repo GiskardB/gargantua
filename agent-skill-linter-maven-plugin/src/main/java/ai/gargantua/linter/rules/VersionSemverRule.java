@@ -30,7 +30,7 @@ public class VersionSemverRule implements LintRule {
 
     @Override
     public Optional<SkillLintResult> check(SkillLintInput input) {
-        Object version = input.frontmatter().get("version");
+        var version = input.frontmatter().get("version");
         if (version == null) {
             return Optional.of(new SkillLintResult(
                     input.skillName(),
@@ -41,7 +41,7 @@ public class VersionSemverRule implements LintRule {
                     1
             ));
         }
-        String v = version.toString();
+        var v = version.toString();
         if (!SEMVER.matcher(v).matches()) {
             return Optional.of(new SkillLintResult(
                     input.skillName(),

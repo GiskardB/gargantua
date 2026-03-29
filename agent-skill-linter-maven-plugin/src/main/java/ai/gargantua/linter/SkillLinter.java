@@ -56,26 +56,26 @@ public class SkillLinter {
      * @return list of lint findings
      */
     public List<SkillLintResult> lint(File skillsDir) {
-        List<SkillLintResult> results = new ArrayList<>();
+        var results = new ArrayList<SkillLintResult>();
 
         if (skillsDir == null || !skillsDir.isDirectory()) {
             return results;
         }
 
-        File[] children = skillsDir.listFiles(File::isDirectory);
+        var children = skillsDir.listFiles(File::isDirectory);
         if (children == null) {
             return results;
         }
 
-        for (File skillDir : children) {
-            File skillMd = new File(skillDir, "SKILL.md");
+        for (var skillDir : children) {
+            var skillMd = new File(skillDir, "SKILL.md");
             if (!skillMd.isFile()) {
                 continue;
             }
 
             try {
-                String content = Files.readString(skillMd.toPath());
-                SkillLintInput input = parseSkillMd(content, skillDir);
+                var content = Files.readString(skillMd.toPath());
+                var input = parseSkillMd(content, skillDir);
 
                 for (LintRule rule : activeRules) {
                     rule.check(input).ifPresent(results::add);
@@ -98,23 +98,23 @@ public class SkillLinter {
     @SuppressWarnings("unchecked")
     private SkillLintInput parseSkillMd(String content, File skillDir) {
         Map<String, Object> frontmatter = new HashMap<>();
-        String body = content;
+        var body = content;
 
         if (content.startsWith("---")) {
-            int endIndex = content.indexOf("---", 3);
+            var endIndex = content.indexOf("---", 3);
             if (endIndex > 0) {
-                String yamlBlock = content.substring(3, endIndex).trim();
+                var yamlBlock = content.substring(3, endIndex).trim();
                 body = content.substring(endIndex + 3).trim();
 
-                Yaml yaml = new Yaml();
-                Object parsed = yaml.load(yamlBlock);
-                if (parsed instanceof Map) {
-                    frontmatter = (Map<String, Object>) parsed;
+                var yaml = new Yaml();
+                var parsed = yaml.load(yamlBlock);
+                if (parsed instanceof Map<?, ?> parsedMap) {
+                    frontmatter = (Map<String, Object>) parsedMap;
                 }
             }
         }
 
-        String skillName = frontmatter.containsKey("name")
+        var skillName = frontmatter.containsKey("name")
                 ? frontmatter.get("name").toString()
                 : null;
 

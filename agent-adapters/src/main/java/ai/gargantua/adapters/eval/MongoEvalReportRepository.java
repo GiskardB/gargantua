@@ -33,15 +33,15 @@ public class MongoEvalReportRepository {
     }
 
     public Optional<EvalReport> findLatest(String skillName) {
-        Query query = new Query(Criteria.where("skillName").is(skillName))
+        var query = new Query(Criteria.where("skillName").is(skillName))
                 .with(Sort.by(Sort.Direction.DESC, "runAt"))
                 .limit(1);
-        EvalReport result = mongoTemplate.findOne(query, EvalReport.class, COLLECTION);
+        var result = mongoTemplate.findOne(query, EvalReport.class, COLLECTION);
         return Optional.ofNullable(result);
     }
 
     public List<EvalReport> findHistory(String skillName, int limit) {
-        Query query = new Query(Criteria.where("skillName").is(skillName))
+        var query = new Query(Criteria.where("skillName").is(skillName))
                 .with(Sort.by(Sort.Direction.DESC, "runAt"))
                 .limit(limit);
         return mongoTemplate.find(query, EvalReport.class, COLLECTION);

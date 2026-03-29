@@ -23,7 +23,7 @@ public class OpenApiConfig {
     public OpenAPI agentKitOpenApi() {
         return new OpenAPI()
                 .info(new Info()
-                        .title(agentDisplayName + " API")
+                        .title("%s API".formatted(agentDisplayName))
                         .description("REST API for the AgentKit AI Agent framework")
                         .version("1.0.0")
                         .contact(new Contact()
