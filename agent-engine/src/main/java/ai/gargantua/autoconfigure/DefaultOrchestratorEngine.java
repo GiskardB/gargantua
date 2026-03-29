@@ -5,6 +5,7 @@ import ai.gargantua.core.exception.SkillNotFoundException;
 import ai.gargantua.core.guardrail.GuardrailInputContext;
 import ai.gargantua.core.guardrail.GuardrailOutputContext;
 import ai.gargantua.core.guardrail.GuardrailPipelineResult;
+import ai.gargantua.core.guardrail.GuardrailResult;
 import ai.gargantua.core.llm.LlmRoutingContext;
 import ai.gargantua.core.memory.ComposedMemory;
 import ai.gargantua.core.orchestrator.AgentRequest;
@@ -75,6 +76,9 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
     @Nullable
     private final SkillRegistry skillRegistry;
 
+    @Nullable
+    private final AuditService auditService;
+
     public DefaultOrchestratorEngine(GuardrailPipeline guardrailPipeline,
                                      SemanticRoutingService semanticRoutingService,
                                      TokenBudgetManager tokenBudgetManager,
@@ -83,7 +87,8 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
                                      ToolRegistry toolRegistry,
                                      AgentProperties properties,
                                      @Nullable SkillRegistry skillRegistry,
-                                     List<ContextEnricher> contextEnrichers) {
+                                     List<ContextEnricher> contextEnrichers,
+                                     @Nullable AuditService auditService) {
         this.guardrailPipeline = guardrailPipeline;
         this.semanticRoutingService = semanticRoutingService;
         this.tokenBudgetManager = tokenBudgetManager;
@@ -93,6 +98,7 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
         this.properties = properties;
         this.skillRegistry = skillRegistry;
         this.contextEnrichers = contextEnrichers != null ? contextEnrichers : List.of();
+        this.auditService = auditService;
     }
 
     @Override
