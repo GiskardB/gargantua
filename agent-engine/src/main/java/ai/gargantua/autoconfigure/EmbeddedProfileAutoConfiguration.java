@@ -4,9 +4,11 @@ import ai.gargantua.core.hitl.ApprovalStore;
 import ai.gargantua.core.memory.EpisodicMemoryPort;
 import ai.gargantua.core.memory.KnowledgeMemoryPort;
 import ai.gargantua.core.memory.WorkingMemoryPort;
+import ai.gargantua.core.rag.VectorStorePort;
 import ai.gargantua.memory.adapters.inmemory.InMemoryApprovalStore;
 import ai.gargantua.memory.adapters.inmemory.InMemoryEpisodicMemoryAdapter;
 import ai.gargantua.memory.adapters.inmemory.InMemoryKnowledgeMemoryAdapter;
+import ai.gargantua.memory.adapters.inmemory.InMemoryVectorStore;
 import ai.gargantua.memory.adapters.inmemory.InMemoryWorkingMemoryAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,5 +72,12 @@ public class EmbeddedProfileAutoConfiguration {
     @ConditionalOnMissingBean(ApprovalStore.class)
     public ApprovalStore inMemoryApprovalStore() {
         return new InMemoryApprovalStore();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(VectorStorePort.class)
+    public VectorStorePort inMemoryVectorStore() {
+        log.info("Using in-memory vector store (keyword-based, not for production)");
+        return new InMemoryVectorStore();
     }
 }

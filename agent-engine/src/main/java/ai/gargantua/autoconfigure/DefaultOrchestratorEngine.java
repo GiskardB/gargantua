@@ -11,6 +11,7 @@ import ai.gargantua.core.orchestrator.AgentRequest;
 import ai.gargantua.core.orchestrator.AgentResponse;
 import ai.gargantua.core.orchestrator.BudgetAllocation;
 import ai.gargantua.core.orchestrator.BudgetRequest;
+import ai.gargantua.core.orchestrator.ContextEnricher;
 import ai.gargantua.core.orchestrator.EnricherContext;
 import ai.gargantua.core.orchestrator.OrchestratorEngine;
 import ai.gargantua.core.orchestrator.RoutingMethod;
@@ -28,6 +29,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.DayOfWeek;
 import java.time.LocalTime;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -67,6 +69,7 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
     private final PromptBuilder promptBuilder;
     private final ToolRegistry toolRegistry;
     private final AgentProperties properties;
+    private final List<ContextEnricher> contextEnrichers;
 
     @Nullable
     private final SkillRegistry skillRegistry;
@@ -78,7 +81,8 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
                                      PromptBuilder promptBuilder,
                                      ToolRegistry toolRegistry,
                                      AgentProperties properties,
-                                     @Nullable SkillRegistry skillRegistry) {
+                                     @Nullable SkillRegistry skillRegistry,
+                                     List<ContextEnricher> contextEnrichers) {
         this.guardrailPipeline = guardrailPipeline;
         this.semanticRoutingService = semanticRoutingService;
         this.tokenBudgetManager = tokenBudgetManager;
@@ -87,6 +91,7 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
         this.toolRegistry = toolRegistry;
         this.properties = properties;
         this.skillRegistry = skillRegistry;
+        this.contextEnrichers = contextEnrichers != null ? contextEnrichers : List.of();
     }
 
     @Override
@@ -150,14 +155,37 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
         // 6. Compose memory (placeholder - empty memory)
         var memory = new ComposedMemory(List.of(), List.of(), List.of(), 0);
 
-        // 7. Build prompt
-        var enricherContext = new EnricherContext(
+        // 7. Build prompt — run context enrichers first
+        var enricherAttributes = new HashMap<String, String>();
+        var enricherCtxForEnrichers = new EnricherContext(
                 request.userId(),
                 request.sessionId(),
                 skillCard.meta().name(),
                 skillCard.meta().domain(),
                 request.message(),
                 Map.of()
+        );
+        contextEnrichers.stream()
+                .sorted(Comparator.comparingInt(ContextEnricher::order))
+                .filter(e -> e.targetSkill() == null || e.targetSkill().equals(skillCard.meta().name()))
+                .forEach(e -> {
+                    try {
+                        String section = e.enrich(enricherCtxForEnrichers);
+                        if (section != null && !section.isBlank()) {
+                            enricherAttributes.put(e.sectionName(), section);
+                        }
+                    } catch (Exception ex) {
+                        log.warn("Context enricher '{}' failed: {}", e.sectionName(), ex.getMessage());
+                    }
+                });
+
+        var enricherContext = new EnricherContext(
+                request.userId(),
+                request.sessionId(),
+                skillCard.meta().name(),
+                skillCard.meta().domain(),
+                request.message(),
+                enricherAttributes
         );
         var systemPrompt = promptBuilder.build(skillCard, memory, enricherContext);
 
