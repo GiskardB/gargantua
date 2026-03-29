@@ -13,3 +13,4 @@ ai.gargantua.autoconfigure.ToolCacheAutoConfiguration
 ai.gargantua.autoconfigure.ObservabilityAutoConfiguration
 ai.gargantua.autoconfigure.EmbeddedProfileAutoConfiguration
 ai.gargantua.autoconfigure.RagAutoConfiguration
+ai.gargantua.autoconfigure.SecurityAutoConfiguration

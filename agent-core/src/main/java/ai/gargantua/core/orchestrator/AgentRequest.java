@@ -1,5 +1,6 @@
 package ai.gargantua.core.orchestrator;
 
+import ai.gargantua.core.security.SecurityContext;
 import ai.gargantua.core.session.DryRunContext;
 
 import java.util.HashMap;
@@ -15,6 +16,7 @@ import java.util.Map;
  * @param forceSkill        if non-null, bypasses routing and activates this skill directly
  * @param dryRunContext     when active, tool calls are stubbed and memory is not persisted
  * @param contextAttributes arbitrary key-value pairs forwarded to enrichers and guardrails
+ * @param securityContext   RBAC and multi-tenancy context extracted from gateway headers
  *
  * @see AgentResponse
  * @see OrchestratorEngine
@@ -25,7 +27,8 @@ public record AgentRequest(
         String sessionId,
         String forceSkill,
         DryRunContext dryRunContext,
-        Map<String, String> contextAttributes
+        Map<String, String> contextAttributes,
+        SecurityContext securityContext
 ) {
 
     public static Builder builder() {
@@ -39,6 +42,7 @@ public record AgentRequest(
         private String forceSkill;
         private DryRunContext dryRunContext;
         private Map<String, String> contextAttributes = new HashMap<>();
+        private SecurityContext securityContext;
 
         private Builder() {
         }
@@ -78,10 +82,16 @@ public record AgentRequest(
             return this;
         }
 
+        public Builder securityContext(SecurityContext securityContext) {
+            this.securityContext = securityContext;
+            return this;
+        }
+
         public AgentRequest build() {
             return new AgentRequest(message, userId, sessionId, forceSkill,
                     dryRunContext != null ? dryRunContext : DryRunContext.inactive(),
-                    contextAttributes);
+                    contextAttributes,
+                    securityContext != null ? securityContext : SecurityContext.anonymous("anonymous"));
         }
     }
 }

@@ -1,13 +1,16 @@
 package ai.gargantua.adapters.web;
 
+import ai.gargantua.autoconfigure.SecurityContextFilter;
 import ai.gargantua.core.orchestrator.AgentRequest;
 import ai.gargantua.core.orchestrator.AgentResponse;
 import ai.gargantua.core.orchestrator.OrchestratorEngine;
+import ai.gargantua.core.security.SecurityContext;
 import ai.gargantua.core.session.DryRunContext;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -48,17 +51,21 @@ public class ChatController {
             @Parameter(description = "Session identifier")
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId,
             @Parameter(description = "Dry run mode")
-            @RequestHeader(value = "X-Dry-Run", defaultValue = "false") boolean dryRun) {
+            @RequestHeader(value = "X-Dry-Run", defaultValue = "false") boolean dryRun,
+            HttpServletRequest httpRequest) {
 
         DryRunContext dryRunContext = dryRun
                 ? DryRunContext.active(Map.of())
                 : DryRunContext.inactive();
+
+        var securityContext = (SecurityContext) httpRequest.getAttribute(SecurityContextFilter.SECURITY_CONTEXT_ATTR);
 
         AgentRequest agentRequest = AgentRequest.builder()
                 .message(request.message())
                 .userId(userId)
                 .sessionId(sessionId)
                 .dryRunContext(dryRunContext)
+                .securityContext(securityContext)
                 .build();
 
         AgentResponse response = orchestratorEngine.invoke(agentRequest);

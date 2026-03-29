@@ -9,6 +9,7 @@ import ai.gargantua.core.llm.LlmRoutingContext;
 import ai.gargantua.core.memory.ComposedMemory;
 import ai.gargantua.core.orchestrator.AgentRequest;
 import ai.gargantua.core.orchestrator.AgentResponse;
+import ai.gargantua.core.security.SecurityContext;
 import ai.gargantua.core.orchestrator.BudgetAllocation;
 import ai.gargantua.core.orchestrator.BudgetRequest;
 import ai.gargantua.core.orchestrator.ContextEnricher;
@@ -104,16 +105,26 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
                 : DryRunContext.inactive();
         var isDryRun = dryRunContext.active();
 
+        // Tenant-aware session id: prefix with tenantId when available
+        var securityContext = request.securityContext();
+        String effectiveSessionId = (securityContext != null && securityContext.isMultiTenant())
+                ? securityContext.tenantId() + ":" + request.sessionId()
+                : request.sessionId();
+
         // 2. Input guardrails
         var inputAttributes = new HashMap<String, Object>();
         if (request.contextAttributes() != null) {
             inputAttributes.putAll(request.contextAttributes());
         }
+        // Propagate SecurityContext into guardrail attributes for RBAC guardrail
+        if (securityContext != null) {
+            inputAttributes.put("gargantua.securityContext", securityContext);
+        }
 
         var inputCtx = new GuardrailInputContext(
                 request.message(),
                 request.userId(),
-                request.sessionId(),
+                effectiveSessionId,
                 null, // skill not yet resolved
                 inputAttributes
         );
@@ -159,7 +170,7 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
         var enricherAttributes = new HashMap<String, String>();
         var enricherCtxForEnrichers = new EnricherContext(
                 request.userId(),
-                request.sessionId(),
+                effectiveSessionId,
                 skillCard.meta().name(),
                 skillCard.meta().domain(),
                 request.message(),
@@ -181,7 +192,7 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
 
         var enricherContext = new EnricherContext(
                 request.userId(),
-                request.sessionId(),
+                effectiveSessionId,
                 skillCard.meta().name(),
                 skillCard.meta().domain(),
                 request.message(),
@@ -210,7 +221,7 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
         // 9. LLM call (placeholder)
         var llmCtx = new LlmRoutingContext(
                 request.userId(),
-                request.sessionId(),
+                effectiveSessionId,
                 skillCard.meta().name(),
                 skillCard.meta().domain(),
                 request.message(),
@@ -251,7 +262,7 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
 
         return new AgentResponse(
                 processedResponse,
-                request.sessionId(),
+                effectiveSessionId,
                 routingResult.skillName(),
                 List.of(),
                 routingResult.method(),

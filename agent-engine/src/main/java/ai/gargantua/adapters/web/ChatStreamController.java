@@ -1,13 +1,16 @@
 package ai.gargantua.adapters.web;
 
+import ai.gargantua.autoconfigure.SecurityContextFilter;
 import ai.gargantua.core.orchestrator.AgentRequest;
 import ai.gargantua.core.orchestrator.AgentResponse;
 import ai.gargantua.core.orchestrator.OrchestratorEngine;
+import ai.gargantua.core.security.SecurityContext;
 import ai.gargantua.core.session.DryRunContext;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -55,7 +58,10 @@ public class ChatStreamController {
             @Parameter(description = "Session identifier")
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId,
             @Parameter(description = "Dry run mode")
-            @RequestHeader(value = "X-Dry-Run", defaultValue = "false") boolean dryRun) {
+            @RequestHeader(value = "X-Dry-Run", defaultValue = "false") boolean dryRun,
+            HttpServletRequest httpRequest) {
+
+        var securityContext = (SecurityContext) httpRequest.getAttribute(SecurityContextFilter.SECURITY_CONTEXT_ATTR);
 
         Sinks.Many<ServerSentEvent<String>> sink = Sinks.many().unicast().onBackpressureBuffer();
 
@@ -70,6 +76,7 @@ public class ChatStreamController {
                         .userId(userId)
                         .sessionId(sessionId)
                         .dryRunContext(dryRunContext)
+                        .securityContext(securityContext)
                         .build();
 
                 sink.tryEmitNext(ServerSentEvent.<String>builder()
