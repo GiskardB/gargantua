@@ -27,7 +27,7 @@ class SemanticRoutingServiceTest {
     }
 
     private SkillMeta skill(String name, String description) {
-        return new SkillMeta(name, description, "1.0.0", true, false, "general", SkillSource.FILESYSTEM);
+        return new SkillMeta(name, description, "1.0.0", true, false, "general", SkillSource.FILESYSTEM, java.util.Set.of());
     }
 
     @Test
@@ -72,7 +72,7 @@ class SemanticRoutingServiceTest {
     void indexesSkillsForRouting() {
         List<SkillMeta> skills = List.of(
                 skill("active", "An active skill"),
-                new SkillMeta("inactive", "An inactive skill", "1.0.0", false, false, "general", SkillSource.FILESYSTEM)
+                new SkillMeta("inactive", "An inactive skill", "1.0.0", false, false, "general", SkillSource.FILESYSTEM, java.util.Set.of())
         );
 
         service.index(skills);

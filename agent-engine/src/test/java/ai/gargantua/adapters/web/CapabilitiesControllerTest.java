@@ -28,7 +28,7 @@ class CapabilitiesControllerTest {
 
         SkillMeta meta = new SkillMeta(
                 "code-review", "Reviews code", "1.0.0",
-                true, true, "engineering", SkillSource.FILESYSTEM);
+                true, true, "engineering", SkillSource.FILESYSTEM, java.util.Set.of());
         SkillCard card = new SkillCard(
                 meta, "You are a code reviewer.", List.of("read_file"),
                 null, List.of(), 4096, 0.3, null, null);

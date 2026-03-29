@@ -34,7 +34,7 @@ class RagEnricherTest {
     @Test
     void shouldReturnNullWhenSkillHasNoRagConfig() {
         var meta = new SkillMeta("general", "General skill", "1.0.0",
-                true, false, "general", SkillSource.FILESYSTEM);
+                true, false, "general", SkillSource.FILESYSTEM, java.util.Set.of());
         var card = new SkillCard(meta, "You are helpful.", List.of(),
                 null, List.of(), null, null, null, null);
         when(skillRegistry.load("general")).thenReturn(card);
@@ -52,7 +52,7 @@ class RagEnricherTest {
     void shouldReturnFormattedDocumentsWhenRagConfigPresent() {
         var ragConfig = new RagConfig("hr-docs", 5, 0.3);
         var meta = new SkillMeta("hr-assistant", "HR assistant", "1.0.0",
-                true, false, "hr", SkillSource.FILESYSTEM);
+                true, false, "hr", SkillSource.FILESYSTEM, java.util.Set.of());
         var card = new SkillCard(meta, "You are an HR assistant.", List.of(),
                 null, List.of(), null, null, null, ragConfig);
         when(skillRegistry.load("hr-assistant")).thenReturn(card);
@@ -81,7 +81,7 @@ class RagEnricherTest {
     void shouldReturnNullWhenNoChunksFound() {
         var ragConfig = new RagConfig("empty-collection");
         var meta = new SkillMeta("test-skill", "Test", "1.0.0",
-                true, false, "general", SkillSource.FILESYSTEM);
+                true, false, "general", SkillSource.FILESYSTEM, java.util.Set.of());
         var card = new SkillCard(meta, "Test prompt.", List.of(),
                 null, List.of(), null, null, null, ragConfig);
         when(skillRegistry.load("test-skill")).thenReturn(card);

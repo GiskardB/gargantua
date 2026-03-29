@@ -2,6 +2,8 @@ package ai.gargantua.core.skill;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.Set;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class SkillMetaTest {
@@ -15,7 +17,8 @@ class SkillMetaTest {
                 true,
                 true,
                 "nlp",
-                SkillSource.CLASSPATH_JAR
+                SkillSource.CLASSPATH_JAR,
+                Set.of()
         );
 
         assertEquals("summarize", meta.name());
@@ -36,7 +39,8 @@ class SkillMetaTest {
                 false,
                 false,
                 null,
-                SkillSource.FILESYSTEM
+                SkillSource.FILESYSTEM,
+                Set.of()
         );
 
         assertNull(meta.domain());

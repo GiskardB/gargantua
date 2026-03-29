@@ -35,7 +35,13 @@ public class SkillMdParser {
         var outputSchema = getString(metadata, "output-schema", null);
         var hasSchema = outputSchema != null && !outputSchema.isBlank();
 
-        return new SkillMeta(name, description, version, active, hasSchema, domain, source);
+        var allowedRolesStr = getStringList(metadata, "allowed-roles");
+        var allowedRoles = allowedRolesStr.isEmpty()
+                ? java.util.Set.<String>of()
+                : new java.util.HashSet<>(allowedRolesStr);
+
+        return new SkillMeta(name, description, version, active, hasSchema, domain, source,
+                allowedRoles.isEmpty() ? java.util.Set.of() : java.util.Collections.unmodifiableSet(allowedRoles));
     }
 
     /**
@@ -78,7 +84,12 @@ public class SkillMdParser {
             );
         }
 
-        var meta = new SkillMeta(name, description, version, active, hasSchema, domain, source);
+        var allowedRolesCard = getStringList(metadata, "allowed-roles");
+        var allowedRolesSet = allowedRolesCard.isEmpty()
+                ? java.util.Set.<String>of()
+                : java.util.Collections.unmodifiableSet(new java.util.HashSet<>(allowedRolesCard));
+
+        var meta = new SkillMeta(name, description, version, active, hasSchema, domain, source, allowedRolesSet);
 
         return new SkillCard(
                 meta,
