@@ -12,11 +12,17 @@ services:
       LLM_PRIMARY_PROVIDER: ${symbol_dollar}{LLM_PRIMARY_PROVIDER:-openai}
       LLM_PRIMARY_MODEL: ${symbol_dollar}{LLM_PRIMARY_MODEL:-gpt-4o}
       LLM_PRIMARY_API_KEY: ${symbol_dollar}{LLM_PRIMARY_API_KEY}
+      LLM_PRIMARY_ENDPOINT: ${symbol_dollar}{LLM_PRIMARY_ENDPOINT:-}
       LLM_FALLBACK_PROVIDER: ${symbol_dollar}{LLM_FALLBACK_PROVIDER:-anthropic}
+      LLM_FALLBACK_MODEL: ${symbol_dollar}{LLM_FALLBACK_MODEL:-claude-sonnet-4-20250514}
       LLM_FALLBACK_API_KEY: ${symbol_dollar}{LLM_FALLBACK_API_KEY:-}
+      LLM_ROUTING_PROVIDER: ${symbol_dollar}{LLM_ROUTING_PROVIDER:-ollama}
+      LLM_ROUTING_MODEL: ${symbol_dollar}{LLM_ROUTING_MODEL:-phi4-mini}
+      LLM_ROUTING_ENDPOINT: http://ollama:11434
     depends_on:
       mongo: { condition: service_healthy }
       redis: { condition: service_healthy }
+      ollama: { condition: service_healthy }
 
   mongo:
     image: mongo:8.0
@@ -29,6 +35,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
 
   redis:
     image: redis:7.4-alpine
@@ -40,5 +47,19 @@ services:
       timeout: 3s
       retries: 5
 
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
 volumes:
   mongo-data:
+  ollama-data:

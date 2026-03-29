@@ -74,16 +74,23 @@ my-agent/
         └── sample-skill/SKILL.md    -- example skill
 ```
 
-### 3. Start MongoDB and Redis
+### 3. Start infrastructure (MongoDB + Redis + Ollama)
 
 ```bash
 cd my-agent
-docker compose up -d mongo redis
+docker compose up -d mongo redis ollama
 ```
 
-> Both services must be running before the agent starts. The agent connects to:
+After the first start, pull the routing model into Ollama (one-time):
+
+```bash
+docker compose exec ollama ollama pull phi4-mini
+```
+
+> The agent connects to:
 > - MongoDB at `mongodb://localhost:27017` (configurable via `MONGODB_URI`)
 > - Redis at `redis://localhost:6379` (configurable via `REDIS_URL`)
+> - Ollama at `http://localhost:11434` (used for skill routing and session summaries — zero API cost)
 
 > **Skip Docker entirely?** Use embedded mode — everything in-memory, zero infrastructure:
 > ```bash
@@ -111,6 +118,12 @@ export LLM_PRIMARY_API_KEY=sk-...
 # export LLM_FALLBACK_API_KEY=               # auto-failover to fallback provider
 # export MONGODB_URI=mongodb://localhost:27017/my-agent
 # export REDIS_URL=redis://localhost:6379
+
+# Routing model runs locally via Ollama by default (started by docker compose).
+# Override only if you want to use a cloud provider for routing:
+# export LLM_ROUTING_PROVIDER=ollama         # ollama | openai | anthropic
+# export LLM_ROUTING_MODEL=phi4-mini         # local model name
+# export LLM_ROUTING_ENDPOINT=http://localhost:11434
 
 mvn spring-boot:run
 ```
@@ -480,10 +493,11 @@ All storage uses in-memory ConcurrentHashMaps. Data is lost on restart.
 | `LLM_FALLBACK_MODEL` | Fallback model | `claude-sonnet-4-20250514` |
 | `LLM_FALLBACK_API_KEY` | Fallback API key | *(optional)* |
 | `LLM_FALLBACK_ENDPOINT` | Fallback endpoint | provider default |
-| **Routing LLM** | Cheap model for skill routing, eval judge, session summaries | |
-| `LLM_ROUTING_PROVIDER` | Routing model provider | `openai` |
-| `LLM_ROUTING_MODEL` | Routing model name | `gpt-4o-mini` |
-| `LLM_ROUTING_API_KEY` | Routing model API key | same as primary |
+| **Routing LLM** | Local model for skill routing, eval judge, session summaries (zero API cost via Ollama) | |
+| `LLM_ROUTING_PROVIDER` | Routing model provider: `ollama`, `openai`, `anthropic` | `ollama` |
+| `LLM_ROUTING_MODEL` | Routing model name | `phi4-mini` |
+| `LLM_ROUTING_ENDPOINT` | Routing model endpoint (Ollama URL when running locally) | `http://localhost:11434` |
+| `LLM_ROUTING_API_KEY` | Routing model API key (not needed for Ollama) | *(optional)* |
 | **Routing** | | |
 | `ROUTING_STRATEGY` | Skill routing: `hybrid`, `semantic`, `llm` | `hybrid` |
 | `ROUTING_THRESHOLD` | Semantic similarity threshold (0.0 -- 1.0) | `0.82` |
