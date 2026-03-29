@@ -1,5 +1,6 @@
 package ai.gargantua.adapters.skill;
 
+import ai.gargantua.autoconfigure.SkillMdParser;
 import ai.gargantua.core.exception.SkillNotFoundException;
 import ai.gargantua.core.skill.SkillCard;
 import ai.gargantua.core.skill.SkillMeta;
@@ -59,7 +60,7 @@ public class FilesystemSkillRegistry implements SkillRegistry {
             for (var resource : resources) {
                 try (var is = resource.getInputStream()) {
                     var content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-                    var meta = skillMdParser.parseFrontmatter(content, SkillSource.FILESYSTEM);
+                    var meta = skillMdParser.parseToMeta(content, SkillSource.FILESYSTEM);
                     result.add(meta);
                 } catch (IOException e) {
                     log.warn("Failed to parse skill file: {}", resource.getDescription(), e);
@@ -84,7 +85,7 @@ public class FilesystemSkillRegistry implements SkillRegistry {
             }
             try (var is = resources[0].getInputStream()) {
                 var content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-                return skillMdParser.parseFull(content, SkillSource.FILESYSTEM);
+                return skillMdParser.parseToCard(content, SkillSource.FILESYSTEM);
             }
         } catch (IOException e) {
             throw new SkillNotFoundException(skillName);
