@@ -187,6 +187,29 @@ graph TB
     style DOCS fill:#2196F3,color:#fff,stroke:#1565C0
 ```
 
+### What happens when a user sends a message
+
+When a client calls `POST /api/agent/chat/stream`, the Orchestrator Engine executes this pipeline:
+
+```
+  User message
+       │
+  1.   ▼  RBAC check — does this user have access?
+  2.   ▼  Input guardrails — PII masking, injection detection, rate limit
+  3.   ▼  Skill routing — semantic similarity + LLM fallback → select skill
+  4.   ▼  RAG retrieval — if skill declares knowledge-base, search vector store
+  5.   ▼  Memory compose — load working + episodic + knowledge (parallel)
+  6.   ▼  Token budget — truncate if over context window limit
+  7.   ▼  LLM call — stream tokens, call tools, handle @RequiresApproval
+  8.   ▼  Output guardrails — PII redaction, disclaimer, schema validation
+  9.   ▼  Persist — save to memory, chat history, cost tracking, audit trail
+       │
+       ▼
+  SSE stream → client (token by token)
+```
+
+Each step is a pluggable component — replace any part by declaring your own `@Bean`. For the full sequence diagrams of every flow (routing, memory, HITL, eval, A2A), see [Architecture Diagrams](docs/architecture-diagrams.md).
+
 ---
 
 ## Full Setup Guide
@@ -258,9 +281,9 @@ Gargantua uses **three LLM roles** — each can be a different provider and mode
 |------|---------|---------|------|
 | **Primary** | Agent conversations — answers the user | OpenAI `gpt-4o` | Per-token API cost |
 | **Fallback** | Auto-failover when primary fails | Anthropic `claude-sonnet` | Per-token (only on failure) |
-| **Routing** | Internal: skill routing, session summaries, eval judge | Ollama `phi4-mini` (local) | **Free** |
+| **Routing** | Internal: skill routing, session summaries, eval judge | Ollama `phi4-mini` (local) | **Free** (if local) |
 
-The routing model runs locally via Ollama (started by `docker compose`). It handles all internal LLM operations at zero cost — only the primary model calls the cloud API.
+By default the routing model runs locally via Ollama — but this is just a suggestion. All three roles accept **any LangChain4j provider**. You can configure routing to use OpenAI, Anthropic, or any other cloud provider exactly like primary and fallback — just set `LLM_ROUTING_PROVIDER`, `LLM_ROUTING_MODEL`, `LLM_ROUTING_API_KEY`, and `LLM_ROUTING_ENDPOINT`.
 
 > **Supported providers:** Gargantua supports any LLM provider available in LangChain4j — OpenAI, Anthropic, Azure OpenAI, Google Gemini, Mistral, Groq, Cohere, Together AI, AWS Bedrock, Ollama, and more. Set the provider name and endpoint accordingly.
 
