@@ -63,6 +63,59 @@ That's a running agent with skill routing, guardrails, memory, streaming, and a 
 
 ---
 
+## Features
+
+Every feature has dedicated documentation — click the link to dive deeper.
+
+### Agent Development
+
+| Feature | What it does | Docs |
+|---------|-------------|------|
+| **Declarative Skills** | Define agent behavior in `SKILL.md` files — system prompt, allowed tools, routing hints. No code changes to add a skill. | [Skills & Routing](docs/skills-and-routing.md) |
+| **@AgentTool** | Annotate Java methods as agent actions. Add `@ToolRetry` for resilience, `@RequiresApproval` for HITL, `@CacheableToolResult` for caching. | [Tools & Annotations](docs/tools-and-annotations.md) |
+| **Hybrid Routing** | Semantic similarity (all-MiniLM-L6-v2, in-process, ~2ms) + LLM fallback. The agent picks the right skill automatically. | [Skills & Routing](docs/skills-and-routing.md) |
+| **RAG / Vector Store** | Skills declare `knowledge-base` in SKILL.md — the framework retrieves relevant documents and injects them into the prompt. Pluggable `VectorStorePort`. | [Extending](docs/extending.md) |
+| **Structured Output** | Skills declare a JSON Schema — the framework validates and auto-retries on mismatch. | [Extending](docs/extending.md) |
+
+### Memory & State
+
+| Feature | What it does | Docs |
+|---------|-------------|------|
+| **3-Layer Memory** | Working memory (Redis, current chat), Episodic memory (MongoDB, compressed past sessions), Knowledge memory (MongoDB, user profile). | [Memory System](docs/memory-system.md) |
+| **Session Summarizer** | When a session expires, the routing model compresses it into an episodic summary — zero cost via Ollama. | [Memory System](docs/memory-system.md) |
+| **Token Budget Manager** | Automatically truncates memory to fit the model's context window, by priority. | [Extending](docs/extending.md) |
+
+### Security & Compliance
+
+| Feature | What it does | Docs |
+|---------|-------------|------|
+| **Guardrail Pipeline** | Chain of input/output filters: PII masking, prompt injection detection, rate limiting, schema validation. Add custom guardrails with `@Component` + `@Order`. | [Guardrails](docs/guardrails.md) |
+| **RBAC + Multi-Tenancy** | Role-based access via `X-User-Roles` header. Skills restrict access with `allowed-roles`. Automatic tenant data isolation via `X-Tenant-Id`. | [Extending](docs/extending.md) |
+| **Audit Trail** | Immutable log of every agent decision: input, routing, guardrails, tools, output, cost. For SOC 2, GDPR, EU AI Act. | [Extending](docs/extending.md) |
+| **Human-in-the-Loop** | `@RequiresApproval` suspends the agent and waits for user confirmation before executing dangerous tools. | [Extending](docs/extending.md) |
+
+### Integration & Interop
+
+| Feature | What it does | Docs |
+|---------|-------------|------|
+| **Multi-Provider LLM** | OpenAI, Anthropic, Azure OpenAI, Ollama. Rule-based model selection + Resilience4j failover. | [LLM Configuration](docs/llm-configuration.md) |
+| **A2A Protocol** | Agent-to-Agent interop. Discovery via `/.well-known/agent.json`, tasks via JSON-RPC 2.0. Call remote agents with `HttpA2AClient`. | [Extending](docs/extending.md) |
+| **MCP Server** | Expose the agent to Claude Desktop, Cursor, VS Code via the Model Context Protocol. | [Extending](docs/extending.md) |
+| **SSE Streaming** | Real-time token delivery, tool call events, approval requests — all via Server-Sent Events. | [API Reference](docs/api-reference.md) |
+
+### Operations & Quality
+
+| Feature | What it does | Docs |
+|---------|-------------|------|
+| **Eval Framework** | LLM-as-Judge: test agent behavior against golden datasets. CI fails if quality drops below threshold. | [Eval Framework](docs/eval-framework.md) |
+| **Cost Tracking** | Per-request token usage and cost, broken down by skill, user, provider. Admin dashboards. | [Extending](docs/extending.md) |
+| **Observability** | OpenTelemetry spans + Micrometer metrics with GenAI semantic conventions. | [Deployment](docs/deployment.md) |
+| **Interactive CLI** | Spring Shell 4 — chat, manage skills, run evals, view costs from the terminal. | [Extending](docs/extending.md) |
+| **GraalVM Native** | < 100ms startup, ~50MB image. Multi-stage Dockerfile included. | [Deployment](docs/deployment.md) |
+| **Kubernetes** | Kustomize overlays (dev/staging/prod), Helm chart, KEDA autoscaling on SSE connections. | [Deployment](docs/deployment.md) |
+
+---
+
 ## How it works
 
 **You write two things:**
@@ -202,33 +255,45 @@ docker compose exec ollama ollama pull phi4-mini
 | **Redis** | Session memory, HITL approvals, tool cache, rate limits | 6379 |
 | **Ollama** | Local routing model (zero API cost for skill routing and session summaries) | 11434 |
 
-### 3. Configure your LLM provider
+### 3. Configure your LLM providers
 
-Copy `.env.example` to `.env` and fill in 3 values:
+Gargantua uses **three LLM roles** — each can be a different provider and model:
+
+| Role | Purpose | Default | Cost |
+|------|---------|---------|------|
+| **Primary** | Agent conversations — answers the user | OpenAI `gpt-4o` | Per-token API cost |
+| **Fallback** | Auto-failover when primary fails | Anthropic `claude-sonnet` | Per-token (only on failure) |
+| **Routing** | Internal: skill routing, session summaries, eval judge | Ollama `phi4-mini` (local) | **Free** |
+
+The routing model runs locally via Ollama (started by `docker compose`). It handles all internal LLM operations at zero cost — only the primary model calls the cloud API.
+
+Copy `.env.example` to `.env` and fill in the primary provider:
 
 ```bash
 cp .env.example .env
 ```
 
 ```bash
-# 1. Choose a provider: openai | anthropic | azure-openai
-export LLM_PRIMARY_PROVIDER=openai
-
-# 2. Choose a model from that provider
+# Primary LLM — the model that answers users
+export LLM_PRIMARY_PROVIDER=openai            # openai | anthropic | azure-openai
 export LLM_PRIMARY_MODEL=gpt-4o
-
-# 3. Set the API key
-#    OpenAI:    sk-...        (from platform.openai.com/api-keys)
-#    Anthropic: sk-ant-...    (from console.anthropic.com)
-#    Azure:     your resource key
 export LLM_PRIMARY_API_KEY=sk-your-key-here
-
-# 4. Set the endpoint
-#    OpenAI:    https://api.openai.com/v1          (default)
-#    Anthropic: https://api.anthropic.com           (default)
-#    Azure:     https://your-resource.openai.azure.com  (REQUIRED)
 export LLM_PRIMARY_ENDPOINT=https://api.openai.com/v1
+
+# Fallback — optional, auto-failover on primary failure
+# export LLM_FALLBACK_PROVIDER=anthropic
+# export LLM_FALLBACK_MODEL=claude-sonnet-4-20250514
+# export LLM_FALLBACK_API_KEY=sk-ant-...
+# export LLM_FALLBACK_ENDPOINT=https://api.anthropic.com
+
+# Routing — local Ollama by default, no config needed
+# Override only to use a cloud provider for routing:
+# export LLM_ROUTING_PROVIDER=openai
+# export LLM_ROUTING_MODEL=gpt-4o-mini
+# export LLM_ROUTING_API_KEY=sk-...
 ```
+
+> See [LLM Configuration](docs/llm-configuration.md) for advanced setups: model catalogs, rule-based routing, per-skill model overrides, A/B testing.
 
 ### 4. Run
 
@@ -410,38 +475,6 @@ With GitHub Packages, use groupId `ai.gargantua` and version `1.0.0` (no `v` pre
     </dependency>
 </dependencies>
 ```
-
----
-
-## Features
-
-- **Declarative skills** via SKILL.md -- routing, system prompt, and tool bindings in one file
-- **@AgentTool** with `@ToolRetry`, `@RequiresApproval`, `@CacheableToolResult`
-- **Hybrid routing** -- semantic (all-MiniLM-L6-v2, in-process) + LLM fallback
-- **3-layer memory** -- working (Redis) + episodic (MongoDB) + knowledge (MongoDB)
-- **RAG / Vector Store** -- skills declare `knowledge-base` in SKILL.md; RagEnricher auto-injects retrieved documents; pluggable VectorStorePort
-- **RBAC + Multi-Tenancy** -- role-based access control via `allowed-roles` and `@RequiresRole`; automatic tenant data isolation via `X-Tenant-Id`
-- **A2A Protocol** -- Agent-to-Agent interop via `/.well-known/agent.json` discovery and JSON-RPC 2.0 `POST /a2a`; HttpA2AClient for calling remote agents
-- **Audit Trail** -- immutable AuditEvent log of every agent decision; MongoAuditStore (append-only); admin query API
-- **Guardrail pipeline** -- RBAC, PII masking, prompt injection, rate limiting, custom guardrails via `@Order`
-- **SSE streaming + sync** endpoints
-- **Human-in-the-Loop** approval flow with TTL
-- **Structured output** with JSON Schema validation + auto-retry
-- **Multi-provider LLM** with rule-based routing + Resilience4j failover
-- **Token budget manager** with priority truncation
-- **Eval framework** (LLM-as-Judge) with golden datasets per skill
-- **Cost tracking** per skill / user / provider / phase
-- **Chat history** with search, export (JSON/TXT/MD), GDPR delete
-- **Dry-run mode** -- zero side-effects, full execution trace
-- **Agent-as-Tool** for multi-agent delegation
-- **Interactive CLI** (Spring Shell 4)
-- **MCP Server** gateway for Claude Desktop / Cursor
-- **SkillsJars** -- import skills as Maven dependencies
-- **GraalVM native image** support (startup < 100ms)
-- **Kubernetes** manifests (Kustomize + Helm + KEDA)
-- **OpenAPI** docs (Swagger UI + Redoc)
-- **RFC 9457** Problem Details error handling
-- **OpenTelemetry** GenAI semantic conventions
 
 ---
 
