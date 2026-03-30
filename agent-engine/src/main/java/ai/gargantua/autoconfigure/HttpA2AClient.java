@@ -2,7 +2,10 @@ package ai.gargantua.autoconfigure;
 
 import ai.gargantua.core.a2a.A2AClient;
 import ai.gargantua.core.a2a.A2ATask;
-import ai.gargantua.core.a2a.A2ATask.A2AMessage;
+import ai.gargantua.core.a2a.A2ATask.Artifact;
+import ai.gargantua.core.a2a.A2ATask.Message;
+import ai.gargantua.core.a2a.A2ATask.Part;
+import ai.gargantua.core.a2a.A2ATask.TaskStatus;
 import ai.gargantua.core.a2a.AgentCard;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,10 +13,12 @@ import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * HTTP-based implementation of {@link A2AClient} using Spring's {@link RestClient}.
@@ -51,18 +56,23 @@ public class HttpA2AClient implements A2AClient {
     public A2ATask sendTask(String agentUrl, String message, String skillHint) {
         log.debug("Sending task to {} (skillHint={})", agentUrl, skillHint);
 
-        Map<String, Object> input = new LinkedHashMap<>();
-        input.put("role", "user");
-        input.put("content", message);
-        input.put("contentType", "text/plain");
+        // Build A2A Message with Parts
+        Map<String, Object> textPart = new LinkedHashMap<>();
+        textPart.put("kind", "text");
+        textPart.put("text", message);
+
+        Map<String, Object> messageMap = new LinkedHashMap<>();
+        messageMap.put("messageId", UUID.randomUUID().toString());
+        messageMap.put("role", "user");
+        messageMap.put("parts", List.of(textPart));
 
         Map<String, Object> params = new LinkedHashMap<>();
-        params.put("input", input);
+        params.put("message", messageMap);
         if (skillHint != null && !skillHint.isBlank()) {
             params.put("skillHint", skillHint);
         }
 
-        Map<String, Object> response = jsonRpcCall(agentUrl, "tasks/send", params, 1);
+        Map<String, Object> response = jsonRpcCall(agentUrl, "message/send", params, 1);
         return parseTaskFromResult(response);
     }
 
@@ -123,25 +133,62 @@ public class HttpA2AClient implements A2AClient {
         }
 
         String id = (String) result.get("id");
-        String status = (String) result.get("status");
+        String kind = (String) result.getOrDefault("kind", "task");
+        String contextId = (String) result.get("contextId");
 
-        A2AMessage inputMsg = parseMessage((Map<String, Object>) result.get("input"));
-        A2AMessage outputMsg = result.get("output") != null
-                ? parseMessage((Map<String, Object>) result.get("output"))
-                : null;
+        // Parse status
+        TaskStatus status;
+        Object statusObj = result.get("status");
+        if (statusObj instanceof Map) {
+            Map<String, Object> statusMap = (Map<String, Object>) statusObj;
+            String state = (String) statusMap.get("state");
+            Message statusMessage = statusMap.get("message") != null
+                    ? parseMessage((Map<String, Object>) statusMap.get("message"))
+                    : null;
+            status = new TaskStatus(state, statusMessage);
+        } else {
+            // Fallback for legacy string status
+            status = new TaskStatus((String) statusObj, null);
+        }
+
+        // Parse artifacts
+        List<Artifact> artifacts = null;
+        Object artifactsObj = result.get("artifacts");
+        if (artifactsObj instanceof List) {
+            artifacts = new ArrayList<>();
+            for (Object artObj : (List<Object>) artifactsObj) {
+                Map<String, Object> artMap = (Map<String, Object>) artObj;
+                String artName = (String) artMap.get("name");
+                List<Part> artParts = parseParts((List<Map<String, Object>>) artMap.get("parts"));
+                artifacts.add(new Artifact(artName, artParts));
+            }
+        }
 
         Instant createdAt = Instant.parse((String) result.get("createdAt"));
         Instant updatedAt = Instant.parse((String) result.get("updatedAt"));
         Map<String, Object> metadata = (Map<String, Object>) result.get("metadata");
 
-        return new A2ATask(id, status, inputMsg, outputMsg, createdAt, updatedAt, metadata);
+        return new A2ATask(id, kind, contextId, status, artifacts, createdAt, updatedAt, metadata);
     }
 
-    private A2AMessage parseMessage(Map<String, Object> map) {
-        return new A2AMessage(
-                (String) map.get("role"),
-                (String) map.get("content"),
-                (String) map.get("contentType")
-        );
+    @SuppressWarnings("unchecked")
+    private Message parseMessage(Map<String, Object> map) {
+        String messageId = (String) map.get("messageId");
+        String role = (String) map.get("role");
+        List<Part> parts = parseParts((List<Map<String, Object>>) map.get("parts"));
+        return new Message(messageId, role, parts);
+    }
+
+    private List<Part> parseParts(List<Map<String, Object>> partsList) {
+        if (partsList == null) {
+            return List.of();
+        }
+        List<Part> parts = new ArrayList<>();
+        for (Map<String, Object> partMap : partsList) {
+            String kind = (String) partMap.get("kind");
+            String text = (String) partMap.get("text");
+            parts.add(new Part(kind, text));
+        }
+        return parts;
     }
 }
