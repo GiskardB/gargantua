@@ -620,15 +620,14 @@ Gargantua implements the [A2A protocol](https://google.github.io/A2A/) for agent
 
 ### Agent Card discovery
 
-The Agent Card is served at two endpoints:
+The Agent Card is served at:
 - `GET /.well-known/agent.json` -- A2A standard well-known URI
-- `GET /api/capabilities` -- backward-compatible (same payload)
 
-The card advertises `supportedProtocols: ["a2a/1.0", "mcp/1.0"]` and lists all active skills.
+The card advertises `protocolVersion: "1.0"` and lists all active skills.
 
 ### JSON-RPC 2.0 endpoint
 
-`POST /a2a` accepts JSON-RPC 2.0 requests with methods: `tasks/send`, `tasks/get`, `tasks/cancel`.
+`POST /a2a` accepts JSON-RPC 2.0 requests with methods: `message/send`, `tasks/get`, `tasks/cancel`.
 
 ### Calling remote A2A agents
 

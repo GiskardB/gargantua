@@ -1,7 +1,8 @@
 package ai.gargantua.autoconfigure;
 
 import ai.gargantua.core.a2a.AgentCard;
-import ai.gargantua.core.a2a.AgentCard.AgentAuthentication;
+import ai.gargantua.core.a2a.AgentCard.AgentAuthScheme;
+import ai.gargantua.core.a2a.AgentCard.AgentCapabilities;
 import ai.gargantua.core.a2a.AgentCard.AgentSkill;
 import ai.gargantua.core.skill.SkillCard;
 import ai.gargantua.core.skill.SkillMeta;
@@ -14,8 +15,7 @@ import java.util.List;
 
 /**
  * Builds the A2A {@link AgentCard} from the skill registry and agent configuration.
- * This replaces the former {@code CapabilitiesService} and provides the unified
- * response for both {@code /.well-known/agent.json} and {@code /api/capabilities}.
+ * This provides the response for {@code /.well-known/agent.json}.
  */
 @Component
 public class AgentCardService {
@@ -39,11 +39,7 @@ public class AgentCardService {
     public AgentCard getAgentCard(String baseUrl) {
         List<AgentSkill> skills = buildSkills();
 
-        List<String> protocols = new ArrayList<>();
-        protocols.add("a2a/1.0");
-        if (properties.getMcp().isEnabled()) {
-            protocols.add("mcp/1.0");
-        }
+        AgentCapabilities capabilities = new AgentCapabilities(false, false);
 
         return new AgentCard(
                 properties.getApi().getDisplayName(),
@@ -52,9 +48,13 @@ public class AgentCardService {
                         : properties.getApi().getDescription(),
                 properties.getApi().getVersion(),
                 baseUrl,
+                "1.0",
+                capabilities,
+                List.of("text/plain"),
+                List.of("text/plain"),
                 skills,
-                protocols,
-                new AgentAuthentication("none", null)
+                null,
+                List.of(new AgentAuthScheme("none", "No authentication required"))
         );
     }
 

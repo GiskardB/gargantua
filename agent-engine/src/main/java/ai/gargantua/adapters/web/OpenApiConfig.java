@@ -39,7 +39,7 @@ public class OpenApiConfig {
         return GroupedOpenApi.builder()
                 .group("chat")
                 .displayName("Chat API")
-                .pathsToMatch("/api/agent/**", "/api/capabilities")
+                .pathsToMatch("/api/agent/**", "/.well-known/agent.json")
                 .build();
     }
 

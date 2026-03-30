@@ -359,17 +359,17 @@ sequenceDiagram
     Note over Remote,A2A: Inbound: this agent is called by a remote agent
 
     Remote->>WK: GET /.well-known/agent.json
-    WK-->>Remote: AgentCard (skills, supportedProtocols: [a2a/1.0, mcp/1.0])
+    WK-->>Remote: AgentCard (skills, protocolVersion: "1.0")
 
-    Remote->>A2A: JSON-RPC 2.0 {method: "tasks/send", params: {message: "..."}}
+    Remote->>A2A: JSON-RPC 2.0 {method: "message/send", params: {message: {parts: [...]}}}
     A2A->>Engine: route + execute (full pipeline)
     Engine-->>A2A: AgentResponse
-    A2A-->>Remote: {jsonrpc: "2.0", result: {taskId, status, output}}
+    A2A-->>Remote: {jsonrpc: "2.0", result: {id, kind, status, artifacts}}
 
     Note over Local,ExtAgent: Outbound: this agent calls a remote A2A agent
 
     Local->>HttpClient: sendTask("research query")
-    HttpClient->>ExtAgent: POST /a2a {method: "tasks/send", params: {...}}
+    HttpClient->>ExtAgent: POST /a2a {method: "message/send", params: {...}}
     ExtAgent-->>HttpClient: {result: {taskId, status, output}}
     HttpClient-->>Local: TaskResult
 ```

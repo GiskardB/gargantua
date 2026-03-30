@@ -338,7 +338,7 @@ java -jar agent-shell/target/agent-shell-1.0.0.jar
 # Then talk to your agent interactively. Type \exit to quit.
 
 # See what skills are available
-curl http://localhost:8080/api/capabilities
+curl http://localhost:8080/.well-known/agent.json
 
 # Interactive docs
 open http://localhost:8080/swagger-ui
@@ -560,12 +560,11 @@ gargantua/
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/.well-known/agent.json` | A2A Agent Card (standard discovery) |
-| `POST` | `/a2a` | A2A JSON-RPC 2.0 (tasks/send, tasks/get, tasks/cancel) |
+| `POST` | `/a2a` | A2A JSON-RPC 2.0 (message/send, tasks/get, tasks/cancel) |
 | `POST` | `/api/agent/chat` | Sync chat |
 | `POST` | `/api/agent/chat/stream` | SSE streaming chat |
 | `POST` | `/api/agent/session/new` | Create session |
 | `POST` | `/api/agent/approval/{id}` | HITL approval |
-| `GET` | `/api/capabilities` | Agent capabilities |
 | `GET` | `/api/agent/chat/sessions/{userId}` | List sessions |
 | `GET` | `/api/agent/chat/history/{userId}/{sessionId}` | Chat history |
 | `GET` | `/api/agent/chat/export/{userId}/{sessionId}` | Export conversation |

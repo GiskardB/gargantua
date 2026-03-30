@@ -37,25 +37,10 @@ class CapabilitiesControllerTest {
         assertEquals(200, response.getStatusCode().value());
         assertNotNull(response.getBody());
         assertEquals("Test Agent", response.getBody().name());
+        assertEquals("1.0", response.getBody().protocolVersion());
         assertEquals(1, response.getBody().skills().size());
         assertEquals("code-review", response.getBody().skills().get(0).id());
         assertTrue(response.getHeaders().get("Cache-Control").contains("max-age=60"));
-    }
-
-    @Test
-    @DisplayName("GET /api/capabilities returns A2A Agent Card (backward compat)")
-    void capabilitiesEndpointReturnsAgentCard() {
-        AgentCardService agentCardService = buildAgentCardService();
-
-        var controller = new CapabilitiesController(agentCardService, null);
-
-        var request = mockRequest();
-        ResponseEntity<AgentCard> response = controller.getCapabilities(request);
-
-        assertEquals(200, response.getStatusCode().value());
-        assertNotNull(response.getBody());
-        assertEquals("Test Agent", response.getBody().name());
-        assertTrue(response.getBody().supportedProtocols().contains("a2a/1.0"));
     }
 
     @Test
@@ -79,15 +64,15 @@ class CapabilitiesControllerTest {
     }
 
     @Test
-    @DisplayName("POST /a2a tasks/send without orchestrator returns error")
-    void taskSendWithoutOrchestratorReturnsError() {
+    @DisplayName("POST /a2a message/send without orchestrator returns error")
+    void messageSendWithoutOrchestratorReturnsError() {
         AgentCardService agentCardService = buildAgentCardService();
 
         var controller = new CapabilitiesController(agentCardService, null);
 
         Map<String, Object> jsonRpc = Map.of(
                 "jsonrpc", "2.0",
-                "method", "tasks/send",
+                "method", "message/send",
                 "id", 1,
                 "params", Map.of("message", "Hello")
         );

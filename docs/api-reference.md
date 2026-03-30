@@ -172,7 +172,7 @@ curl -X POST http://localhost:8080/api/agent/approval/apr_7f3a9c \
 
 ### GET /.well-known/agent.json -- Agent Card
 
-Returns the A2A-standard Agent Card for discovery. This is the same payload as `GET /api/capabilities` (backward compatible) but served at the well-known URI per the A2A specification.
+Returns the A2A-standard Agent Card for discovery, served at the well-known URI per the A2A specification.
 
 ```bash
 curl http://localhost:8080/.well-known/agent.json
@@ -181,23 +181,27 @@ curl http://localhost:8080/.well-known/agent.json
 **Response (200)**
 ```json
 {
-  "agentId": "default-agent",
-  "displayName": "AI Agent",
+  "name": "AI Agent",
   "description": "AI Agent powered by Gargantua",
-  "supportedProtocols": ["a2a/1.0", "mcp/1.0"],
-  "skills": [{ "name": "weather-skill", "description": "..." }],
-  "available": true
+  "version": "1.0.0",
+  "url": "http://localhost:8080",
+  "protocolVersion": "1.0",
+  "capabilities": { "streaming": false, "pushNotifications": false },
+  "defaultInputModes": ["text/plain"],
+  "defaultOutputModes": ["text/plain"],
+  "skills": [{ "id": "weather-skill", "name": "weather-skill", "description": "..." }],
+  "authSchemes": [{ "scheme": "none", "description": "No authentication required" }]
 }
 ```
 
 ### POST /a2a -- JSON-RPC 2.0
 
-A2A-standard JSON-RPC 2.0 endpoint. Supports the following methods: `tasks/send`, `tasks/get`, `tasks/cancel`.
+A2A-standard JSON-RPC 2.0 endpoint. Supports the following methods: `message/send`, `tasks/get`, `tasks/cancel`.
 
 ```bash
 curl -X POST http://localhost:8080/a2a \
   -H "Content-Type: application/json" \
-  -d '{"jsonrpc": "2.0", "id": 1, "method": "tasks/send", "params": {"message": "What is the weather in Rome?"}}'
+  -d '{"jsonrpc": "2.0", "id": 1, "method": "message/send", "params": {"message": {"messageId": "msg1", "role": "user", "parts": [{"kind": "text", "text": "What is the weather in Rome?"}]}}}'
 ```
 
 **Response (200)**
@@ -206,46 +210,15 @@ curl -X POST http://localhost:8080/a2a \
   "jsonrpc": "2.0",
   "id": 1,
   "result": {
-    "taskId": "task_abc123",
-    "status": "completed",
-    "output": "The current weather in Rome is 22 C and sunny."
+    "id": "task_abc123",
+    "kind": "task",
+    "status": { "state": "completed", "message": { "messageId": "...", "role": "agent", "parts": [{"kind": "text", "text": "The current weather in Rome is 22 C and sunny."}] } },
+    "artifacts": [{ "name": "response", "parts": [{"kind": "text", "text": "The current weather in Rome is 22 C and sunny."}] }]
   }
 }
 ```
 
 Use `HttpA2AClient` to call remote A2A-compatible agents programmatically.
-
----
-
-## Agent Discovery
-
-### GET /api/capabilities
-
-Returns the agent's registered skills, their tools, domains, and metadata. The response is cached for 60 seconds. Use this for capability discovery -- for example, a UI can call it on load to show available skills.
-
-```bash
-curl http://localhost:8080/api/capabilities
-```
-
-**Response (200)**
-```json
-{
-  "agentId": "default-agent",
-  "displayName": "AI Agent",
-  "description": "AI Agent powered by AgentKit",
-  "available": true,
-  "skills": [{
-    "name": "weather-skill",
-    "description": "Provides current weather and forecasts",
-    "domain": "weather",
-    "version": "1.0.0",
-    "active": true,
-    "hasSchema": true,
-    "allowedTools": ["getWeather", "getForecast"]
-  }],
-  "timestamp": "2026-03-29T10:15:30Z"
-}
-```
 
 ---
 
