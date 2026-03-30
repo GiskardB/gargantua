@@ -39,6 +39,8 @@
       <includes>
         <include>.gitignore</include>
         <include>.env.example</include>
+        <include>Dockerfile</include>
+        <include>docker-compose.yml</include>
       </includes>
     </fileSet>
   </fileSets>

@@ -21,9 +21,9 @@ ${symbol_pound}   LLM_FALLBACK_PROVIDER    Fallback provider when primary fails 
 ${symbol_pound}   LLM_FALLBACK_MODEL       Fallback model name (default: claude-sonnet-4-20250514)
 ${symbol_pound}   LLM_FALLBACK_API_KEY     Fallback API key (optional)
 ${symbol_pound}
-${symbol_pound}   LLM_ROUTING_PROVIDER     Routing model provider — cheap, for skill routing (default: openai)
-${symbol_pound}   LLM_ROUTING_MODEL        Routing model name (default: gpt-4o-mini)
-${symbol_pound}   LLM_ROUTING_API_KEY      Routing API key (defaults to primary key)
+${symbol_pound}   LLM_ROUTING_PROVIDER     Routing model provider (default: ollama / phi4-mini, local)
+${symbol_pound}   LLM_ROUTING_MODEL        Routing model name (default: phi4-mini)
+${symbol_pound}   LLM_ROUTING_API_KEY      Not needed for Ollama
 ${symbol_pound}
 ${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}
 
@@ -64,9 +64,10 @@ agent:
       api-key: ${symbol_dollar}{LLM_FALLBACK_API_KEY:}
       endpoint: ${symbol_dollar}{LLM_FALLBACK_ENDPOINT:}
     routing-model:
-      provider: ${symbol_dollar}{LLM_ROUTING_PROVIDER:openai}
-      model: ${symbol_dollar}{LLM_ROUTING_MODEL:gpt-4o-mini}
-      api-key: ${symbol_dollar}{LLM_ROUTING_API_KEY:${symbol_dollar}{LLM_PRIMARY_API_KEY:}}
+      provider: ${symbol_dollar}{LLM_ROUTING_PROVIDER:ollama}
+      model: ${symbol_dollar}{LLM_ROUTING_MODEL:phi4-mini}
+      api-key: ${symbol_dollar}{LLM_ROUTING_API_KEY:}
+      endpoint: ${symbol_dollar}{LLM_ROUTING_ENDPOINT:http://localhost:11434}
       temperature: 0.0
       max-tokens: 50
 
@@ -111,6 +112,10 @@ agent:
     default-ttl-minutes: 5
 
   cost-tracking:
+    enabled: true
+    retention-days: 365
+
+  audit:
     enabled: true
     retention-days: 365
 

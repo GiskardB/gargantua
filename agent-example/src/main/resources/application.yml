@@ -22,9 +22,9 @@
 # │ LLM_FALLBACK_API_KEY       │ API key for fallback provider                           │ (optional)                   │
 # │ LLM_FALLBACK_ENDPOINT      │ Fallback base URL / endpoint                           │ (provider default)           │
 # ├────────────────────────────┼────────────────────────────────────────────────────────┼──────────────────────────────┤
-# │ LLM_ROUTING_PROVIDER       │ Routing model provider (cheap, for skill routing)      │ openai                       │
-# │ LLM_ROUTING_MODEL          │ Routing model name                                     │ gpt-4o-mini                  │
-# │ LLM_ROUTING_API_KEY        │ API key for routing model                               │ (same as primary if omitted) │
+# │ LLM_ROUTING_PROVIDER       │ Routing model provider (default: ollama, local)        │ ollama                       │
+# │ LLM_ROUTING_MODEL          │ Routing model name                                     │ phi4-mini                    │
+# │ LLM_ROUTING_API_KEY        │ Not needed for Ollama                                  │ (optional)                   │
 # ├────────────────────────────┼────────────────────────────────────────────────────────┼──────────────────────────────┤
 # │ ROUTING_STRATEGY           │ Skill routing: hybrid | semantic | llm                 │ hybrid                       │
 # │ ROUTING_THRESHOLD          │ Semantic similarity threshold (0.0–1.0)                │ 0.82                         │
@@ -76,9 +76,10 @@ agent:
       api-key: ${LLM_FALLBACK_API_KEY:}
       endpoint: ${LLM_FALLBACK_ENDPOINT:}
     routing-model:
-      provider: ${LLM_ROUTING_PROVIDER:openai}
-      model: ${LLM_ROUTING_MODEL:gpt-4o-mini}
-      api-key: ${LLM_ROUTING_API_KEY:${LLM_PRIMARY_API_KEY:}}
+      provider: ${LLM_ROUTING_PROVIDER:ollama}
+      model: ${LLM_ROUTING_MODEL:phi4-mini}
+      api-key: ${LLM_ROUTING_API_KEY:}
+      endpoint: ${LLM_ROUTING_ENDPOINT:http://localhost:11434}
       temperature: 0.0
       max-tokens: 50
 
@@ -172,6 +173,10 @@ agent:
   evals:
     enabled: true
     fail-threshold: 0.70
+
+  audit:
+    enabled: true
+    retention-days: 365
 
   dry-run:
     enabled: true
