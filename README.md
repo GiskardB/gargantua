@@ -527,7 +527,7 @@ gargantua/
 ├── agent-memory-sdk/                -- Standalone memory library (Redis + MongoDB)
 ├── agent-engine/                    -- Core engine: auto-configuration, orchestrator, guardrails, routing, REST controllers, skill registries
 ├── agent-mcp-server/                -- MCP Server gateway (optional)
-├── agent-example/                   -- Reference agent (weather/search tools)
+├── agent-example-fitcoach/                   -- Reference agent (weather/search tools)
 ├── agent-shell/                     -- Interactive CLI (Spring Shell 4)
 ├── agent-skill-linter-maven-plugin/ -- Build-time SKILL.md validation
 ├── agent-archetype/                 -- Maven archetype for scaffolding new projects

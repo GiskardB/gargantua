@@ -43,33 +43,33 @@ jobs:
           java-version: ${{ matrix.java }}
           cache: maven
 
-      # Build all framework modules (skip agent-example since it's standalone)
+      # Build all framework modules (skip agent-example-fitcoach since it's standalone)
       - name: Build framework modules
         run: >
           mvn clean install -DskipTests
           --batch-mode --no-transfer-progress
-          -pl '!agent-example'
+          -pl '!agent-example-fitcoach'
 
-      # Build agent-example separately (it uses Spring Boot parent, not gargantua-parent)
-      - name: Build agent-example
+      # Build agent-example-fitcoach separately (it uses Spring Boot parent, not gargantua-parent)
+      - name: Build agent-example-fitcoach
         run: >
           mvn clean compile -DskipTests
           --batch-mode --no-transfer-progress
-          -f agent-example/pom.xml
+          -f agent-example-fitcoach/pom.xml
 
       # Run unit tests on framework modules
       - name: Run tests
         run: >
           mvn test
           --batch-mode --no-transfer-progress
-          -pl '!agent-example'
+          -pl '!agent-example-fitcoach'
 
-      # Run agent-example tests
-      - name: Run agent-example tests
+      # Run agent-example-fitcoach tests
+      - name: Run agent-example-fitcoach tests
         run: >
           mvn test
           --batch-mode --no-transfer-progress
-          -f agent-example/pom.xml
+          -f agent-example-fitcoach/pom.xml
         continue-on-error: true  # Example tests may need infra
 
       # Upload test reports on failure

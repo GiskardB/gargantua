@@ -90,7 +90,7 @@ docker build --target runtime-native -t my-agent:native .
 
 ### Maven profile
 ```bash
-./mvnw clean package -Pnative -pl agent-example -am -DskipTests
+./mvnw clean package -Pnative -pl agent-example-fitcoach -am -DskipTests
 ```
 
 ### RuntimeHints

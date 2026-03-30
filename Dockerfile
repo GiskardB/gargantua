@@ -12,7 +12,7 @@ COPY agent-memory-sdk/pom.xml                agent-memory-sdk/pom.xml
 COPY agent-spring-boot-starter/pom.xml       agent-spring-boot-starter/pom.xml
 COPY agent-adapters/pom.xml                  agent-adapters/pom.xml
 COPY agent-mcp-server/pom.xml                agent-mcp-server/pom.xml
-COPY agent-example/pom.xml                   agent-example/pom.xml
+COPY agent-example-fitcoach/pom.xml                   agent-example-fitcoach/pom.xml
 COPY agent-shell/pom.xml                     agent-shell/pom.xml
 COPY agent-skill-linter-maven-plugin/pom.xml agent-skill-linter-maven-plugin/pom.xml
 
@@ -24,7 +24,7 @@ RUN --mount=type=cache,target=/root/.m2 \
 COPY . .
 
 RUN --mount=type=cache,target=/root/.m2 \
-    ./mvnw clean package -pl agent-example -am -DskipTests -B
+    ./mvnw clean package -pl agent-example-fitcoach -am -DskipTests -B
 
 # ─────────────────────────────────────────────────────────────
 # Stage 2A – JVM runtime
@@ -35,7 +35,7 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
 WORKDIR /app
 
-COPY --from=builder /workspace/agent-example/target/*.jar app.jar
+COPY --from=builder /workspace/agent-example-fitcoach/target/*.jar app.jar
 
 RUN chown -R appuser:appgroup /app
 USER appuser
@@ -57,7 +57,7 @@ WORKDIR /workspace
 COPY --from=builder /workspace /workspace
 
 RUN --mount=type=cache,target=/root/.m2 \
-    ./mvnw -Pnative native:compile -pl agent-example -am -DskipTests -B
+    ./mvnw -Pnative native:compile -pl agent-example-fitcoach -am -DskipTests -B
 
 # ─────────────────────────────────────────────────────────────
 # Stage 2C – Distroless native runtime
@@ -66,7 +66,7 @@ FROM gcr.io/distroless/base-debian12 AS runtime-native
 
 WORKDIR /app
 
-COPY --from=native-builder /workspace/agent-example/target/agent-example app
+COPY --from=native-builder /workspace/agent-example-fitcoach/target/agent-example-fitcoach app
 
 EXPOSE 8080
 

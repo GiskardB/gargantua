@@ -319,7 +319,7 @@ graph TD
 
     MCP[agent-mcp-server<br/><i>MCP protocol gateway</i>]
 
-    EXAMPLE[agent-example<br/><i>Reference agent<br/>standalone project</i>]
+    EXAMPLE[agent-example-fitcoach<br/><i>Reference agent<br/>standalone project</i>]
 
     SHELL[agent-shell<br/><i>Interactive CLI</i>]
 

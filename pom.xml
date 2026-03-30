@@ -16,7 +16,7 @@
     <module>agent-memory-sdk</module>
     <module>agent-engine</module>
     <module>agent-mcp-server</module>
-    <module>agent-example</module>
+    <module>agent-example-fitcoach</module>
     <module>agent-shell</module>
     <module>agent-skill-linter-maven-plugin</module>
     <module>agent-archetype</module>
