@@ -31,17 +31,12 @@ LLM_PRIMARY_ENDPOINT=https://api.openai.com/v1 \
 SPRING_PROFILES_ACTIVE=embedded \
 mvn spring-boot:run
 #
-# Using Anthropic instead?
-#   LLM_PRIMARY_PROVIDER=anthropic
-#   LLM_PRIMARY_MODEL=claude-sonnet-4-20250514
-#   LLM_PRIMARY_API_KEY=sk-ant-your-key
-#   LLM_PRIMARY_ENDPOINT=https://api.anthropic.com
-#
-# Using Azure OpenAI?
-#   LLM_PRIMARY_PROVIDER=azure-openai
-#   LLM_PRIMARY_MODEL=gpt-4o
-#   LLM_PRIMARY_API_KEY=your-azure-key
-#   LLM_PRIMARY_ENDPOINT=https://your-resource.openai.azure.com
+# Other providers (any LangChain4j-supported provider works):
+#   Anthropic:    LLM_PRIMARY_PROVIDER=anthropic     LLM_PRIMARY_ENDPOINT=https://api.anthropic.com
+#   Azure OpenAI: LLM_PRIMARY_PROVIDER=azure-openai  LLM_PRIMARY_ENDPOINT=https://your-resource.openai.azure.com
+#   Google Gemini: LLM_PRIMARY_PROVIDER=google-gemini LLM_PRIMARY_MODEL=gemini-2.5-pro
+#   Mistral:      LLM_PRIMARY_PROVIDER=mistral       LLM_PRIMARY_MODEL=mistral-large-latest
+#   Ollama local: LLM_PRIMARY_PROVIDER=ollama        LLM_PRIMARY_ENDPOINT=http://localhost:11434
 
 # 3. Talk to your agent (pick one)
 
@@ -98,7 +93,7 @@ Every feature has dedicated documentation — click the link to dive deeper.
 
 | Feature | What it does | Docs |
 |---------|-------------|------|
-| **Multi-Provider LLM** | OpenAI, Anthropic, Azure OpenAI, Ollama. Rule-based model selection + Resilience4j failover. | [LLM Configuration](docs/llm-configuration.md) |
+| **Multi-Provider LLM** | Any provider supported by LangChain4j: OpenAI, Anthropic, Azure OpenAI, Google Gemini, Mistral, Groq, Cohere, Ollama, and more. Rule-based model selection + Resilience4j failover. | [LLM Configuration](docs/llm-configuration.md) |
 | **A2A Protocol** | Agent-to-Agent interop. Discovery via `/.well-known/agent.json`, tasks via JSON-RPC 2.0. Call remote agents with `HttpA2AClient`. | [Extending](docs/extending.md) |
 | **MCP Server** | Expose the agent to Claude Desktop, Cursor, VS Code via the Model Context Protocol. | [Extending](docs/extending.md) |
 | **SSE Streaming** | Real-time token delivery, tool call events, approval requests — all via Server-Sent Events. | [API Reference](docs/api-reference.md) |
@@ -118,10 +113,10 @@ Every feature has dedicated documentation — click the link to dive deeper.
 
 ## How it works
 
-**You write two things:**
+**You write:**
 
-1. A `SKILL.md` file — declares what your agent can do, how it behaves, and which tools it can use
-2. A `@AgentTool` class — implements the actual actions (API calls, database queries, business logic)
+1. One or more `SKILL.md` files — each declares a skill: behavior, allowed tools, routing hints. You can also **import skills as Maven JARs** from the [SkillsJars](docs/skills-and-routing.md) ecosystem instead of writing them.
+2. `@AgentTool` classes — Java methods that implement the actual actions (API calls, database queries, business logic)
 
 **Gargantua handles everything else:**
 
@@ -267,6 +262,8 @@ Gargantua uses **three LLM roles** — each can be a different provider and mode
 
 The routing model runs locally via Ollama (started by `docker compose`). It handles all internal LLM operations at zero cost — only the primary model calls the cloud API.
 
+> **Supported providers:** Gargantua supports any LLM provider available in LangChain4j — OpenAI, Anthropic, Azure OpenAI, Google Gemini, Mistral, Groq, Cohere, Together AI, AWS Bedrock, Ollama, and more. Set the provider name and endpoint accordingly.
+
 Copy `.env.example` to `.env` and fill in the primary provider:
 
 ```bash
@@ -274,19 +271,21 @@ cp .env.example .env
 ```
 
 ```bash
-# Primary LLM — the model that answers users
-export LLM_PRIMARY_PROVIDER=openai            # openai | anthropic | azure-openai
+# ── Primary LLM — the model that answers users ──────────────────
+# Provider: openai | anthropic | azure-openai | google-gemini |
+#           mistral | groq | cohere | ollama | any LangChain4j provider
+export LLM_PRIMARY_PROVIDER=openai
 export LLM_PRIMARY_MODEL=gpt-4o
 export LLM_PRIMARY_API_KEY=sk-your-key-here
 export LLM_PRIMARY_ENDPOINT=https://api.openai.com/v1
 
-# Fallback — optional, auto-failover on primary failure
+# ── Fallback — optional, auto-failover on primary failure ───────
 # export LLM_FALLBACK_PROVIDER=anthropic
 # export LLM_FALLBACK_MODEL=claude-sonnet-4-20250514
 # export LLM_FALLBACK_API_KEY=sk-ant-...
 # export LLM_FALLBACK_ENDPOINT=https://api.anthropic.com
 
-# Routing — local Ollama by default, no config needed
+# ── Routing — local Ollama by default, no config needed ─────────
 # Override only to use a cloud provider for routing:
 # export LLM_ROUTING_PROVIDER=openai
 # export LLM_ROUTING_MODEL=gpt-4o-mini
@@ -609,7 +608,7 @@ All storage uses in-memory ConcurrentHashMaps. Data is lost on restart.
 | `REDIS_URL` | Redis connection URL | `redis://localhost:6379` |
 | `SERVER_PORT` | HTTP server port | `8080` |
 | **Primary LLM** | Choose a provider, a model, and set the API key — all three are needed | |
-| `LLM_PRIMARY_PROVIDER` | Which LLM service: `openai`, `azure-openai`, `anthropic` | `openai` |
+| `LLM_PRIMARY_PROVIDER` | LLM provider: `openai`, `anthropic`, `azure-openai`, `google-gemini`, `mistral`, `groq`, `cohere`, `ollama`, or any LangChain4j provider | `openai` |
 | `LLM_PRIMARY_MODEL` | Which model from that provider (e.g. `gpt-4o`, `claude-sonnet-4-20250514`) | `gpt-4o` |
 | `LLM_PRIMARY_API_KEY` | API key for the chosen provider (OpenAI: `sk-...`, Anthropic: `sk-ant-...`) | **(required)** |
 | `LLM_PRIMARY_ENDPOINT` | Provider API endpoint. Required for `azure-openai`. Defaults: OpenAI `https://api.openai.com/v1`, Anthropic `https://api.anthropic.com` | provider default |
