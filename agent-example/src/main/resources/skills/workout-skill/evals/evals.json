@@ -1,0 +1,43 @@
+[
+  {
+    "name": "workout-plan-muscle-gain",
+    "description": "User asks for a muscle gain workout plan",
+    "input": "I want to build muscle. I'm intermediate level and have access to a full gym with barbells and dumbbells.",
+    "expectedToolCalls": ["generateWorkout"],
+    "expectedToolArgs": {
+      "generateWorkout": {
+        "goal": "muscle_gain",
+        "level": "intermediate"
+      }
+    },
+    "expectedOutputContains": ["sets", "reps", "Hypertrophy"],
+    "expectedSkill": "workout-skill"
+  },
+  {
+    "name": "search-chest-exercises",
+    "description": "User asks for exercises targeting a specific muscle group",
+    "input": "What are some good chest exercises?",
+    "expectedToolCalls": ["searchExercises"],
+    "expectedToolArgs": {
+      "searchExercises": {
+        "muscleGroup": "chest"
+      }
+    },
+    "expectedOutputContains": ["Bench Press", "chest"],
+    "expectedSkill": "workout-skill"
+  },
+  {
+    "name": "beginner-fat-loss-workout",
+    "description": "Beginner user asks for a weight loss workout with limited equipment",
+    "input": "I'm a beginner trying to lose weight. I only have resistance bands and a yoga mat at home.",
+    "expectedToolCalls": ["generateWorkout"],
+    "expectedToolArgs": {
+      "generateWorkout": {
+        "goal": "fat_loss",
+        "level": "beginner"
+      }
+    },
+    "expectedOutputContains": ["Fat", "circuit"],
+    "expectedSkill": "workout-skill"
+  }
+]

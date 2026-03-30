@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WorkoutPlan",
+  "description": "A structured workout plan with exercises, duration, and notes.",
+  "type": "object",
+  "required": ["planName", "goal", "exercises", "estimatedMinutes"],
+  "properties": {
+    "planName": {
+      "type": "string",
+      "description": "Name of the workout plan"
+    },
+    "goal": {
+      "type": "string",
+      "description": "Fitness goal this plan targets",
+      "enum": ["muscle_gain", "fat_loss", "endurance", "flexibility", "general_fitness"]
+    },
+    "exercises": {
+      "type": "array",
+      "description": "Ordered list of exercises in the plan",
+      "items": {
+        "type": "object",
+        "required": ["name", "sets", "reps", "muscleGroup", "difficulty"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Exercise name"
+          },
+          "sets": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "description": "Number of sets"
+          },
+          "reps": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Repetitions per set (or duration in minutes for timed exercises)"
+          },
+          "muscleGroup": {
+            "type": "string",
+            "description": "Primary muscle group targeted"
+          },
+          "difficulty": {
+            "type": "string",
+            "enum": ["beginner", "intermediate", "advanced"],
+            "description": "Exercise difficulty level"
+          }
+        }
+      }
+    },
+    "estimatedMinutes": {
+      "type": "integer",
+      "minimum": 10,
+      "maximum": 120,
+      "description": "Estimated workout duration in minutes"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Additional coaching notes and recommendations"
+    }
+  }
+}

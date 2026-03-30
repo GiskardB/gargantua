@@ -1,0 +1,29 @@
+[
+  {
+    "name": "meal-plan-muscle-gain",
+    "description": "User asks for a bulking meal plan",
+    "input": "Create a meal plan for muscle gain. I want to eat about 2500 calories per day.",
+    "expectedToolCalls": ["createMealPlan"],
+    "expectedToolArgs": {
+      "createMealPlan": {
+        "goal": "muscle gain",
+        "targetCalories": 2500
+      }
+    },
+    "expectedOutputContains": ["protein", "calories", "meal"],
+    "expectedSkill": "nutrition-skill"
+  },
+  {
+    "name": "food-lookup-salmon",
+    "description": "User asks about nutritional value of a specific food",
+    "input": "How many calories are in salmon? Is it a good source of protein?",
+    "expectedToolCalls": ["lookupFood"],
+    "expectedToolArgs": {
+      "lookupFood": {
+        "food": "salmon"
+      }
+    },
+    "expectedOutputContains": ["208", "protein", "Omega-3"],
+    "expectedSkill": "nutrition-skill"
+  }
+]

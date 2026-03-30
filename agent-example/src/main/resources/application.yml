@@ -1,46 +1,47 @@
 ##############################################################################
-# Gargantua Agent — Example Application Configuration
+# FitCoach AI — Gargantua Agent Example Application Configuration
 #
 # Environment variables reference:
 #
-# ┌────────────────────────────┬────────────────────────────────────────────────────────┬──────────────────────────────┐
-# │ Variable                   │ Description                                            │ Default                      │
-# ├────────────────────────────┼────────────────────────────────────────────────────────┼──────────────────────────────┤
-# │ MONGODB_URI                │ MongoDB connection string                              │ mongodb://localhost:27017/... │
-# │ REDIS_URL                  │ Redis connection URL                                   │ redis://localhost:6379        │
-# │ SERVER_PORT                │ HTTP server port                                       │ 8080                         │
-# ├────────────────────────────┼────────────────────────────────────────────────────────┼──────────────────────────────┤
-# │ LLM_PRIMARY_PROVIDER       │ Primary LLM provider: openai | azure-openai | anthropic│ openai                       │
-# │ LLM_PRIMARY_MODEL          │ Primary model name (e.g. gpt-4o, claude-sonnet-4-...)  │ gpt-4o                       │
-# │ LLM_PRIMARY_API_KEY        │ API key for the primary LLM provider                   │ (required)                   │
-# │ LLM_PRIMARY_ENDPOINT       │ Base URL / endpoint (required for azure-openai)        │ (provider default)           │
-# │ LLM_PRIMARY_TEMPERATURE    │ Sampling temperature 0.0–1.0                           │ 0.7                          │
-# │ LLM_PRIMARY_MAX_TOKENS     │ Max tokens in LLM response                             │ 1000                         │
-# ├────────────────────────────┼────────────────────────────────────────────────────────┼──────────────────────────────┤
-# │ LLM_FALLBACK_PROVIDER      │ Fallback LLM provider (used when primary fails)        │ anthropic                    │
-# │ LLM_FALLBACK_MODEL         │ Fallback model name                                    │ claude-sonnet-4-20250514      │
-# │ LLM_FALLBACK_API_KEY       │ API key for fallback provider                           │ (optional)                   │
-# │ LLM_FALLBACK_ENDPOINT      │ Fallback base URL / endpoint                           │ (provider default)           │
-# ├────────────────────────────┼────────────────────────────────────────────────────────┼──────────────────────────────┤
-# │ LLM_ROUTING_PROVIDER       │ Routing model provider (default: ollama, local)        │ ollama                       │
-# │ LLM_ROUTING_MODEL          │ Routing model name                                     │ phi4-mini                    │
-# │ LLM_ROUTING_API_KEY        │ Not needed for Ollama                                  │ (optional)                   │
-# ├────────────────────────────┼────────────────────────────────────────────────────────┼──────────────────────────────┤
-# │ ROUTING_STRATEGY           │ Skill routing: hybrid | semantic | llm                 │ hybrid                       │
-# │ ROUTING_THRESHOLD          │ Semantic similarity threshold (0.0–1.0)                │ 0.82                         │
-# └────────────────────────────┴────────────────────────────────────────────────────────┴──────────────────────────────┘
+# ┌──────────────────────────────┬──────────────────────────────────────────────────────────┬──────────────────────────────┐
+# │ Variable                     │ Description                                              │ Default                      │
+# ├──────────────────────────────┼──────────────────────────────────────────────────────────┼──────────────────────────────┤
+# │ MONGODB_URI                  │ MongoDB connection string                                │ mongodb://localhost:27017/... │
+# │ REDIS_URL                    │ Redis connection URL                                     │ redis://localhost:6379        │
+# │ SERVER_PORT                  │ HTTP server port                                         │ 8080                         │
+# ├──────────────────────────────┼──────────────────────────────────────────────────────────┼──────────────────────────────┤
+# │ LLM_PRIMARY_PROVIDER         │ Primary LLM provider: openai | azure-openai | anthropic  │ openai                       │
+# │ LLM_PRIMARY_MODEL            │ Primary model name (e.g. gpt-4o, claude-sonnet-4-...)    │ gpt-4o                       │
+# │ LLM_PRIMARY_API_KEY          │ API key for the primary LLM provider                     │ (required)                   │
+# │ LLM_PRIMARY_ENDPOINT         │ Base URL / endpoint (required for azure-openai)          │ (provider default)           │
+# │ LLM_PRIMARY_TEMPERATURE      │ Sampling temperature 0.0–1.0                             │ 0.7                          │
+# │ LLM_PRIMARY_MAX_TOKENS       │ Max tokens in LLM response                               │ 1000                         │
+# ├──────────────────────────────┼──────────────────────────────────────────────────────────┼──────────────────────────────┤
+# │ LLM_FALLBACK_PROVIDER        │ Fallback LLM provider (used when primary fails)          │ anthropic                    │
+# │ LLM_FALLBACK_MODEL           │ Fallback model name                                      │ claude-sonnet-4-20250514      │
+# │ LLM_FALLBACK_API_KEY         │ API key for fallback provider                             │ (optional)                   │
+# │ LLM_FALLBACK_ENDPOINT        │ Fallback base URL / endpoint                             │ (provider default)           │
+# ├──────────────────────────────┼──────────────────────────────────────────────────────────┼──────────────────────────────┤
+# │ LLM_ROUTING_PROVIDER         │ Routing model provider (default: ollama, local)          │ ollama                       │
+# │ LLM_ROUTING_MODEL            │ Routing model name                                       │ phi4-mini                    │
+# │ LLM_ROUTING_API_KEY          │ Not needed for Ollama                                    │ (optional)                   │
+# │ LLM_ROUTING_ENDPOINT         │ Ollama endpoint                                          │ http://localhost:11434        │
+# ├──────────────────────────────┼──────────────────────────────────────────────────────────┼──────────────────────────────┤
+# │ ROUTING_STRATEGY             │ Skill routing: hybrid | semantic | llm                   │ hybrid                       │
+# │ ROUTING_THRESHOLD            │ Semantic similarity threshold (0.0–1.0)                  │ 0.82                         │
+# └──────────────────────────────┴──────────────────────────────────────────────────────────┴──────────────────────────────┘
 #
 ##############################################################################
 
 spring:
   application:
-    name: gargantua-example
+    name: fitcoach-ai
   threads:
     virtual:
       enabled: true
   data:
     mongodb:
-      uri: ${MONGODB_URI:mongodb://localhost:27017/gargantua_example}
+      uri: ${MONGODB_URI:mongodb://localhost:27017/fitcoach_ai}
     redis:
       url: ${REDIS_URL:redis://localhost:6379}
 
@@ -58,7 +59,7 @@ management:
       show-details: when_authorized
 
 ##############################################################################
-# Agent — LLM Providers
+# Agent — LLM Providers (3 roles: primary, fallback, routing)
 ##############################################################################
 
 agent:
@@ -82,6 +83,33 @@ agent:
       endpoint: ${LLM_ROUTING_ENDPOINT:http://localhost:11434}
       temperature: 0.0
       max-tokens: 50
+
+  ##############################################################################
+  # Agent — LLM Routing Rules
+  #   domain=medical → primary (best model for health/nutrition accuracy)
+  #   domain=general → fallback (cheaper model for news/admin/default)
+  ##############################################################################
+
+  llm-routing:
+    rules:
+      - name: medical-domain-best-model
+        description: "Route medical-domain skills (nutrition, health) to the primary high-accuracy model"
+        match:
+          domain: medical
+        target: primary
+        priority: 10
+      - name: general-domain-cheaper-model
+        description: "Route general-domain skills (news, admin, default) to the cheaper fallback model"
+        match:
+          domain: general
+        target: fallback
+        priority: 20
+      - name: fitness-domain-primary
+        description: "Route fitness-domain skills (workout) to the primary model"
+        match:
+          domain: fitness
+        target: primary
+        priority: 15
 
   ##############################################################################
   # Agent — Skill Routing
@@ -132,12 +160,15 @@ agent:
           - "act as if"
           - "disregard"
           - "override your"
+          - "system prompt"
+          - "reveal your instructions"
       pii-masking:
         enabled: true
         patterns:
-          - { type: EMAIL, regex: "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}" }
-          - { type: PHONE, regex: "\\+?[0-9]{10,13}" }
-          - { type: IBAN, regex: "[A-Z]{2}[0-9]{2}[A-Z0-9]{4}[0-9]{7}([A-Z0-9]?){0,16}" }
+          - { type: EMAIL,  regex: "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}" }
+          - { type: PHONE,  regex: "\\+?[0-9]{10,13}" }
+          - { type: IBAN,   regex: "[A-Z]{2}[0-9]{2}[A-Z0-9]{4}[0-9]{7}([A-Z0-9]?){0,16}" }
+          - { type: SSN,    regex: "\\d{3}-\\d{2}-\\d{4}" }
       rate-limit:
         enabled: false
         requests-per-minute: 20
@@ -149,34 +180,73 @@ agent:
         enabled: true
         domains:
           financial: "This is not financial advice."
-          medical: "Consult a doctor before making health decisions."
+          medical: "Consult a doctor before making health decisions. This is informational only."
           legal: "This is not legal advice."
       schema-validator:
         enabled: true
 
   ##############################################################################
-  # Agent — Other Features
+  # Agent — Structured Output Validation
   ##############################################################################
 
   output:
     validation-retries: 2
+
+  ##############################################################################
+  # Agent — Human-in-the-Loop (HITL)
+  ##############################################################################
 
   hitl:
     enabled: true
     default-ttl-minutes: 5
     auto-deny-on-expiry: true
 
+  ##############################################################################
+  # Agent — Cost Tracking with Provider Pricing
+  ##############################################################################
+
   cost-tracking:
     enabled: true
     retention-days: 365
+    pricing:
+      openai:
+        gpt-4o:
+          input-per-1k: 0.005
+          output-per-1k: 0.015
+        gpt-4o-mini:
+          input-per-1k: 0.00015
+          output-per-1k: 0.0006
+      anthropic:
+        claude-sonnet-4-20250514:
+          input-per-1k: 0.003
+          output-per-1k: 0.015
+        claude-haiku-4-20250414:
+          input-per-1k: 0.00025
+          output-per-1k: 0.00125
+      ollama:
+        phi4-mini:
+          input-per-1k: 0.0
+          output-per-1k: 0.0
+
+  ##############################################################################
+  # Agent — Eval Framework
+  ##############################################################################
 
   evals:
     enabled: true
     fail-threshold: 0.70
 
+  ##############################################################################
+  # Agent — Audit Trail
+  ##############################################################################
+
   audit:
     enabled: true
     retention-days: 365
+
+  ##############################################################################
+  # Agent — Dry-Run Mode (dev/test only)
+  ##############################################################################
 
   dry-run:
     enabled: true
@@ -184,13 +254,31 @@ agent:
       - dev
       - test
 
+  ##############################################################################
+  # Agent — Chat History
+  ##############################################################################
+
   chat-history:
     ttl-days: 365
+
+  ##############################################################################
+  # Agent — Observability
+  ##############################################################################
 
   observability:
     tracing-enabled: false
     metrics-enabled: true
     log-token-usage: true
+
+  ##############################################################################
+  # Agent — MCP Server
+  ##############################################################################
+
+  mcp:
+    server:
+      enabled: true
+      name: fitcoach-ai
+      description: "FitCoach AI agent exposed via Model Context Protocol"
 
 ##############################################################################
 # Springdoc / OpenAPI
