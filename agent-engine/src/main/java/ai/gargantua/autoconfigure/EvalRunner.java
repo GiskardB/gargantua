@@ -22,7 +22,7 @@ import java.util.Set;
 
 /**
  * Runs evaluation suites for skills. Executes each case through the orchestrator
- * in dry-run mode and uses a judge (placeholder) to evaluate results.
+ * in dry-run mode and uses an LLM-as-judge (via the routing model) to evaluate results.
  */
 @Component
 public class EvalRunner {

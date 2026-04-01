@@ -306,7 +306,7 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
         );
         var allocation = tokenBudgetManager.allocate(budgetRequest);
 
-        // 9. LLM call (placeholder)
+        // 9. LLM call via LangChain4j
         var llmCtx = new LlmRoutingContext(
                 request.userId(),
                 effectiveSessionId,
