@@ -174,7 +174,7 @@ agent:
       gpt-4o:
         provider: openai
         model: gpt-4o
-        api-key: ${OPENAI_API_KEY}
+        api-key: ${LLM_OPENAI_API_KEY}
         temperature: 0.7
         max-tokens: 1000
 
@@ -182,7 +182,7 @@ agent:
       gpt-4o-mini:
         provider: openai
         model: gpt-4o-mini
-        api-key: ${OPENAI_API_KEY}
+        api-key: ${LLM_OPENAI_API_KEY}
         temperature: 0.7
         max-tokens: 1000
 
@@ -190,7 +190,7 @@ agent:
       claude-sonnet:
         provider: anthropic
         model: claude-sonnet-4-20250514
-        api-key: ${ANTHROPIC_API_KEY}
+        api-key: ${LLM_ANTHROPIC_API_KEY}
         temperature: 0.7
         max-tokens: 1000
 
@@ -198,7 +198,7 @@ agent:
       claude-haiku:
         provider: anthropic
         model: claude-haiku-4-5-20251001
-        api-key: ${ANTHROPIC_API_KEY}
+        api-key: ${LLM_ANTHROPIC_API_KEY}
         temperature: 0.7
         max-tokens: 500
 
@@ -206,7 +206,7 @@ agent:
       gpt-4o-large:
         provider: openai
         model: gpt-4o
-        api-key: ${OPENAI_API_KEY}
+        api-key: ${LLM_OPENAI_API_KEY}
         temperature: 0.7
         max-tokens: 4000    # Higher token limit for this alias
 

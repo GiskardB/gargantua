@@ -649,7 +649,7 @@ public class MultiAgentTools {
 }
 ```
 
-The old `AgentCapabilities` type has been replaced by `AgentCard`.
+The agent's identity and capabilities are described by the `AgentCard` type.
 
 ---
 
