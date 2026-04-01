@@ -6,10 +6,12 @@ import ai.gargantua.core.skill.SkillCard;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.model.anthropic.AnthropicChatModel;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.lang.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -69,6 +71,26 @@ public class LlmProviderFactory {
     }
 
     /**
+     * Get or build the primary model (used for agent conversations).
+     */
+    public ChatModel getPrimaryModel() {
+        return getModel("primary");
+    }
+
+    /**
+     * Get or build the fallback model (used for failover).
+     * Returns {@code null} if no fallback is configured (no model name set).
+     */
+    @Nullable
+    public ChatModel getFallbackModel() {
+        var config = getModelConfig("fallback");
+        if (config.getModel() == null || config.getModel().isBlank()) {
+            return null;
+        }
+        return getModel("fallback");
+    }
+
+    /**
      * Get or build the routing model (used for skill routing and session summaries).
      */
     public ChatModel getRoutingModel() {
@@ -77,24 +99,39 @@ public class LlmProviderFactory {
 
     private ChatModel buildModel(String alias) {
         var config = getModelConfig(alias);
-        String baseUrl = normalizeEndpoint(config.getEndpoint());
 
         String apiKey = config.getApiKey();
         if (apiKey == null || apiKey.isBlank()) {
             apiKey = "no-key"; // Bifrost/Ollama don't require API keys
         }
 
-        log.info("Building ChatModel: alias={}, provider={}, model={}, endpoint={}",
-                alias, config.getProvider(), config.getModel(), baseUrl);
+        String provider = config.getProvider() != null ? config.getProvider() : "openai";
 
-        return OpenAiChatModel.builder()
-                .baseUrl(baseUrl)
-                .apiKey(apiKey)
-                .modelName(config.getModel())
-                .temperature(config.getTemperature())
-                .logRequests(log.isDebugEnabled())
-                .logResponses(log.isDebugEnabled())
-                .build();
+        log.info("Building ChatModel: alias={}, provider={}, model={}, endpoint={}",
+                alias, provider, config.getModel(), config.getEndpoint());
+
+        return switch (provider) {
+            case "anthropic" -> AnthropicChatModel.builder()
+                    .apiKey(apiKey)
+                    .modelName(config.getModel())
+                    .temperature(config.getTemperature())
+                    .maxTokens(config.getMaxTokens())
+                    .logRequests(log.isDebugEnabled())
+                    .logResponses(log.isDebugEnabled())
+                    .build();
+            default -> {
+                // openai, azure-openai, ollama all speak OpenAI-compatible protocol
+                String baseUrl = normalizeEndpoint(config.getEndpoint());
+                yield OpenAiChatModel.builder()
+                        .baseUrl(baseUrl)
+                        .apiKey(apiKey)
+                        .modelName(config.getModel())
+                        .temperature(config.getTemperature())
+                        .logRequests(log.isDebugEnabled())
+                        .logResponses(log.isDebugEnabled())
+                        .build();
+            }
+        };
     }
 
     /**
@@ -109,6 +146,18 @@ public class LlmProviderFactory {
             url = url + "/v1";
         }
         return url;
+    }
+
+    /**
+     * Convenience method: generate a response from a specific model with a system prompt
+     * and user message. Useful for routing, eval judging, and other non-conversation calls.
+     */
+    public String generate(ChatModel model, String systemPrompt, String userMessage) {
+        var response = model.chat(
+                SystemMessage.from(systemPrompt),
+                UserMessage.from(userMessage)
+        );
+        return response.aiMessage().text();
     }
 
     /**
