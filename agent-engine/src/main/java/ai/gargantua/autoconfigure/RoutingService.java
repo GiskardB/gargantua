@@ -1,11 +1,12 @@
 package ai.gargantua.autoconfigure;
 
+import ai.gargantua.core.llm.LlmClient;
+import ai.gargantua.core.llm.LlmRequest;
+import ai.gargantua.core.llm.LlmResponse;
 import ai.gargantua.core.skill.SkillMeta;
-import dev.langchain4j.data.message.SystemMessage;
-import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.model.chat.ChatModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -21,9 +22,20 @@ public class RoutingService {
     private final AgentProperties properties;
     private final LlmProviderFactory llmProviderFactory;
 
+    /**
+     * Constructor used when LLM-based routing is available.
+     */
     public RoutingService(AgentProperties properties, LlmProviderFactory llmProviderFactory) {
         this.properties = properties;
         this.llmProviderFactory = llmProviderFactory;
+    }
+
+    /**
+     * Constructor for lightweight usage (no LLM routing, returns fallback skill).
+     */
+    public RoutingService(AgentProperties properties) {
+        this.properties = properties;
+        this.llmProviderFactory = null;
     }
 
     /**
@@ -32,6 +44,11 @@ public class RoutingService {
      */
     public String routeWithLlm(String userMessage, List<SkillMeta> skills) {
         if (skills == null || skills.isEmpty()) {
+            return properties.getRouting().getFallbackSkill();
+        }
+
+        if (llmProviderFactory == null) {
+            log.debug("No LlmProviderFactory configured, returning fallback skill");
             return properties.getRouting().getFallbackSkill();
         }
 
@@ -56,12 +73,23 @@ public class RoutingService {
                 """.formatted(skillCatalog);
 
         try {
-            ChatModel routingModel = llmProviderFactory.getRoutingModel();
-            var response = routingModel.chat(
-                    SystemMessage.from(systemPrompt),
-                    UserMessage.from(userMessage)
+            LlmClient routingClient = llmProviderFactory.getRoutingClient();
+            AgentProperties.LlmModelConfig routingConfig = properties.getLlm().getRoutingModel();
+
+            var messages = List.of(
+                    new LlmRequest.LlmMessage("system", systemPrompt),
+                    new LlmRequest.LlmMessage("user", userMessage)
             );
-            String result = response.aiMessage().text().trim();
+
+            var request = new LlmRequest(
+                    routingConfig.getModel(),
+                    messages,
+                    routingConfig.getTemperature(),
+                    routingConfig.getMaxTokens()
+            );
+
+            LlmResponse response = routingClient.chat(request);
+            String result = response.content().trim();
 
             // Validate the result is a known skill name
             String matched = skillNames.stream()

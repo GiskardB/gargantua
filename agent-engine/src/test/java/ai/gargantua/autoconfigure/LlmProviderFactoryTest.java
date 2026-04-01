@@ -185,30 +185,31 @@ class LlmProviderFactoryTest {
     }
 
     @Nested
-    @DisplayName("getModel caching")
-    class GetModelCaching {
+    @DisplayName("getLlmClient caching")
+    class GetLlmClientCaching {
 
         @Test
-        @DisplayName("getRoutingModel returns model for 'routing' alias")
-        void getRoutingModelUsesRoutingAlias() {
+        @DisplayName("getRoutingClient returns client for routing config")
+        void getRoutingClientUsesRoutingConfig() {
             properties.getLlm().getRoutingModel().setModel("routing-model");
-            properties.getLlm().getRoutingModel().setEndpoint("http://localhost:11434/v1");
-            properties.getLlm().getRoutingModel().setApiKey("test-key");
+            properties.getLlm().getRoutingModel().setProvider("ollama");
+            properties.getLlm().getRoutingModel().setEndpoint("http://localhost:11434");
 
-            // This will build the model; we just verify no exception
-            var model = factory.getRoutingModel();
-            assertThat(model).isNotNull();
+            var client = factory.getRoutingClient();
+            assertThat(client).isNotNull();
         }
 
         @Test
-        @DisplayName("getModel returns same instance for same alias (cached)")
+        @DisplayName("getLlmClient returns same instance for same config (cached)")
         void returnsIdenticalCachedInstance() {
-            properties.getLlm().getPrimary().setEndpoint("http://localhost:11434/v1");
+            properties.getLlm().getPrimary().setProvider("openai");
+            properties.getLlm().getPrimary().setEndpoint("https://api.openai.com/v1");
             properties.getLlm().getPrimary().setApiKey("test-key");
 
-            var model1 = factory.getModel("primary");
-            var model2 = factory.getModel("primary");
-            assertThat(model1).isSameAs(model2);
+            var config = factory.getModelConfig("primary");
+            var client1 = factory.getLlmClient(config);
+            var client2 = factory.getLlmClient(config);
+            assertThat(client1).isSameAs(client2);
         }
     }
 }

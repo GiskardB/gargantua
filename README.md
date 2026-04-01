@@ -4,7 +4,7 @@
 
 Gargantua gives you everything you need to go from idea to deployed AI agent: multi-provider LLM orchestration, semantic skill routing, 3-layer persistent memory, guardrails pipeline, streaming, human-in-the-loop approvals, eval framework, cost tracking, and Kubernetes manifests. All as Maven dependencies — add them to your project and start building.
 
-Built on Java 21, Spring Boot 4.0.4, and LangChain4j 1.12.1.
+Built on Java 21 and Spring Boot 4.0.4. LLM providers (OpenAI, Anthropic, Azure OpenAI, Ollama) are called via built-in native HTTP clients -- no third-party LLM SDK needed.
 
 ---
 
@@ -288,7 +288,7 @@ Gargantua uses **three LLM roles** — each can be a different provider and mode
 
 By default the routing model runs locally via Ollama — but this is just a suggestion. All three roles accept **any OpenAI-compatible endpoint**. You can configure routing to use OpenAI, Azure OpenAI, or any OpenAI-compatible gateway exactly like primary and fallback — just set `LLM_ROUTING_PROVIDER`, `LLM_ROUTING_MODEL`, `LLM_ROUTING_API_KEY`, and `LLM_ROUTING_ENDPOINT`.
 
-> **Supported providers:** Gargantua uses LangChain4j's `OpenAiChatModel` under the hood, so it works with any API that speaks the OpenAI chat completions protocol: OpenAI, Azure OpenAI, Ollama, LiteLLM, Bifrost, and similar gateways. Non-OpenAI providers (Anthropic, Google Gemini, Mistral, etc.) are supported when accessed through an OpenAI-compatible proxy.
+> **Supported providers:** Gargantua ships with built-in native HTTP clients for OpenAI, Anthropic, Azure OpenAI, and Ollama. Add support for other providers by implementing the `LlmClient` interface (a single `chat()` method).
 
 Copy `.env.example` to `.env` and fill in the primary provider:
 
@@ -510,7 +510,6 @@ With GitHub Packages, use groupId `ai.gargantua` and version `1.0.0` (no `v` pre
 | Java | 21 (Virtual Threads) |
 | Spring Boot | 4.0.4 |
 | Spring Framework | 7.0.5 |
-| LangChain4j | 1.12.1 |
 | MongoDB | 8.0 |
 | Redis | 7.4 |
 | Spring Shell | 4.0.1 |

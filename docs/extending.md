@@ -373,7 +373,7 @@ When enabled, the client must send `Authorization: Bearer <key>` on the SSE conn
 
 The agent can simultaneously:
 - **Be an MCP server** (this feature) — invoked by Claude Desktop, other agents
-- **Be an MCP client** (`langchain4j-mcp` in the engine) — calling external MCP servers as tools
+- **Be an MCP client** (via the MCP SDK in the engine) — calling external MCP servers as tools
 
 Both directions work at the same time.
 
