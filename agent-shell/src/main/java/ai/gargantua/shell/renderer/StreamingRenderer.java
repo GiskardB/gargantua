@@ -1,5 +1,6 @@
 package ai.gargantua.shell.renderer;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -24,6 +25,7 @@ public class StreamingRenderer {
     private static final String DIM = "\u001B[2m";
     private static final String BOLD = "\u001B[1m";
 
+    @Autowired
     public StreamingRenderer(@Value("${agent.shell.ansi:auto}") String ansiMode) {
         this.out = System.out;
         this.ansiEnabled = resolveAnsi(ansiMode);

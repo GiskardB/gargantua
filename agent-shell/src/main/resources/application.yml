@@ -12,7 +12,7 @@ agent:
     user-id: dev-user
     show-meta: true
     show-timing: true
-    ansi: auto
+    ansi: true
     remote:
       url: http://localhost:8080
       api-key: ""
