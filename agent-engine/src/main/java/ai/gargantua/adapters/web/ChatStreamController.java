@@ -2,7 +2,6 @@ package ai.gargantua.adapters.web;
 
 import ai.gargantua.autoconfigure.SecurityContextFilter;
 import ai.gargantua.core.orchestrator.AgentRequest;
-import ai.gargantua.core.orchestrator.AgentResponse;
 import ai.gargantua.core.orchestrator.OrchestratorEngine;
 import ai.gargantua.core.security.SecurityContext;
 import ai.gargantua.core.session.DryRunContext;

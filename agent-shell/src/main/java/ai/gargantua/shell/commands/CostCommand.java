@@ -2,8 +2,6 @@ package ai.gargantua.shell.commands;
 
 import ai.gargantua.shell.renderer.StreamingRenderer;
 import ai.gargantua.shell.renderer.TableRenderer;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.shell.core.command.annotation.Command;
 import org.springframework.stereotype.Component;
 

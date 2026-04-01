@@ -1,6 +1,5 @@
 package ai.gargantua.shell.commands;
 
-import ai.gargantua.core.skill.SkillCard;
 import ai.gargantua.core.skill.SkillMeta;
 import ai.gargantua.core.skill.SkillRegistry;
 import ai.gargantua.shell.renderer.StreamingRenderer;

@@ -1,7 +1,6 @@
 package ai.gargantua.shell.commands;
 
 import ai.gargantua.core.orchestrator.AgentRequest;
-import ai.gargantua.core.orchestrator.AgentResponse;
 import ai.gargantua.core.orchestrator.OrchestratorEngine;
 import ai.gargantua.core.session.DryRunContext;
 import ai.gargantua.core.skill.SkillMeta;

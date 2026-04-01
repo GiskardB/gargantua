@@ -1,8 +1,6 @@
 package ai.gargantua.autoconfigure;
 
 import ai.gargantua.core.memory.ComposedMemory;
-import ai.gargantua.core.memory.KnowledgeSegment;
-import ai.gargantua.core.memory.SessionSummary;
 import ai.gargantua.core.orchestrator.EnricherContext;
 import ai.gargantua.core.skill.SkillCard;
 import org.springframework.stereotype.Component;

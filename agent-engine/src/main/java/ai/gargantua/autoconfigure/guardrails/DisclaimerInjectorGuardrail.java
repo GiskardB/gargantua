@@ -8,8 +8,6 @@ import ai.gargantua.core.guardrail.OutputGuardrail;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
-
 /**
  * Output guardrail that appends a configurable disclaimer to the agent's response.
  * Can be scoped to specific skill domains (e.g. only add "not medical advice" to health skills).
