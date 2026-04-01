@@ -1,26 +1,23 @@
 package ai.gargantua.autoconfigure;
 
-import ai.gargantua.core.llm.LlmClient;
-import ai.gargantua.core.llm.LlmRequest;
-import ai.gargantua.core.llm.LlmResponse;
 import ai.gargantua.core.llm.LlmRoutingContext;
 import ai.gargantua.core.memory.ChatMessage;
 import ai.gargantua.core.skill.SkillCard;
-import ai.gargantua.autoconfigure.llm.AnthropicLlmClient;
-import ai.gargantua.autoconfigure.llm.OllamaLlmClient;
-import ai.gargantua.autoconfigure.llm.OpenAiLlmClient;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.openai.OpenAiChatModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Factory for building and caching {@link LlmClient} instances based on
- * provider configuration. Creates the appropriate native HTTP client
- * (OpenAI, Anthropic, Azure OpenAI, or Ollama) from {@link AgentProperties}.
+ * Factory for building and caching LangChain4j {@link ChatModel} instances.
+ * Uses the OpenAI-compatible API for all providers (Bifrost gateway, Ollama, etc.).
  *
  * <p>Created via {@link LlmProviderAutoConfiguration}.</p>
  */
@@ -30,7 +27,7 @@ public class LlmProviderFactory {
 
     private final AgentProperties properties;
     private final LlmRouter llmRouter;
-    private final Map<String, LlmClient> clientCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, ChatModel> modelCache = new ConcurrentHashMap<>();
 
     public LlmProviderFactory(AgentProperties properties, LlmRouter llmRouter) {
         this.properties = properties;
@@ -65,19 +62,53 @@ public class LlmProviderFactory {
     }
 
     /**
-     * Get or create an {@link LlmClient} for the given provider configuration.
-     * Clients are cached by a key derived from provider + endpoint + apiKey.
+     * Get or build a cached {@link ChatModel} for the given alias.
      */
-    public LlmClient getLlmClient(AgentProperties.LlmModelConfig config) {
-        String cacheKey = config.getProvider() + "|" + config.getEndpoint() + "|" + config.getApiKey();
-        return clientCache.computeIfAbsent(cacheKey, k -> createClient(config));
+    public ChatModel getModel(String alias) {
+        return modelCache.computeIfAbsent(alias, this::buildModel);
     }
 
     /**
-     * Get or create the routing {@link LlmClient} (used for skill routing and session summaries).
+     * Get or build the routing model (used for skill routing and session summaries).
      */
-    public LlmClient getRoutingClient() {
-        return getLlmClient(properties.getLlm().getRoutingModel());
+    public ChatModel getRoutingModel() {
+        return getModel("routing");
+    }
+
+    private ChatModel buildModel(String alias) {
+        var config = getModelConfig(alias);
+        String baseUrl = normalizeEndpoint(config.getEndpoint());
+
+        String apiKey = config.getApiKey();
+        if (apiKey == null || apiKey.isBlank()) {
+            apiKey = "no-key"; // Bifrost/Ollama don't require API keys
+        }
+
+        log.info("Building ChatModel: alias={}, provider={}, model={}, endpoint={}",
+                alias, config.getProvider(), config.getModel(), baseUrl);
+
+        return OpenAiChatModel.builder()
+                .baseUrl(baseUrl)
+                .apiKey(apiKey)
+                .modelName(config.getModel())
+                .temperature(config.getTemperature())
+                .logRequests(log.isDebugEnabled())
+                .logResponses(log.isDebugEnabled())
+                .build();
+    }
+
+    /**
+     * Ensure the endpoint URL ends with /v1 for OpenAI-compatible APIs.
+     */
+    private String normalizeEndpoint(String endpoint) {
+        if (endpoint == null || endpoint.isBlank()) {
+            return "https://api.openai.com/v1";
+        }
+        String url = endpoint.replaceAll("/+$", "");
+        if (!url.endsWith("/v1")) {
+            url = url + "/v1";
+        }
+        return url;
     }
 
     /**
@@ -98,58 +129,28 @@ public class LlmProviderFactory {
                 config.getProvider(), config.getModel(), alias, config.getEndpoint(),
                 conversationHistory.size());
 
-        LlmClient client = getLlmClient(config);
+        var model = getModel(alias);
 
-        var messages = new ArrayList<LlmRequest.LlmMessage>();
-        messages.add(new LlmRequest.LlmMessage("system", systemPrompt));
+        var messages = new ArrayList<dev.langchain4j.data.message.ChatMessage>();
+        messages.add(SystemMessage.from(systemPrompt));
 
         // Add conversation history (working memory)
         for (var msg : conversationHistory) {
             if ("user".equals(msg.role())) {
-                messages.add(new LlmRequest.LlmMessage("user", msg.content()));
+                messages.add(UserMessage.from(msg.content()));
             } else if ("assistant".equals(msg.role())) {
-                messages.add(new LlmRequest.LlmMessage("assistant", msg.content()));
+                messages.add(AiMessage.from(msg.content()));
             }
         }
 
         // Add the current user message
-        messages.add(new LlmRequest.LlmMessage("user", userMessage));
+        messages.add(UserMessage.from(userMessage));
 
-        var request = new LlmRequest(
-                config.getModel(),
-                messages,
-                config.getTemperature(),
-                config.getMaxTokens()
-        );
-
-        LlmResponse response = client.chat(request);
-        String text = response.content();
+        var response = model.chat(messages);
+        String text = response.aiMessage().text();
 
         log.debug("LLM response ({}): {}", alias, text != null && text.length() > 200
                 ? text.substring(0, 200) + "..." : text);
         return text;
-    }
-
-    private LlmClient createClient(AgentProperties.LlmModelConfig config) {
-        String provider = config.getProvider().toLowerCase();
-        return switch (provider) {
-            case "openai" -> new OpenAiLlmClient(
-                    defaultIfBlank(config.getEndpoint(), "https://api.openai.com/v1"),
-                    config.getApiKey(), false);
-            case "azure-openai", "azure_openai" -> new OpenAiLlmClient(
-                    config.getEndpoint(), config.getApiKey(), true);
-            case "anthropic" -> new AnthropicLlmClient(
-                    defaultIfBlank(config.getEndpoint(), "https://api.anthropic.com"),
-                    config.getApiKey());
-            case "ollama" -> new OllamaLlmClient(
-                    defaultIfBlank(config.getEndpoint(), "http://localhost:11434"));
-            default -> throw new IllegalArgumentException(
-                    "Unsupported LLM provider: '%s'. Built-in providers: openai, anthropic, azure-openai, ollama. "
-                    + "For other providers, register a custom LlmClient bean.".formatted(provider));
-        };
-    }
-
-    private static String defaultIfBlank(String value, String defaultValue) {
-        return (value == null || value.isBlank()) ? defaultValue : value;
     }
 }

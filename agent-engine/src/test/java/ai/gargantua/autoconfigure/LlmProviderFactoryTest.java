@@ -185,31 +185,30 @@ class LlmProviderFactoryTest {
     }
 
     @Nested
-    @DisplayName("getLlmClient caching")
-    class GetLlmClientCaching {
+    @DisplayName("getModel caching")
+    class GetModelCaching {
 
         @Test
-        @DisplayName("getRoutingClient returns client for routing config")
-        void getRoutingClientUsesRoutingConfig() {
+        @DisplayName("getRoutingModel returns model for 'routing' alias")
+        void getRoutingModelUsesRoutingAlias() {
             properties.getLlm().getRoutingModel().setModel("routing-model");
-            properties.getLlm().getRoutingModel().setProvider("ollama");
-            properties.getLlm().getRoutingModel().setEndpoint("http://localhost:11434");
+            properties.getLlm().getRoutingModel().setEndpoint("http://localhost:11434/v1");
+            properties.getLlm().getRoutingModel().setApiKey("test-key");
 
-            var client = factory.getRoutingClient();
-            assertThat(client).isNotNull();
+            // This will build the model; we just verify no exception
+            var model = factory.getRoutingModel();
+            assertThat(model).isNotNull();
         }
 
         @Test
-        @DisplayName("getLlmClient returns same instance for same config (cached)")
+        @DisplayName("getModel returns same instance for same alias (cached)")
         void returnsIdenticalCachedInstance() {
-            properties.getLlm().getPrimary().setProvider("openai");
-            properties.getLlm().getPrimary().setEndpoint("https://api.openai.com/v1");
+            properties.getLlm().getPrimary().setEndpoint("http://localhost:11434/v1");
             properties.getLlm().getPrimary().setApiKey("test-key");
 
-            var config = factory.getModelConfig("primary");
-            var client1 = factory.getLlmClient(config);
-            var client2 = factory.getLlmClient(config);
-            assertThat(client1).isSameAs(client2);
+            var model1 = factory.getModel("primary");
+            var model2 = factory.getModel("primary");
+            assertThat(model1).isSameAs(model2);
         }
     }
 }
