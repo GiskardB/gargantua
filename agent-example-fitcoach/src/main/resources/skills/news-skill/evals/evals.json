@@ -1,0 +1,26 @@
+[
+  {
+    "id": "latest-fitness-trends",
+    "description": "User asks about current fitness trends",
+    "input": "What are the latest fitness trends? Any new training methods that are popular right now?",
+    "expectedBehaviors": ["fitness", "trend"],
+    "forbiddenBehaviors": [],
+    "tags": ["happy-path", "trends"]
+  },
+  {
+    "id": "health-research-news",
+    "description": "User asks about recent health research",
+    "input": "Any new scientific research about the benefits of strength training for longevity?",
+    "expectedBehaviors": ["research", "strength"],
+    "forbiddenBehaviors": [],
+    "tags": ["research", "science"]
+  },
+  {
+    "id": "sports-events",
+    "description": "User asks about recent sports events",
+    "input": "What's happening in the world of competitive fitness and sports right now?",
+    "expectedBehaviors": ["sport", "fitness"],
+    "forbiddenBehaviors": [],
+    "tags": ["sports", "events"]
+  }
+]
