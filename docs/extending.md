@@ -755,3 +755,17 @@ agent:
   output:
     validation-retries: 2   # Number of retry attempts on schema mismatch
 ```
+
+---
+
+## Custom LLM Provider
+
+Gargantua supports any LLM provider via LangChain4j. Built-in: OpenAI, Anthropic, Azure OpenAI, Ollama.
+
+To add a new provider (e.g., Google Gemini):
+
+1. Add `langchain4j-google-ai-gemini` to your POM
+2. Create a `@Bean` that returns a `ChatModel`
+3. Reference it in your routing rules
+
+See [LLM Configuration — Adding a provider](llm-configuration.md#adding-a-langchain4j-provider-eg-google-gemini-mistral-cohere) for step-by-step instructions.

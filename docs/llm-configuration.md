@@ -2,6 +2,98 @@
 
 Gargantua supports multiple LLM endpoints simultaneously via the OpenAI chat completions API protocol. You can use one endpoint for conversations, another as failover, a local model for routing, and define rules that dynamically select the best model based on context (domain, user tier, input length, time of day). Any API that speaks the OpenAI protocol works: OpenAI, Azure OpenAI, Ollama, LiteLLM, Bifrost gateways, and similar proxies.
 
+## Supported LLM Providers
+
+Gargantua uses [LangChain4j](https://docs.langchain4j.dev/) for LLM API calls. The following providers work out of the box:
+
+| Provider | Config value | Protocol | Notes |
+|----------|-------------|----------|-------|
+| **OpenAI** | `openai` | OpenAI API | GPT-4o, GPT-4o-mini, etc. |
+| **Anthropic** | `anthropic` | Anthropic Messages API | Claude Sonnet, Haiku, Opus |
+| **Azure OpenAI** | `azure-openai` | OpenAI-compatible | Set endpoint to your Azure resource URL |
+| **Ollama** | `ollama` | OpenAI-compatible | Local models. Default for routing. |
+| **LiteLLM** | `openai` | OpenAI-compatible | Set endpoint to your LiteLLM proxy |
+| **vLLM** | `openai` | OpenAI-compatible | Set endpoint to your vLLM server |
+| **Any OpenAI-compatible** | `openai` | OpenAI-compatible | Any server that speaks the `/v1/chat/completions` protocol |
+
+> **Key insight:** Any server that implements the OpenAI chat completions API works with `provider: openai` — just set the `endpoint` to your server URL. This includes LiteLLM, vLLM, LocalAI, text-generation-inference, and many others.
+
+### Adding a LangChain4j provider (e.g., Google Gemini, Mistral, Cohere)
+
+LangChain4j supports 20+ providers via dedicated modules. To add one:
+
+**Step 1 — Add the LangChain4j module to your POM:**
+
+```xml
+<!-- Example: Google Gemini -->
+<dependency>
+    <groupId>dev.langchain4j</groupId>
+    <artifactId>langchain4j-google-ai-gemini</artifactId>
+</dependency>
+
+<!-- Example: Mistral -->
+<dependency>
+    <groupId>dev.langchain4j</groupId>
+    <artifactId>langchain4j-mistral-ai</artifactId>
+</dependency>
+```
+
+**Step 2 — Register a custom `ChatModel` bean:**
+
+Create a `@Configuration` class in your project that provides a named `ChatModel`:
+
+```java
+@Configuration
+public class GeminiConfig {
+
+    @Bean("gemini")
+    public ChatModel geminiModel(
+            @Value("${LLM_GEMINI_API_KEY}") String apiKey,
+            @Value("${LLM_GEMINI_MODEL:gemini-2.0-flash}") String model) {
+        return GoogleAiGeminiChatModel.builder()
+            .apiKey(apiKey)
+            .modelName(model)
+            .build();
+    }
+}
+```
+
+**Step 3 — Reference it in your config:**
+
+```yaml
+agent:
+  llm:
+    models:
+      gemini:
+        provider: gemini
+        model: gemini-2.0-flash
+    routing-rules:
+      - name: use-gemini-for-creative
+        priority: 10
+        condition:
+          domain:
+            operator: EQ
+            value: creative
+        target-model: gemini
+```
+
+**Available LangChain4j provider modules:**
+
+| Provider | Artifact |
+|----------|----------|
+| Google Gemini | `langchain4j-google-ai-gemini` |
+| Mistral AI | `langchain4j-mistral-ai` |
+| Cohere | `langchain4j-cohere` |
+| AWS Bedrock | `langchain4j-bedrock` |
+| Google Vertex AI | `langchain4j-vertex-ai` |
+| Hugging Face | `langchain4j-hugging-face` |
+| Groq | `langchain4j-open-ai` (OpenAI-compatible, set endpoint) |
+| Together AI | `langchain4j-open-ai` (OpenAI-compatible, set endpoint) |
+| Fireworks | `langchain4j-open-ai` (OpenAI-compatible, set endpoint) |
+| Deepseek | `langchain4j-open-ai` (OpenAI-compatible, set endpoint) |
+
+> Full list: [LangChain4j Integrations](https://docs.langchain4j.dev/category/integrations)
+
 ---
 
 ## Simple Setup — One Provider

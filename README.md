@@ -31,15 +31,15 @@ LLM_PRIMARY_ENDPOINT=https://api.openai.com/v1 \
 SPRING_PROFILES_ACTIVE=embedded \
 mvn spring-boot:run
 #
-# Other OpenAI-compatible providers (all use the OpenAI chat completions API):
+# Provider: openai (also works for Ollama, LiteLLM, vLLM, any OpenAI-compatible)
+#           anthropic | azure-openai
+#           Add more via LangChain4j modules (see docs/llm-configuration.md)
+#
+# OpenAI-compatible examples:
 #   Azure OpenAI: LLM_PRIMARY_PROVIDER=azure-openai  LLM_PRIMARY_ENDPOINT=https://your-resource.openai.azure.com
 #   Ollama local: LLM_PRIMARY_PROVIDER=ollama        LLM_PRIMARY_ENDPOINT=http://localhost:11434
-#   LiteLLM:      LLM_PRIMARY_PROVIDER=litellm       LLM_PRIMARY_ENDPOINT=http://localhost:4000
-#   Bifrost:      LLM_PRIMARY_PROVIDER=bifrost       LLM_PRIMARY_ENDPOINT=https://your-gateway.example.com
-#
-# Non-OpenAI providers (Anthropic, Gemini, Mistral) work when fronted by
-# an OpenAI-compatible proxy (e.g. LiteLLM, Bifrost, or the provider's
-# own OpenAI-compatible endpoint).
+#   LiteLLM:      LLM_PRIMARY_PROVIDER=openai        LLM_PRIMARY_ENDPOINT=http://localhost:4000
+#   vLLM:         LLM_PRIMARY_PROVIDER=openai        LLM_PRIMARY_ENDPOINT=http://localhost:8000
 
 # 3. Talk to your agent (pick one)
 
@@ -96,7 +96,7 @@ Every feature has dedicated documentation — click the link to dive deeper.
 
 | Feature | What it does | Docs |
 |---------|-------------|------|
-| **Multi-Provider LLM** | Any OpenAI-compatible API: OpenAI, Azure OpenAI, Ollama, LiteLLM, Bifrost gateways, and more. Non-OpenAI providers (Anthropic, Gemini, Mistral) work when fronted by an OpenAI-compatible proxy. Rule-based model selection + Resilience4j failover. | [LLM Configuration](docs/llm-configuration.md) |
+| **Multi-Provider LLM** | OpenAI, Anthropic, Azure OpenAI, Ollama built-in. Add Google Gemini, Mistral, Cohere, AWS Bedrock, or any LangChain4j provider with one dependency. Any OpenAI-compatible endpoint works out of the box. | [LLM Configuration](docs/llm-configuration.md) |
 | **A2A Protocol** | Agent-to-Agent interop. Discovery via `/.well-known/agent.json`, tasks via JSON-RPC 2.0. Call remote agents with `HttpA2AClient`. | [Extending](docs/extending.md) |
 | **MCP Server** | Expose the agent to Claude Desktop, Cursor, VS Code via the Model Context Protocol. | [Extending](docs/extending.md) |
 | **SSE Streaming** | Real-time token delivery, tool call events, approval requests — all via Server-Sent Events. | [API Reference](docs/api-reference.md) |
@@ -288,7 +288,7 @@ Gargantua uses **three LLM roles** — each can be a different provider and mode
 
 By default the routing model runs locally via Ollama — but this is just a suggestion. All three roles accept **any OpenAI-compatible endpoint**. You can configure routing to use OpenAI, Azure OpenAI, or any OpenAI-compatible gateway exactly like primary and fallback — just set `LLM_ROUTING_PROVIDER`, `LLM_ROUTING_MODEL`, `LLM_ROUTING_API_KEY`, and `LLM_ROUTING_ENDPOINT`.
 
-> **Supported providers:** Gargantua uses LangChain4j's `OpenAiChatModel` under the hood, so it works with any API that speaks the OpenAI chat completions protocol: OpenAI, Azure OpenAI, Ollama, LiteLLM, Bifrost, and similar gateways. Non-OpenAI providers (Anthropic, Google Gemini, Mistral, etc.) are supported when accessed through an OpenAI-compatible proxy.
+> **Supported providers:** Gargantua uses [LangChain4j](https://docs.langchain4j.dev/) under the hood. OpenAI, Anthropic, Azure OpenAI, and Ollama work out of the box. Any OpenAI-compatible endpoint (LiteLLM, vLLM, Bifrost, etc.) works by setting `provider: openai` with your endpoint URL. Additional providers (Google Gemini, Mistral, Cohere, AWS Bedrock, and 20+ others) can be added by including the corresponding LangChain4j module dependency. See [LLM Configuration](docs/llm-configuration.md) for details.
 
 Copy `.env.example` to `.env` and fill in the primary provider:
 
