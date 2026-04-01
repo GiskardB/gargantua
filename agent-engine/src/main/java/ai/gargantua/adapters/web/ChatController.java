@@ -11,6 +11,8 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -29,6 +31,8 @@ import java.util.Map;
 @RequestMapping("/api/agent/chat")
 @Tag(name = "Chat")
 public class ChatController {
+
+    private static final Logger log = LoggerFactory.getLogger(ChatController.class);
 
     private final OrchestratorEngine orchestratorEngine;
 
@@ -52,6 +56,8 @@ public class ChatController {
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId,
             @Parameter(description = "Dry run mode")
             @RequestHeader(value = "X-Dry-Run", defaultValue = "false") boolean dryRun,
+            @Parameter(description = "Force a specific skill (bypass routing)")
+            @RequestHeader(value = "X-Force-Skill", required = false) String forceSkill,
             HttpServletRequest httpRequest) {
 
         DryRunContext dryRunContext = dryRun
@@ -64,11 +70,19 @@ public class ChatController {
                 .message(request.message())
                 .userId(userId)
                 .sessionId(sessionId)
+                .forceSkill(forceSkill)
                 .dryRunContext(dryRunContext)
                 .securityContext(securityContext)
                 .build();
 
+        log.info("[Chat] POST /api/agent/chat — userId={}, sessionId={}, forceSkill={}, dryRun={}",
+                userId, sessionId, forceSkill, dryRun);
+
         AgentResponse response = orchestratorEngine.invoke(agentRequest);
+
+        log.info("[Chat] Response — skill={}, routing={}, tokens={}, durationMs={}",
+                response.skillUsed(), response.routingMethod(), response.totalTokens(), response.durationMs());
+
         return ResponseEntity.ok(response);
     }
 

@@ -5,6 +5,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
@@ -24,6 +26,8 @@ import java.util.Set;
  */
 public class SecurityContextFilter extends OncePerRequestFilter {
 
+    private static final Logger log = LoggerFactory.getLogger(SecurityContextFilter.class);
+
     public static final String SECURITY_CONTEXT_ATTR = "gargantua.securityContext";
 
     @Override
@@ -37,10 +41,12 @@ public class SecurityContextFilter extends OncePerRequestFilter {
         var rolesHeader = request.getHeader("X-User-Roles");
         Set<String> roles = (rolesHeader != null && !rolesHeader.isBlank())
             ? Set.of(rolesHeader.split(","))
-            : Set.of();
+            : Set.of("user");
 
         var ctx = new SecurityContext(userId, tenantId, roles);
         request.setAttribute(SECURITY_CONTEXT_ATTR, ctx);
+        log.debug("[Security] {} {} — userId={}, tenantId={}, roles={}",
+                request.getMethod(), request.getRequestURI(), userId, tenantId, roles);
         chain.doFilter(request, response);
     }
 }

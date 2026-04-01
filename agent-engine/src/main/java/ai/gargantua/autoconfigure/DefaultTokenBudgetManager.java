@@ -36,7 +36,7 @@ public class DefaultTokenBudgetManager implements TokenBudgetManager {
     @Override
     public int estimate(String text) {
         if (text == null || text.isEmpty()) return 0;
-        return text.length() / 4;
+        return Math.max(1, text.length() / 4);
     }
 
     @Override

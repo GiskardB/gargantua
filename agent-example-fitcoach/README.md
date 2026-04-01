@@ -11,21 +11,96 @@ FitCoach AI can:
 - Fetch latest fitness and sports news
 - Manage user profiles (admin-only, role-restricted)
 
+## Architecture
+
+```
+                  ┌──────────────┐
+  User ──────────>│  FitCoach AI │──── skill routing ────> Ollama (phi4-mini)
+                  │  (Spring Boot)│                         localhost:11434
+                  └──────┬───────┘
+                         │
+                   LLM calls (primary/fallback)
+                         │
+                         v
+                  ┌──────────────┐
+                  │   Bifrost    │──── Azure OpenAI / OpenAI / ...
+                  │ (LLM Gateway)│    (real API keys configured here)
+                  └──────────────┘
+                    localhost:8090
+```
+
+**Bifrost** is the LLM gateway — all primary and fallback LLM calls go through it. You configure the real provider API keys (Azure OpenAI, OpenAI, Anthropic, etc.) inside Bifrost via `.env`. The application itself never holds provider API keys directly.
+
+**Ollama** runs locally for lightweight skill routing (phi4-mini model, auto-pulled on first start).
+
 ## Run it
 
-```bash
-# Embedded mode (no Docker, everything in-memory)
-LLM_PRIMARY_PROVIDER=openai \
-LLM_PRIMARY_MODEL=gpt-4o \
-LLM_PRIMARY_API_KEY=sk-your-key \
-LLM_PRIMARY_ENDPOINT=https://api.openai.com/v1 \
-SPRING_PROFILES_ACTIVE=embedded \
-mvn spring-boot:run
+### Prerequisites
 
-# Full mode (with Docker infrastructure)
-docker compose up -d mongo redis ollama
-docker compose exec ollama ollama pull phi4-mini
-mvn spring-boot:run
+- Java 21+
+- Maven 3.8+
+- Docker
+
+### Option 1: Embedded mode (no database)
+
+Best for quick testing. Uses in-memory stores (no MongoDB/Redis).
+
+```bash
+# Start infrastructure (Ollama + Bifrost)
+docker compose up -d
+
+# Run the app
+start-embedded.bat
+```
+
+Or manually:
+```bash
+docker compose up -d
+mvn spring-boot:run -pl agent-example-fitcoach -Dspring-boot.run.profiles=embedded
+```
+
+### Option 2: Full mode (with persistence)
+
+Uses MongoDB for data persistence and Redis for caching.
+
+```bash
+# Start all infrastructure (Ollama + Bifrost + MongoDB + Redis)
+start-infra.bat
+
+# Run the app
+start-app.bat
+```
+
+Or manually:
+```bash
+docker compose --profile full up -d
+mvn spring-boot:run -pl agent-example-fitcoach
+```
+
+### Configuration (.env)
+
+Copy `.env.example` to `.env` and configure:
+
+```env
+# Bifrost LLM Gateway — provider keys
+AZURE_OPENAI_API_KEY=your-azure-key
+AZURE_OPENAI_BASE_URL=https://your-resource.openai.azure.com
+AZURE_OPENAI_API_VERSION=2024-02-01
+LLM_MODEL=gpt-4o
+LLM_ROUTING_MODEL=gpt-4o-mini
+
+# App settings
+SERVER_PORT=8080
+BIFROST_PORT=8090
+LLM_ROUTING_MODEL=phi4-mini
+```
+
+### Stop everything
+
+```bash
+stop.bat
+# or
+docker compose --profile full down
 ```
 
 ## Framework Features Demonstrated
@@ -88,7 +163,7 @@ curl -X POST http://localhost:8080/api/agent/chat \
   -H "X-User-Id: user1" -H "X-Session-Id: s3" \
   -H "X-User-Roles: user" \
   -d '{"message": "Delete profile for user user2"}'
-# → Blocked by RbacGuardrail
+# -> Blocked by RbacGuardrail
 ```
 
 ### Human-in-the-Loop (HITL)
@@ -121,9 +196,10 @@ The `application.yml` configures rule-based model selection:
 | Rule | Priority | Condition | Model |
 |------|----------|-----------|-------|
 | medical-domains | 10 | domain IN [medical] | primary (best model) |
+| fitness-domains | 15 | domain EQ fitness | primary (best model) |
 | general-domains | 20 | domain EQ general | fallback (cheaper model) |
 
-Skills with `domain: medical` (nutrition, health) automatically get the most capable model. Skills with `domain: general` (news, admin) use the cheaper fallback.
+All LLM calls are routed through **Bifrost**, which handles the actual provider keys and load balancing.
 
 ### Guardrails
 
@@ -141,40 +217,48 @@ Configured in `application.yml`:
 | Cost tracking | Enabled | Per-request token/cost tracking with provider pricing |
 | MCP server | Enabled | Gateway mode on `/mcp`, discoverable by Claude Desktop |
 | Dry-run | Enabled | `X-Dry-Run: true` header for testing without side effects |
-| Embedded mode | Supported | `SPRING_PROFILES_ACTIVE=embedded` — zero infrastructure |
+| Embedded mode | Supported | `SPRING_PROFILES_ACTIVE=embedded` — no MongoDB/Redis |
 | GraalVM native | Supported | RuntimeHints registered for all tool records |
 
 ## Project Structure
 
 ```
 agent-example-fitcoach/
+├── docker-compose.yml                     Ollama + Bifrost (+ MongoDB/Redis with --profile full)
+├── infra/bifrost/
+│   ├── config.template.json               Bifrost provider config template
+│   └── entrypoint.sh                      Generates runtime config from .env
 ├── src/main/java/ai/gargantua/example/
-│   ├── ExampleAgentApplication.java          @SpringBootApplication
-│   ├── AgentKitRuntimeHints.java             GraalVM reflection hints
+│   ├── ExampleAgentApplication.java       @SpringBootApplication
+│   ├── AgentKitRuntimeHints.java          GraalVM reflection hints
 │   ├── enrichers/
-│   │   └── FitnessProfileEnricher.java       ContextEnricher — user profile
+│   │   └── FitnessProfileEnricher.java    ContextEnricher — user profile
 │   └── tools/
-│       ├── WorkoutTool.java                  @CacheableToolResult + @ToolRetry
-│       ├── NutritionTool.java                @CacheableToolResult
-│       ├── HealthTool.java                   @RequiresApproval (HITL)
-│       ├── NewsTool.java                     @ToolRetry + @CacheableToolResult
-│       └── ProfileTool.java                  @RequiresRole + @RequiresApproval(dangerous)
+│       ├── WorkoutTool.java               @CacheableToolResult + @ToolRetry
+│       ├── NutritionTool.java             @CacheableToolResult
+│       ├── HealthTool.java                @RequiresApproval (HITL)
+│       ├── NewsTool.java                  @ToolRetry + @CacheableToolResult
+│       └── ProfileTool.java              @RequiresRole + @RequiresApproval(dangerous)
 ├── src/main/resources/
-│   ├── application.yml                       Full config (LLM, routing rules, guardrails, audit)
-│   ├── application-embedded.yml              Embedded mode (no Docker)
-│   ├── static/docs/index.html                Redoc API docs
+│   ├── application.yml                    Full config (LLM via Bifrost, routing, guardrails)
+│   ├── application-embedded.yml           Embedded mode overrides
+│   ├── static/docs/index.html             Redoc API docs
 │   └── skills/
 │       ├── default-skill/SKILL.md
 │       ├── workout-skill/
-│       │   ├── SKILL.md                      Structured output
-│       │   ├── assets/schema.json            JSON Schema for WorkoutPlan
-│       │   └── evals/evals.json              3 eval cases
+│       │   ├── SKILL.md                   Structured output
+│       │   ├── assets/schema.json         JSON Schema for WorkoutPlan
+│       │   └── evals/evals.json           3 eval cases
 │       ├── nutrition-skill/
-│       │   ├── SKILL.md                      RAG knowledge-base
-│       │   └── evals/evals.json              2 eval cases
-│       ├── health-skill/SKILL.md             HITL + RBAC
-│       ├── news-skill/SKILL.md               Low temperature
-│       └── admin-skill/SKILL.md              RBAC restricted
+│       │   ├── SKILL.md                   RAG knowledge-base
+│       │   └── evals/evals.json           2 eval cases
+│       ├── health-skill/SKILL.md          HITL + RBAC
+│       ├── news-skill/SKILL.md            Low temperature
+│       └── admin-skill/SKILL.md           RBAC restricted
+├── start-embedded.bat                     Embedded mode (Ollama + Bifrost only)
+├── start-infra.bat                        Start full infra (+ MongoDB + Redis)
+├── start-app.bat                          Run app against full infra
+├── stop.bat                               Stop all Docker services
 └── src/test/java/
-    └── ExampleAgentApplicationTest.java      Context load + tool unit tests
+    └── ExampleAgentApplicationTest.java   Context load + tool unit tests
 ```

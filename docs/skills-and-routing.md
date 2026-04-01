@@ -137,9 +137,9 @@ This three-phase approach means that adding dozens of skills does not impact boo
 The default routing strategy combines fast in-process semantic similarity with an LLM fallback for ambiguous queries.
 
 ```
-Input → Embedding (all-MiniLM-L6-v2, in-process, ~2-5ms)
+Input → Embedding (all-MiniLM-L6-v2-quantized, in-process, ~2-5ms)
       → Cosine similarity vs pre-computed skill embeddings
-      → If score >= threshold (default 0.82): SEMANTIC routing
+      → If score >= threshold (default 0.6): SEMANTIC routing
       → If score <  threshold: LLM routing fallback (~300ms)
       → If forceSkill header present: FORCED routing (skip all matching)
 ```

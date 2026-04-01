@@ -54,7 +54,7 @@ class ChatControllerTest {
         when(orchestratorEngine.invoke(any(AgentRequest.class))).thenReturn(agentResponse);
 
         var request = new ChatController.ChatRequest("Hello");
-        var response = controller.chat(request, "user-1", "sess_123", false, mockHttpRequest());
+        var response = controller.chat(request, "user-1", "sess_123", false, null, mockHttpRequest());
 
         assertNotNull(response.getBody());
         assertEquals("Hello! How can I help you?", response.getBody().text());
@@ -74,6 +74,6 @@ class ChatControllerTest {
 
         var request = new ChatController.ChatRequest("bad content");
         assertThrows(GuardrailBlockedException.class, () ->
-                controller.chat(request, "user-1", "sess_123", false, mockHttpRequest()));
+                controller.chat(request, "user-1", "sess_123", false, null, mockHttpRequest()));
     }
 }

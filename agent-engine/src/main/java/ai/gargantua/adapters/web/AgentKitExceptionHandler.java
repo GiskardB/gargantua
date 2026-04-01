@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.net.URI;
 
@@ -97,6 +98,14 @@ public class AgentKitExceptionHandler {
         problem.setTitle("Eval Suite Not Found");
         problem.setType(URI.create("https://agentkit.io/errors/eval-suite-not-found"));
         problem.setProperty("skillName", ex.getSkillName());
+        return problem;
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ProblemDetail handleNotFound(NoResourceFoundException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        problem.setTitle("Not Found");
+        problem.setType(URI.create("https://agentkit.io/errors/not-found"));
         return problem;
     }
 

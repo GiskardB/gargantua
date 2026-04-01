@@ -10,7 +10,7 @@ Built on Java 21, Spring Boot 4.0.4, and LangChain4j 1.12.1.
 
 ## Try it in 60 seconds
 
-> Requires: Java 21+, Maven, an OpenAI or Anthropic API key. No Docker needed.
+> Requires: Java 21+, Maven, an OpenAI-compatible API key. No Docker needed.
 
 ```bash
 # 1. Generate a new agent project
@@ -31,12 +31,15 @@ LLM_PRIMARY_ENDPOINT=https://api.openai.com/v1 \
 SPRING_PROFILES_ACTIVE=embedded \
 mvn spring-boot:run
 #
-# Other providers (any LangChain4j-supported provider works):
-#   Anthropic:    LLM_PRIMARY_PROVIDER=anthropic     LLM_PRIMARY_ENDPOINT=https://api.anthropic.com
+# Other OpenAI-compatible providers (all use the OpenAI chat completions API):
 #   Azure OpenAI: LLM_PRIMARY_PROVIDER=azure-openai  LLM_PRIMARY_ENDPOINT=https://your-resource.openai.azure.com
-#   Google Gemini: LLM_PRIMARY_PROVIDER=google-gemini LLM_PRIMARY_MODEL=gemini-2.5-pro
-#   Mistral:      LLM_PRIMARY_PROVIDER=mistral       LLM_PRIMARY_MODEL=mistral-large-latest
 #   Ollama local: LLM_PRIMARY_PROVIDER=ollama        LLM_PRIMARY_ENDPOINT=http://localhost:11434
+#   LiteLLM:      LLM_PRIMARY_PROVIDER=litellm       LLM_PRIMARY_ENDPOINT=http://localhost:4000
+#   Bifrost:      LLM_PRIMARY_PROVIDER=bifrost       LLM_PRIMARY_ENDPOINT=https://your-gateway.example.com
+#
+# Non-OpenAI providers (Anthropic, Gemini, Mistral) work when fronted by
+# an OpenAI-compatible proxy (e.g. LiteLLM, Bifrost, or the provider's
+# own OpenAI-compatible endpoint).
 
 # 3. Talk to your agent (pick one)
 
@@ -93,7 +96,7 @@ Every feature has dedicated documentation — click the link to dive deeper.
 
 | Feature | What it does | Docs |
 |---------|-------------|------|
-| **Multi-Provider LLM** | Any provider supported by LangChain4j: OpenAI, Anthropic, Azure OpenAI, Google Gemini, Mistral, Groq, Cohere, Ollama, and more. Rule-based model selection + Resilience4j failover. | [LLM Configuration](docs/llm-configuration.md) |
+| **Multi-Provider LLM** | Any OpenAI-compatible API: OpenAI, Azure OpenAI, Ollama, LiteLLM, Bifrost gateways, and more. Non-OpenAI providers (Anthropic, Gemini, Mistral) work when fronted by an OpenAI-compatible proxy. Rule-based model selection + Resilience4j failover. | [LLM Configuration](docs/llm-configuration.md) |
 | **A2A Protocol** | Agent-to-Agent interop. Discovery via `/.well-known/agent.json`, tasks via JSON-RPC 2.0. Call remote agents with `HttpA2AClient`. | [Extending](docs/extending.md) |
 | **MCP Server** | Expose the agent to Claude Desktop, Cursor, VS Code via the Model Context Protocol. | [Extending](docs/extending.md) |
 | **SSE Streaming** | Real-time token delivery, tool call events, approval requests — all via Server-Sent Events. | [API Reference](docs/api-reference.md) |
@@ -194,11 +197,11 @@ When a client calls `POST /api/agent/chat/stream`, the Orchestrator Engine execu
 ```
   User message
        │
-  1.   ▼  RBAC check — does this user have access?
-  2.   ▼  Input guardrails — PII masking, injection detection, rate limit
-  3.   ▼  Skill routing — semantic similarity + LLM fallback → select skill
-  4.   ▼  RAG retrieval — if skill declares knowledge-base, search vector store
-  5.   ▼  Memory compose — load working + episodic + knowledge (parallel)
+  1.   ▼  Input guardrails — PII masking, injection detection, rate limit, pre-routing RBAC
+  2.   ▼  Skill routing — semantic similarity + LLM fallback → select skill
+  3.   ▼  Post-routing RBAC — re-run guardrails with resolved skill for role-based access
+  4.   ▼  Memory compose — load working + episodic + knowledge (parallel)
+  5.   ▼  Build prompt — run context enrichers, inject memory sections
   6.   ▼  Token budget — truncate if over context window limit
   7.   ▼  LLM call — stream tokens, call tools, handle @RequiresApproval
   8.   ▼  Output guardrails — PII redaction, disclaimer, schema validation
@@ -283,9 +286,9 @@ Gargantua uses **three LLM roles** — each can be a different provider and mode
 | **Fallback** | Auto-failover when primary fails | Anthropic `claude-sonnet` | Per-token (only on failure) |
 | **Routing** | Internal: skill routing, session summaries, eval judge | Ollama `phi4-mini` (local) | **Free** (if local) |
 
-By default the routing model runs locally via Ollama — but this is just a suggestion. All three roles accept **any LangChain4j provider**. You can configure routing to use OpenAI, Anthropic, or any other cloud provider exactly like primary and fallback — just set `LLM_ROUTING_PROVIDER`, `LLM_ROUTING_MODEL`, `LLM_ROUTING_API_KEY`, and `LLM_ROUTING_ENDPOINT`.
+By default the routing model runs locally via Ollama — but this is just a suggestion. All three roles accept **any OpenAI-compatible endpoint**. You can configure routing to use OpenAI, Azure OpenAI, or any OpenAI-compatible gateway exactly like primary and fallback — just set `LLM_ROUTING_PROVIDER`, `LLM_ROUTING_MODEL`, `LLM_ROUTING_API_KEY`, and `LLM_ROUTING_ENDPOINT`.
 
-> **Supported providers:** Gargantua supports any LLM provider available in LangChain4j — OpenAI, Anthropic, Azure OpenAI, Google Gemini, Mistral, Groq, Cohere, Together AI, AWS Bedrock, Ollama, and more. Set the provider name and endpoint accordingly.
+> **Supported providers:** Gargantua uses LangChain4j's `OpenAiChatModel` under the hood, so it works with any API that speaks the OpenAI chat completions protocol: OpenAI, Azure OpenAI, Ollama, LiteLLM, Bifrost, and similar gateways. Non-OpenAI providers (Anthropic, Google Gemini, Mistral, etc.) are supported when accessed through an OpenAI-compatible proxy.
 
 Copy `.env.example` to `.env` and fill in the primary provider:
 
@@ -295,24 +298,24 @@ cp .env.example .env
 
 ```bash
 # ── Primary LLM — the model that answers users ──────────────────
-# Provider: openai | anthropic | azure-openai | google-gemini |
-#           mistral | groq | cohere | ollama | any LangChain4j provider
+# Provider: openai | azure-openai | ollama | any OpenAI-compatible endpoint
 export LLM_PRIMARY_PROVIDER=openai
 export LLM_PRIMARY_MODEL=gpt-4o
 export LLM_PRIMARY_API_KEY=sk-your-key-here
 export LLM_PRIMARY_ENDPOINT=https://api.openai.com/v1
 
 # ── Fallback — optional, auto-failover on primary failure ───────
-# export LLM_FALLBACK_PROVIDER=anthropic
-# export LLM_FALLBACK_MODEL=claude-sonnet-4-20250514
-# export LLM_FALLBACK_API_KEY=sk-ant-...
-# export LLM_FALLBACK_ENDPOINT=https://api.anthropic.com
+# export LLM_FALLBACK_PROVIDER=azure-openai
+# export LLM_FALLBACK_MODEL=gpt-4o
+# export LLM_FALLBACK_API_KEY=your-azure-key
+# export LLM_FALLBACK_ENDPOINT=https://your-resource.openai.azure.com
 
 # ── Routing — local Ollama by default, no config needed ─────────
 # Override only to use a cloud provider for routing:
 # export LLM_ROUTING_PROVIDER=openai
 # export LLM_ROUTING_MODEL=gpt-4o-mini
 # export LLM_ROUTING_API_KEY=sk-...
+# export LLM_ROUTING_ENDPOINT=https://api.openai.com/v1
 ```
 
 > See [LLM Configuration](docs/llm-configuration.md) for advanced setups: model catalogs, rule-based routing, per-skill model overrides, A/B testing.
@@ -527,7 +530,7 @@ gargantua/
 ├── agent-memory-sdk/                -- Standalone memory library (Redis + MongoDB)
 ├── agent-engine/                    -- Core engine: auto-configuration, orchestrator, guardrails, routing, REST controllers, skill registries
 ├── agent-mcp-server/                -- MCP Server gateway (optional)
-├── agent-example-fitcoach/                   -- Reference agent (weather/search tools)
+├── agent-example-fitcoach/                   -- FitCoach AI example agent (workout/nutrition/health tools)
 ├── agent-shell/                     -- Interactive CLI (Spring Shell 4)
 ├── agent-skill-linter-maven-plugin/ -- Build-time SKILL.md validation
 ├── agent-archetype/                 -- Maven archetype for scaffolding new projects
@@ -578,9 +581,13 @@ gargantua/
 | `GET` | `/api/admin/costs/summary` | Cost summary |
 | `GET` | `/api/admin/llm/rules` | LLM routing rules |
 | `POST` | `/api/admin/llm/simulate` | Simulate LLM routing |
-| `GET` | `/api/admin/audit` | Query audit trail (by user, tenant, session, eventId, count) |
+| `GET` | `/api/admin/audit?userId=...` | Query audit events by user (params: userId, from, to, limit) |
+| `GET` | `/api/admin/audit/tenant?tenantId=...` | Query audit events by tenant |
+| `GET` | `/api/admin/audit/session/{sessionId}` | Query audit events by session |
+| `GET` | `/api/admin/audit/{eventId}` | Get single audit event by ID |
+| `GET` | `/api/admin/audit/count` | Count audit events in time range |
 | `GET` | `/swagger-ui` | Swagger UI |
-| `GET` | `/docs` | Redoc documentation |
+| `GET` | `/docs` | Redoc documentation (requires static `docs/index.html` in your app) |
 
 ---
 
@@ -602,10 +609,11 @@ All storage uses in-memory ConcurrentHashMaps. Data is lost on restart.
 | Working memory | Redis | ConcurrentHashMap |
 | Episodic memory | MongoDB | ConcurrentHashMap |
 | Knowledge memory | MongoDB | ConcurrentHashMap |
-| Chat history | MongoDB | ConcurrentHashMap |
+| Chat history | MongoDB | Not available (requires MongoDB) |
 | HITL approvals | Redis | ConcurrentHashMap |
-| Tool cache | Redis | ConcurrentHashMap |
-| Cost tracking | MongoDB | ConcurrentHashMap |
+| Tool cache | Redis | Not available (requires Redis) |
+| Cost tracking | MongoDB | Not available (requires MongoDB) |
+| Audit trail | MongoDB | ConcurrentHashMap |
 | Requires Docker | Yes | **No** |
 | Data persisted | Yes | **No** (lost on restart) |
 
@@ -630,19 +638,19 @@ All storage uses in-memory ConcurrentHashMaps. Data is lost on restart.
 | `REDIS_URL` | Redis connection URL | `redis://localhost:6379` |
 | `SERVER_PORT` | HTTP server port | `8080` |
 | **Primary LLM** | Choose a provider, a model, and set the API key — all three are needed | |
-| `LLM_PRIMARY_PROVIDER` | LLM provider: `openai`, `anthropic`, `azure-openai`, `google-gemini`, `mistral`, `groq`, `cohere`, `ollama`, or any LangChain4j provider | `openai` |
-| `LLM_PRIMARY_MODEL` | Which model from that provider (e.g. `gpt-4o`, `claude-sonnet-4-20250514`) | `gpt-4o` |
-| `LLM_PRIMARY_API_KEY` | API key for the chosen provider (OpenAI: `sk-...`, Anthropic: `sk-ant-...`) | **(required)** |
-| `LLM_PRIMARY_ENDPOINT` | Provider API endpoint. Required for `azure-openai`. Defaults: OpenAI `https://api.openai.com/v1`, Anthropic `https://api.anthropic.com` | provider default |
+| `LLM_PRIMARY_PROVIDER` | LLM provider: `openai`, `azure-openai`, `ollama`, or any OpenAI-compatible endpoint | `openai` |
+| `LLM_PRIMARY_MODEL` | Which model from that provider (e.g. `gpt-4o`, `gpt-4o-mini`) | `gpt-4o` |
+| `LLM_PRIMARY_API_KEY` | API key for the chosen provider (e.g. OpenAI: `sk-...`) | **(required)** |
+| `LLM_PRIMARY_ENDPOINT` | Provider API endpoint (must be OpenAI-compatible). Required for `azure-openai`. Default: `https://api.openai.com/v1` | `https://api.openai.com/v1` |
 | `LLM_PRIMARY_TEMPERATURE` | Sampling temperature (0.0 -- 1.0) | `0.7` |
 | `LLM_PRIMARY_MAX_TOKENS` | Max tokens in LLM response | `1000` |
 | **Fallback LLM** | Used automatically when primary provider fails | |
-| `LLM_FALLBACK_PROVIDER` | Fallback provider | `anthropic` |
-| `LLM_FALLBACK_MODEL` | Fallback model | `claude-sonnet-4-20250514` |
+| `LLM_FALLBACK_PROVIDER` | Fallback provider (must be OpenAI-compatible) | *(optional)* |
+| `LLM_FALLBACK_MODEL` | Fallback model | *(optional)* |
 | `LLM_FALLBACK_API_KEY` | Fallback API key | *(optional)* |
-| `LLM_FALLBACK_ENDPOINT` | Fallback endpoint | provider default |
+| `LLM_FALLBACK_ENDPOINT` | Fallback endpoint (OpenAI-compatible) | *(optional)* |
 | **Routing LLM** | Local model for skill routing, eval judge, session summaries (zero API cost via Ollama) | |
-| `LLM_ROUTING_PROVIDER` | Routing model provider: `ollama`, `openai`, `anthropic` | `ollama` |
+| `LLM_ROUTING_PROVIDER` | Routing model provider: `ollama`, `openai`, or any OpenAI-compatible endpoint | `ollama` |
 | `LLM_ROUTING_MODEL` | Routing model name | `phi4-mini` |
 | `LLM_ROUTING_ENDPOINT` | Routing model endpoint (Ollama URL when running locally) | `http://localhost:11434` |
 | `LLM_ROUTING_API_KEY` | Routing model API key (not needed for Ollama) | *(optional)* |

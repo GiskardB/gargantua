@@ -10,17 +10,17 @@
 # │ REDIS_URL                    │ Redis connection URL                                     │ redis://localhost:6379        │
 # │ SERVER_PORT                  │ HTTP server port                                         │ 8080                         │
 # ├──────────────────────────────┼──────────────────────────────────────────────────────────┼──────────────────────────────┤
-# │ LLM_PRIMARY_PROVIDER         │ Primary LLM provider: openai | azure-openai | anthropic  │ openai                       │
-# │ LLM_PRIMARY_MODEL            │ Primary model name (e.g. gpt-4o, claude-sonnet-4-...)    │ gpt-4o                       │
-# │ LLM_PRIMARY_API_KEY          │ API key for the primary LLM provider                     │ (required)                   │
-# │ LLM_PRIMARY_ENDPOINT         │ Base URL / endpoint (required for azure-openai)          │ (provider default)           │
+# │ LLM_PRIMARY_PROVIDER         │ Primary LLM provider (via Bifrost gateway)               │ openai                       │
+# │ LLM_PRIMARY_MODEL            │ Primary model name (e.g. gpt-4o)                         │ gpt-4o                       │
+# │ LLM_PRIMARY_API_KEY          │ API key (managed by Bifrost, can be empty)                │ (optional)                   │
+# │ LLM_PRIMARY_ENDPOINT         │ Bifrost gateway URL                                      │ http://localhost:8090         │
 # │ LLM_PRIMARY_TEMPERATURE      │ Sampling temperature 0.0–1.0                             │ 0.7                          │
 # │ LLM_PRIMARY_MAX_TOKENS       │ Max tokens in LLM response                               │ 1000                         │
 # ├──────────────────────────────┼──────────────────────────────────────────────────────────┼──────────────────────────────┤
-# │ LLM_FALLBACK_PROVIDER        │ Fallback LLM provider (used when primary fails)          │ anthropic                    │
-# │ LLM_FALLBACK_MODEL           │ Fallback model name                                      │ claude-sonnet-4-20250514      │
-# │ LLM_FALLBACK_API_KEY         │ API key for fallback provider                             │ (optional)                   │
-# │ LLM_FALLBACK_ENDPOINT        │ Fallback base URL / endpoint                             │ (provider default)           │
+# │ LLM_FALLBACK_PROVIDER        │ Fallback LLM provider (via Bifrost)                      │ openai                       │
+# │ LLM_FALLBACK_MODEL           │ Fallback model name                                      │ gpt-4o-mini                  │
+# │ LLM_FALLBACK_API_KEY         │ API key (managed by Bifrost, can be empty)                │ (optional)                   │
+# │ LLM_FALLBACK_ENDPOINT        │ Bifrost gateway URL                                      │ http://localhost:8090         │
 # ├──────────────────────────────┼──────────────────────────────────────────────────────────┼──────────────────────────────┤
 # │ LLM_ROUTING_PROVIDER         │ Routing model provider (default: ollama, local)          │ ollama                       │
 # │ LLM_ROUTING_MODEL            │ Routing model name                                       │ phi4-mini                    │
@@ -68,14 +68,14 @@ agent:
       provider: ${LLM_PRIMARY_PROVIDER:openai}
       model: ${LLM_PRIMARY_MODEL:gpt-4o}
       api-key: ${LLM_PRIMARY_API_KEY:}
-      endpoint: ${LLM_PRIMARY_ENDPOINT:}
+      endpoint: ${LLM_PRIMARY_ENDPOINT:http://localhost:8090}
       temperature: ${LLM_PRIMARY_TEMPERATURE:0.7}
       max-tokens: ${LLM_PRIMARY_MAX_TOKENS:1000}
     fallback:
-      provider: ${LLM_FALLBACK_PROVIDER:anthropic}
-      model: ${LLM_FALLBACK_MODEL:claude-sonnet-4-20250514}
+      provider: ${LLM_FALLBACK_PROVIDER:openai}
+      model: ${LLM_FALLBACK_MODEL:gpt-4o-mini}
       api-key: ${LLM_FALLBACK_API_KEY:}
-      endpoint: ${LLM_FALLBACK_ENDPOINT:}
+      endpoint: ${LLM_FALLBACK_ENDPOINT:http://localhost:8090}
     routing-model:
       provider: ${LLM_ROUTING_PROVIDER:ollama}
       model: ${LLM_ROUTING_MODEL:phi4-mini}
@@ -84,31 +84,24 @@ agent:
       temperature: 0.0
       max-tokens: 50
 
-  ##############################################################################
-  # Agent — LLM Routing Rules
-  #   domain=medical → primary (best model for health/nutrition accuracy)
-  #   domain=general → fallback (cheaper model for news/admin/default)
-  ##############################################################################
-
-  llm-routing:
-    rules:
+    routing-rules:
       - name: medical-domain-best-model
         description: "Route medical-domain skills (nutrition, health) to the primary high-accuracy model"
-        match:
+        condition:
           domain: medical
-        target: primary
+        target-model: primary
         priority: 10
       - name: general-domain-cheaper-model
         description: "Route general-domain skills (news, admin, default) to the cheaper fallback model"
-        match:
+        condition:
           domain: general
-        target: fallback
+        target-model: fallback
         priority: 20
       - name: fitness-domain-primary
         description: "Route fitness-domain skills (workout) to the primary model"
-        match:
+        condition:
           domain: fitness
-        target: primary
+        target-model: primary
         priority: 15
 
   ##############################################################################
@@ -149,7 +142,7 @@ agent:
 
   guardrail:
     input:
-      max-chars: 2000
+      max-length-chars: 2000
       injection-guard:
         enabled: true
         patterns:

@@ -1,43 +1,82 @@
 [
   {
-    "name": "workout-plan-muscle-gain",
-    "description": "User asks for a muscle gain workout plan",
-    "input": "I want to build muscle. I'm intermediate level and have access to a full gym with barbells and dumbbells.",
-    "expectedToolCalls": ["generateWorkout"],
-    "expectedToolArgs": {
-      "generateWorkout": {
-        "goal": "muscle_gain",
-        "level": "intermediate"
-      }
-    },
-    "expectedOutputContains": ["sets", "reps", "Hypertrophy"],
-    "expectedSkill": "workout-skill"
+    "id": "workout-plan-muscle-gain",
+    "description": "Intermediate user asks for a muscle gain workout plan with full gym",
+    "input": "I want to build muscle. I'm intermediate level, I have 60 minutes per session, and I have access to a full gym with barbells, dumbbells and machines. Give me a plan.",
+    "expectedBehaviors": ["muscle", "press", "day"],
+    "forbiddenBehaviors": ["nutrition", "calorie", "meal plan"],
+    "tags": ["happy-path", "plan-generation"]
   },
   {
-    "name": "search-chest-exercises",
-    "description": "User asks for exercises targeting a specific muscle group",
-    "input": "What are some good chest exercises?",
-    "expectedToolCalls": ["searchExercises"],
-    "expectedToolArgs": {
-      "searchExercises": {
-        "muscleGroup": "chest"
-      }
-    },
-    "expectedOutputContains": ["Bench Press", "chest"],
-    "expectedSkill": "workout-skill"
+    "id": "search-chest-exercises",
+    "description": "User asks for exercises targeting chest",
+    "input": "What are the best chest exercises I can do with dumbbells and a bench?",
+    "expectedBehaviors": ["bench press", "chest", "dumbbell"],
+    "forbiddenBehaviors": ["diet", "calorie"],
+    "tags": ["happy-path", "exercise-search"]
   },
   {
-    "name": "beginner-fat-loss-workout",
-    "description": "Beginner user asks for a weight loss workout with limited equipment",
-    "input": "I'm a beginner trying to lose weight. I only have resistance bands and a yoga mat at home.",
-    "expectedToolCalls": ["generateWorkout"],
-    "expectedToolArgs": {
-      "generateWorkout": {
-        "goal": "fat_loss",
-        "level": "beginner"
-      }
-    },
-    "expectedOutputContains": ["Fat", "circuit"],
-    "expectedSkill": "workout-skill"
+    "id": "beginner-fat-loss-workout",
+    "description": "Beginner wants weight loss with limited home equipment",
+    "input": "I'm a total beginner trying to lose weight. I only have resistance bands and a yoga mat at home. I have 30 minutes per day. Create a workout plan for me.",
+    "expectedBehaviors": ["beginner", "band"],
+    "forbiddenBehaviors": ["barbell", "gym membership"],
+    "tags": ["happy-path", "home-workout"]
+  },
+  {
+    "id": "leg-day-advanced",
+    "description": "Advanced user asks for an intense leg workout",
+    "input": "I'm advanced and want a killer leg day. I have a full gym with squat rack, leg press, and dumbbells. 45 minutes max.",
+    "expectedBehaviors": ["squat", "leg"],
+    "forbiddenBehaviors": ["beginner", "diet"],
+    "tags": ["happy-path", "advanced"]
+  },
+  {
+    "id": "home-bodyweight-routine",
+    "description": "User wants a no-equipment bodyweight routine",
+    "input": "Design a full-body bodyweight workout I can do at home with zero equipment. I'm intermediate level.",
+    "expectedBehaviors": ["push", "bodyweight"],
+    "forbiddenBehaviors": ["barbell", "machine", "gym"],
+    "tags": ["happy-path", "bodyweight"]
+  },
+  {
+    "id": "stretching-flexibility",
+    "description": "User asks about stretching and flexibility work",
+    "input": "Can you give me a 15-minute stretching routine for after my workouts? I want to improve flexibility.",
+    "expectedBehaviors": ["stretch", "flexibility"],
+    "forbiddenBehaviors": ["calorie", "meal"],
+    "tags": ["recovery", "flexibility"]
+  },
+  {
+    "id": "upper-lower-split",
+    "description": "User wants a 4-day upper/lower split",
+    "input": "Create a 4-day upper/lower split for me. I'm intermediate, have a full gym, and my goal is strength and muscle.",
+    "expectedBehaviors": ["upper", "lower"],
+    "forbiddenBehaviors": ["diet", "nutrition"],
+    "tags": ["happy-path", "split"]
+  },
+  {
+    "id": "cardio-recommendations",
+    "description": "User asks about cardio for fat loss",
+    "input": "What kind of cardio should I do to maximize fat loss? I currently do weight training 4 days a week.",
+    "expectedBehaviors": ["cardio", "fat"],
+    "forbiddenBehaviors": ["meal plan", "calorie counting"],
+    "tags": ["cardio", "fat-loss"]
+  },
+  {
+    "id": "shoulder-exercises",
+    "description": "User asks specifically about shoulder training",
+    "input": "My shoulders are lagging behind. What are the best exercises to build bigger shoulders?",
+    "expectedBehaviors": ["shoulder", "press"],
+    "forbiddenBehaviors": ["diet", "calorie"],
+    "tags": ["exercise-search", "shoulders"]
+  },
+  {
+    "id": "workout-injury-modification",
+    "description": "User with a knee injury asks for modified workout",
+    "input": "I have a knee injury and can't do squats or lunges. What lower body exercises can I still do safely?",
+    "expectedBehaviors": ["knee", "safe"],
+    "forbiddenBehaviors": ["squat", "lunge"],
+    "tags": ["edge-case", "injury"]
   }
 ]

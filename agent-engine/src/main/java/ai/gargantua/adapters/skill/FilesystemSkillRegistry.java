@@ -8,10 +8,8 @@ import ai.gargantua.core.skill.SkillRegistry;
 import ai.gargantua.core.skill.SkillSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.ResourcePatternResolver;
-import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -27,7 +25,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
  *
  * @see CompositeSkillRegistry
  */
-@Component("filesystemSkillRegistry")
 public class FilesystemSkillRegistry implements SkillRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(FilesystemSkillRegistry.class);
@@ -38,7 +35,7 @@ public class FilesystemSkillRegistry implements SkillRegistry {
     private volatile List<SkillMeta> cachedMeta;
 
     public FilesystemSkillRegistry(
-            @Value("${agent.skill.path:classpath:skills/}") String skillPath,
+            String skillPath,
             SkillMdParser skillMdParser,
             ResourcePatternResolver resourcePatternResolver) {
         this.skillPath = skillPath;

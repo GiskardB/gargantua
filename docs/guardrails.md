@@ -71,10 +71,12 @@ BLOCK: "Message exceeds maximum length of 10000 characters (was 15000)"
 - `disregard (all)? prior instructions/prompts`
 - `you are now a/an ...`
 - `forget (all)? your/previous instructions/rules`
-- `system prompt:`
+- `system prompt`
 - `DAN mode`
 - `act as if you have no restrictions/rules/guidelines`
 - `override your/the system/safety prompt/instructions`
+- `pretend you are`
+- `reveal your instructions`
 
 **Config key:**
 - `agent.guardrail.input.prompt-injection-enabled` -- boolean, default `true`

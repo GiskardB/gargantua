@@ -19,10 +19,15 @@ class SemanticRoutingServiceTest {
     @BeforeEach
     void setUp() {
         properties = new AgentProperties();
-        properties.getRouting().getSemantic().setThreshold(0.1); // Low threshold for term-overlap routing
+        properties.getRouting().getSemantic().setThreshold(0.1);
         properties.getRouting().setFallbackSkill("fallback");
 
-        RoutingService routingService = new RoutingService(properties);
+        // RoutingService needs LlmProviderFactory, but for semantic-only tests
+        // we use a low threshold so LLM fallback is never reached.
+        // For the fallback test, the RoutingService will return the fallback skill.
+        LlmRouter llmRouter = new LlmRouter(properties);
+        LlmProviderFactory llmProviderFactory = new LlmProviderFactory(properties, llmRouter);
+        RoutingService routingService = new RoutingService(properties, llmProviderFactory);
         service = new SemanticRoutingService(properties, routingService);
     }
 
@@ -38,8 +43,8 @@ class SemanticRoutingServiceTest {
                 skill("code-review", "Review code for bugs and improvements")
         );
 
-        // Use message with strong word overlap to ensure term-frequency cosine similarity passes
-        RoutingResult result = service.route("Summarize text into bullet points please", skills);
+        // ONNX embeddings provide real semantic similarity
+        RoutingResult result = service.route("Can you summarize this article for me?", skills);
 
         assertEquals("summarize", result.skillName());
         assertEquals(RoutingMethod.SEMANTIC, result.method());
@@ -57,6 +62,7 @@ class SemanticRoutingServiceTest {
 
         RoutingResult result = service.route("Completely unrelated topic about cooking", skills);
 
+        // Falls back to LLM routing (which will fail without a real LLM and return fallback)
         assertEquals(RoutingMethod.LLM, result.method());
     }
 
@@ -71,28 +77,14 @@ class SemanticRoutingServiceTest {
     @Test
     void indexesSkillsForRouting() {
         List<SkillMeta> skills = List.of(
-                skill("active", "An active skill"),
+                skill("active", "An active skill for doing work"),
                 new SkillMeta("inactive", "An inactive skill", "1.0.0", false, false, "general", SkillSource.FILESYSTEM, java.util.Set.of())
         );
 
         service.index(skills);
 
-        // Route should work after indexing
-        RoutingResult result = service.route("active skill", skills);
+        // Route should work after indexing — only active skills are indexed
+        RoutingResult result = service.route("I need an active skill to do work", skills);
         assertNotNull(result);
-    }
-
-    @Test
-    void cosineSimilarityCalculation() {
-        String[] a = {"hello", "world", "test"};
-        String[] b = {"hello", "world", "foo"};
-        String[] c = {"completely", "different", "words"};
-
-        double simAB = service.cosineSimilarity(a, b);
-        double simAC = service.cosineSimilarity(a, c);
-
-        assertTrue(simAB > simAC, "Similar texts should have higher similarity");
-        assertTrue(simAB > 0, "Overlapping texts should have positive similarity");
-        assertEquals(0.0, simAC, "Non-overlapping texts should have zero similarity");
     }
 }

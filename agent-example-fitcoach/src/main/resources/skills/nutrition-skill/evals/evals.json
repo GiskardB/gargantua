@@ -1,29 +1,82 @@
 [
   {
-    "name": "meal-plan-muscle-gain",
-    "description": "User asks for a bulking meal plan",
-    "input": "Create a meal plan for muscle gain. I want to eat about 2500 calories per day.",
-    "expectedToolCalls": ["createMealPlan"],
-    "expectedToolArgs": {
-      "createMealPlan": {
-        "goal": "muscle gain",
-        "targetCalories": 2500
-      }
-    },
-    "expectedOutputContains": ["protein", "calories", "meal"],
-    "expectedSkill": "nutrition-skill"
+    "id": "meal-plan-muscle-gain",
+    "description": "User asks for a bulking meal plan at 2500 calories",
+    "input": "Create a detailed daily meal plan for muscle gain. I want to eat about 2500 calories per day with high protein. Include breakfast, lunch, dinner and snacks.",
+    "expectedBehaviors": ["protein", "meal", "breakfast"],
+    "forbiddenBehaviors": ["workout", "exercise routine"],
+    "tags": ["happy-path", "meal-plan"]
   },
   {
-    "name": "food-lookup-salmon",
-    "description": "User asks about nutritional value of a specific food",
-    "input": "How many calories are in salmon? Is it a good source of protein?",
-    "expectedToolCalls": ["lookupFood"],
-    "expectedToolArgs": {
-      "lookupFood": {
-        "food": "salmon"
-      }
-    },
-    "expectedOutputContains": ["208", "protein", "Omega-3"],
-    "expectedSkill": "nutrition-skill"
+    "id": "food-lookup-salmon",
+    "description": "User asks about nutritional value of salmon",
+    "input": "How many calories and how much protein is in a serving of salmon? Is it good for muscle building?",
+    "expectedBehaviors": ["protein", "salmon"],
+    "forbiddenBehaviors": ["workout plan", "exercise"],
+    "tags": ["happy-path", "food-lookup"]
+  },
+  {
+    "id": "vegan-protein-sources",
+    "description": "User asks about plant-based protein for muscle gain",
+    "input": "I'm vegan and want to build muscle. What are the best plant-based protein sources? How much protein do I need?",
+    "expectedBehaviors": ["protein", "plant"],
+    "forbiddenBehaviors": ["chicken", "steak", "whey"],
+    "tags": ["dietary-restriction", "vegan"]
+  },
+  {
+    "id": "cutting-diet-1800cal",
+    "description": "User asks for a calorie deficit meal plan",
+    "input": "I want to cut body fat. Create a 1800 calorie meal plan that keeps protein high. I'm 80kg and train 5 times a week.",
+    "expectedBehaviors": ["protein", "calorie"],
+    "forbiddenBehaviors": ["workout routine", "exercise plan"],
+    "tags": ["happy-path", "cutting"]
+  },
+  {
+    "id": "pre-workout-nutrition",
+    "description": "User asks about what to eat before training",
+    "input": "What should I eat before a heavy weight training session? How long before the workout should I eat?",
+    "expectedBehaviors": ["carb", "before"],
+    "forbiddenBehaviors": [],
+    "tags": ["timing", "pre-workout"]
+  },
+  {
+    "id": "post-workout-meal",
+    "description": "User asks about recovery nutrition",
+    "input": "What should I eat after my workout for optimal muscle recovery? How important is the post-workout meal?",
+    "expectedBehaviors": ["protein", "recovery"],
+    "forbiddenBehaviors": [],
+    "tags": ["timing", "recovery"]
+  },
+  {
+    "id": "macro-breakdown-explanation",
+    "description": "User asks to understand macros",
+    "input": "Explain macros to me. What are protein, carbs and fats? How much of each should I eat if my goal is muscle gain at 2200 calories?",
+    "expectedBehaviors": ["protein", "carb", "fat"],
+    "forbiddenBehaviors": [],
+    "tags": ["education", "macros"]
+  },
+  {
+    "id": "food-comparison",
+    "description": "User compares two foods",
+    "input": "Which is better for protein: chicken breast or Greek yogurt? Compare them nutritionally.",
+    "expectedBehaviors": ["protein", "chicken"],
+    "forbiddenBehaviors": [],
+    "tags": ["food-lookup", "comparison"]
+  },
+  {
+    "id": "hydration-advice",
+    "description": "User asks about water and hydration",
+    "input": "How much water should I drink per day if I train intensely? Does hydration affect muscle performance?",
+    "expectedBehaviors": ["water", "hydration"],
+    "forbiddenBehaviors": [],
+    "tags": ["hydration", "performance"]
+  },
+  {
+    "id": "supplement-creatine",
+    "description": "User asks about creatine supplementation",
+    "input": "Should I take creatine? How much creatine per day is recommended and when should I take it?",
+    "expectedBehaviors": ["creatine", "gram"],
+    "forbiddenBehaviors": [],
+    "tags": ["supplements", "creatine"]
   }
 ]

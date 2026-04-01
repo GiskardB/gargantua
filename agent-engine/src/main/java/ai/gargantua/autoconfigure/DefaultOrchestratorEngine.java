@@ -7,8 +7,11 @@ import ai.gargantua.core.guardrail.GuardrailOutputContext;
 import ai.gargantua.core.guardrail.GuardrailPipelineResult;
 import ai.gargantua.core.guardrail.GuardrailResult;
 import ai.gargantua.core.llm.LlmRoutingContext;
+import ai.gargantua.core.memory.ChatMessage;
 import ai.gargantua.core.memory.ComposedMemory;
+import ai.gargantua.core.memory.WorkingMemoryPort;
 import ai.gargantua.core.orchestrator.AgentRequest;
+import ai.gargantua.memory.composer.MemoryComposer;
 import ai.gargantua.core.orchestrator.AgentResponse;
 import ai.gargantua.core.security.SecurityContext;
 import ai.gargantua.core.orchestrator.BudgetAllocation;
@@ -26,10 +29,15 @@ import ai.gargantua.core.skill.SkillRegistry;
 import ai.gargantua.core.tool.ToolDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 import java.time.DayOfWeek;
+import java.time.Instant;
 import java.time.LocalTime;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -80,6 +88,15 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
     @Nullable
     private final AuditService auditService;
 
+    @Nullable
+    private final MemoryComposer memoryComposer;
+
+    @Nullable
+    private final WorkingMemoryPort workingMemoryPort;
+
+    @Nullable
+    private final MongoTemplate mongoTemplate;
+
     public DefaultOrchestratorEngine(GuardrailPipeline guardrailPipeline,
                                      SemanticRoutingService semanticRoutingService,
                                      TokenBudgetManager tokenBudgetManager,
@@ -89,7 +106,10 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
                                      AgentProperties properties,
                                      @Nullable SkillRegistry skillRegistry,
                                      List<ContextEnricher> contextEnrichers,
-                                     @Nullable AuditService auditService) {
+                                     @Nullable AuditService auditService,
+                                     @Nullable MemoryComposer memoryComposer,
+                                     @Nullable WorkingMemoryPort workingMemoryPort,
+                                     @Nullable MongoTemplate mongoTemplate) {
         this.guardrailPipeline = guardrailPipeline;
         this.semanticRoutingService = semanticRoutingService;
         this.tokenBudgetManager = tokenBudgetManager;
@@ -100,23 +120,37 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
         this.skillRegistry = skillRegistry;
         this.contextEnrichers = contextEnrichers != null ? contextEnrichers : List.of();
         this.auditService = auditService;
+        this.memoryComposer = memoryComposer;
+        this.workingMemoryPort = workingMemoryPort;
+        this.mongoTemplate = mongoTemplate;
     }
 
     @Override
     public AgentResponse invoke(AgentRequest request) {
         long startTime = System.currentTimeMillis();
+        log.info("[Pipeline] START userId={}, sessionId={}, messageLength={}, forceSkill={}",
+                request.userId(), request.sessionId(),
+                request.message() != null ? request.message().length() : 0,
+                request.forceSkill());
 
         // 1. Extract dry-run context
         var dryRunContext = request.dryRunContext() != null
                 ? request.dryRunContext()
                 : DryRunContext.inactive();
         var isDryRun = dryRunContext.active();
+        if (isDryRun) {
+            log.info("[Pipeline] Dry-run mode ACTIVE — no persistence, no side effects");
+        }
 
         // Tenant-aware session id: prefix with tenantId when available
         var securityContext = request.securityContext();
         String effectiveSessionId = (securityContext != null && securityContext.isMultiTenant())
                 ? securityContext.tenantId() + ":" + request.sessionId()
                 : request.sessionId();
+        log.debug("[Pipeline] effectiveSessionId={}, tenantId={}, roles={}",
+                effectiveSessionId,
+                securityContext != null ? securityContext.tenantId() : "none",
+                securityContext != null ? securityContext.roles() : "none");
 
         // 2. Input guardrails
         var inputAttributes = new HashMap<String, Object>();
@@ -137,22 +171,29 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
         );
         var inputResult = guardrailPipeline.checkInput(inputCtx);
         if (inputResult.blocked()) {
+            log.warn("[Pipeline] Input BLOCKED by guardrail '{}': {}", inputResult.blockedBy(), inputResult.reason());
             throw new GuardrailBlockedException(
                     inputResult.blockedBy(),
                     inputResult.reason(),
                     Map.of()
             );
         }
+        log.debug("[Pipeline] Step 2 — Input guardrails passed ({} checks)", inputResult.results().size());
 
         // 3. List available skills
         var skills = skillRegistry != null ? skillRegistry.listMeta() : List.<SkillMeta>of();
+        log.debug("[Pipeline] Step 3 — {} active skills available", skills.size());
 
         // 4. Route to skill
         RoutingResult routingResult;
         if (request.forceSkill() != null && !request.forceSkill().isBlank()) {
             routingResult = RoutingResult.forced(request.forceSkill());
+            log.info("[Pipeline] Step 4 — Routing FORCED to skill '{}'", request.forceSkill());
         } else {
             routingResult = semanticRoutingService.route(request.message(), skills);
+            log.info("[Pipeline] Step 4 — Routing: skill='{}', method={}, confidence={}",
+                    routingResult.skillName(), routingResult.method(),
+                    String.format("%.3f", routingResult.confidence()));
         }
 
         // 5. Load skill card
@@ -170,8 +211,46 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
             skillCard = new SkillCard(meta, "", List.of(), null, List.of(), null, null, null, null);
         }
 
-        // 6. Compose memory (placeholder - empty memory)
-        var memory = new ComposedMemory(List.of(), List.of(), List.of(), 0);
+        // 5b. Post-routing RBAC check — now that the skill is resolved, re-run input guardrails
+        //     with the activated skill so that RbacGuardrail can enforce role-based access control.
+        var postRoutingCtx = new GuardrailInputContext(
+                request.message(),
+                request.userId(),
+                effectiveSessionId,
+                skillCard.meta(),
+                inputAttributes
+        );
+        var rbacResult = guardrailPipeline.checkInput(postRoutingCtx);
+        if (rbacResult.blocked()) {
+            log.warn("[Pipeline] Post-routing RBAC BLOCKED: user='{}', skill='{}', reason='{}'",
+                    request.userId(), routingResult.skillName(), rbacResult.reason());
+            throw new GuardrailBlockedException(
+                    rbacResult.blockedBy(),
+                    rbacResult.reason(),
+                    Map.of()
+            );
+        }
+        log.debug("[Pipeline] Step 5b — Post-routing RBAC passed for skill '{}'", routingResult.skillName());
+
+        // 6. Compose memory from all three layers
+        ComposedMemory memory;
+        if (memoryComposer != null) {
+            try {
+                memory = memoryComposer.compose(
+                        request.userId(),
+                        effectiveSessionId,
+                        properties.getMemory().getComposer().getMaxContextTokens()
+                );
+            } catch (Exception e) {
+                log.warn("Memory composition failed, using empty memory: {}", e.getMessage());
+                memory = new ComposedMemory(List.of(), List.of(), List.of(), 0);
+            }
+        } else {
+            memory = new ComposedMemory(List.of(), List.of(), List.of(), 0);
+        }
+        log.info("[Pipeline] Step 6 — Memory composed: working={} msgs, episodic={} summaries, knowledge={} segments, tokens={}",
+                memory.workingMessages().size(), memory.episodicSummaries().size(),
+                memory.knowledgeSegments().size(), memory.estimatedTokens());
 
         // 7. Build prompt — run context enrichers first
         var enricherAttributes = new HashMap<String, String>();
@@ -206,6 +285,8 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
                 enricherAttributes
         );
         var systemPrompt = promptBuilder.build(skillCard, memory, enricherContext);
+        log.debug("[Pipeline] Step 7 — System prompt built ({} chars, {} enricher sections)",
+                systemPrompt.length(), enricherAttributes.size());
 
         // 8. Token budget allocation
         var toolDescriptions = toolRegistry.getFilteredTools(skillCard.allowedTools())
@@ -244,7 +325,8 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
                 allocation.systemPrompt(),
                 request.message(),
                 skillCard,
-                llmCtx
+                llmCtx,
+                memory.workingMessages()
         );
 
         // 10. Output guardrails
@@ -256,10 +338,62 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
                 inputAttributes
         );
         var processedResponse = guardrailPipeline.processOutput(outputCtx);
+        log.debug("[Pipeline] Step 10 — Output guardrails applied (response {} chars)", processedResponse.length());
 
         // 11. Persist memory (skip in dry-run)
         if (!isDryRun) {
-            log.debug("Memory persistence would happen here (not in dry-run)");
+            if (workingMemoryPort != null) {
+                try {
+                    workingMemoryPort.appendMessage(effectiveSessionId,
+                            ChatMessage.userMessage(request.message()));
+                    workingMemoryPort.appendMessage(effectiveSessionId,
+                            ChatMessage.assistantMessage(processedResponse));
+                } catch (Exception e) {
+                    log.warn("Failed to persist working memory: {}", e.getMessage());
+                }
+            }
+            // Persist chat history to MongoDB
+            if (mongoTemplate != null) {
+                try {
+                    var now = Instant.now();
+                    var userMsg = new HashMap<String, Object>();
+                    userMsg.put("userId", request.userId());
+                    userMsg.put("sessionId", effectiveSessionId);
+                    userMsg.put("role", "user");
+                    userMsg.put("content", request.message());
+                    userMsg.put("timestamp", now);
+                    mongoTemplate.insert(new org.bson.Document(userMsg), "chat_messages");
+                } catch (Exception e) {
+                    log.warn("Failed to persist user chat message: {}", e.getMessage());
+                }
+                try {
+                    var now = Instant.now();
+                    var assistantMsg = new HashMap<String, Object>();
+                    assistantMsg.put("userId", request.userId());
+                    assistantMsg.put("sessionId", effectiveSessionId);
+                    assistantMsg.put("role", "assistant");
+                    assistantMsg.put("content", processedResponse);
+                    assistantMsg.put("timestamp", now);
+                    mongoTemplate.insert(new org.bson.Document(assistantMsg), "chat_messages");
+                } catch (Exception e) {
+                    log.warn("Failed to persist assistant chat message: {}", e.getMessage());
+                }
+                try {
+                    var now = Instant.now();
+                    mongoTemplate.upsert(
+                            Query.query(Criteria.where("userId").is(request.userId())
+                                    .and("sessionId").is(effectiveSessionId)),
+                            new Update()
+                                    .set("userId", request.userId())
+                                    .set("sessionId", effectiveSessionId)
+                                    .set("lastMessageAt", now)
+                                    .inc("messageCount", 2),
+                            "chat_sessions"
+                    );
+                } catch (Exception e) {
+                    log.warn("Failed to persist chat session: {}", e.getMessage());
+                }
+            }
         }
 
         // 12. Build and return response
@@ -286,10 +420,15 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
         if (auditService != null) {
             try {
                 auditService.recordRequest(request, response, routingResult, inputResult.results());
+                log.debug("[Pipeline] Step 13 — Audit event recorded");
             } catch (Exception e) {
                 log.warn("Failed to record audit event: {}", e.getMessage());
             }
         }
+
+        log.info("[Pipeline] END userId={}, skill={}, method={}, tokens={}, durationMs={}, dryRun={}",
+                request.userId(), routingResult.skillName(), routingResult.method(),
+                response.totalTokens(), durationMs, isDryRun);
 
         return response;
     }

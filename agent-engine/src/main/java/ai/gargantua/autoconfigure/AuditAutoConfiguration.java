@@ -22,7 +22,7 @@ import org.springframework.data.mongodb.core.MongoTemplate;
  * <p>In embedded mode, {@link EmbeddedProfileAutoConfiguration} provides an
  * {@link ai.gargantua.memory.adapters.inmemory.InMemoryAuditStore} instead.</p>
  */
-@AutoConfiguration
+@AutoConfiguration(afterName = "org.springframework.boot.data.mongodb.autoconfigure.DataMongoAutoConfiguration")
 @EnableConfigurationProperties(AgentProperties.class)
 @ConditionalOnProperty(prefix = "agent.audit", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class AuditAutoConfiguration {

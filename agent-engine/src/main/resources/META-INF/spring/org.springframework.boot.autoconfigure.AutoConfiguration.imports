@@ -15,3 +15,4 @@ ai.gargantua.autoconfigure.EmbeddedProfileAutoConfiguration
 ai.gargantua.autoconfigure.RagAutoConfiguration
 ai.gargantua.autoconfigure.SecurityAutoConfiguration
 ai.gargantua.autoconfigure.AuditAutoConfiguration
+ai.gargantua.autoconfigure.WebAutoConfiguration

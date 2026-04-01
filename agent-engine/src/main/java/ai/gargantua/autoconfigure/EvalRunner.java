@@ -7,6 +7,7 @@ import ai.gargantua.core.eval.EvalVerdict;
 import ai.gargantua.core.orchestrator.AgentRequest;
 import ai.gargantua.core.orchestrator.AgentResponse;
 import ai.gargantua.core.orchestrator.OrchestratorEngine;
+import ai.gargantua.core.security.SecurityContext;
 import ai.gargantua.core.session.DryRunContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,6 +17,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Runs evaluation suites for skills. Executes each case through the orchestrator
@@ -52,13 +54,15 @@ public class EvalRunner {
         for (EvalCase evalCase : cases) {
             long start = System.currentTimeMillis();
 
-            // Run through orchestrator in dry-run mode
+            // Run through orchestrator in dry-run mode with super-admin role
+            // to bypass RBAC restrictions during evaluation
             AgentRequest request = AgentRequest.builder()
                     .message(evalCase.input())
                     .userId("eval-runner")
-                    .sessionId("eval-" + evalCase.id())
+                    .sessionId("eval-" + evalCase.id() + "-" + System.currentTimeMillis())
                     .forceSkill(skillName)
                     .dryRunContext(DryRunContext.active(Map.of()))
+                    .securityContext(new SecurityContext("eval-runner", null, Set.of("super-admin")))
                     .build();
 
             AgentResponse response;

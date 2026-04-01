@@ -25,7 +25,10 @@ import org.springframework.data.redis.core.StringRedisTemplate;
  * <p>All beans are {@code @ConditionalOnMissingBean} so applications can override
  * any adapter with a custom implementation.</p>
  */
-@AutoConfiguration
+@AutoConfiguration(afterName = {
+        "org.springframework.boot.data.mongodb.autoconfigure.DataMongoAutoConfiguration",
+        "org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration"
+})
 @EnableConfigurationProperties(AgentMemoryProperties.class)
 public class AgentMemoryAutoConfiguration {
 

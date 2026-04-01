@@ -14,8 +14,8 @@ public class SemanticRoutingAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean(RoutingService.class)
-    public RoutingService routingService(AgentProperties properties) {
-        return new RoutingService(properties);
+    public RoutingService routingService(AgentProperties properties, LlmProviderFactory llmProviderFactory) {
+        return new RoutingService(properties, llmProviderFactory);
     }
 
     @Bean

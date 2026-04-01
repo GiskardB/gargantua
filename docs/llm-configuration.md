@@ -1,6 +1,6 @@
 # LLM Configuration & Routing Rules
 
-Gargantua supports multiple LLM providers simultaneously. You can use one provider for conversations, another as failover, a local model for routing, and define rules that dynamically select the best model based on context (domain, user tier, input length, time of day).
+Gargantua supports multiple LLM endpoints simultaneously via the OpenAI chat completions API protocol. You can use one endpoint for conversations, another as failover, a local model for routing, and define rules that dynamically select the best model based on context (domain, user tier, input length, time of day). Any API that speaks the OpenAI protocol works: OpenAI, Azure OpenAI, Ollama, LiteLLM, Bifrost gateways, and similar proxies.
 
 ---
 
@@ -18,7 +18,7 @@ The default `application.yml` uses environment variables with sensible defaults:
 agent:
   llm:
     primary:
-      provider: ${LLM_PRIMARY_PROVIDER:openai}       # openai | azure-openai | anthropic
+      provider: ${LLM_PRIMARY_PROVIDER:openai}       # openai | azure-openai | ollama | any OpenAI-compatible endpoint
       model: ${LLM_PRIMARY_MODEL:gpt-4o}
       api-key: ${LLM_PRIMARY_API_KEY:}
       endpoint: ${LLM_PRIMARY_ENDPOINT:}               # Required only for azure-openai

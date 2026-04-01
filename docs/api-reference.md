@@ -327,7 +327,7 @@ All errors use the [Problem Details for HTTP APIs](https://www.rfc-editor.org/rf
 **Example:**
 ```json
 {
-  "type": "https://gargantua.ai/errors/guardrail-blocked",
+  "type": "https://agentkit.io/errors/guardrail-blocked",
   "title": "Request blocked by guardrail",
   "status": 400,
   "detail": "Potential prompt injection detected in user message",
@@ -343,10 +343,10 @@ Standard fields: `type` (stable URI for programmatic matching), `title` (human-r
 
 | Error Type | HTTP Status | When It Occurs |
 |------------|-------------|----------------|
-| `guardrail-blocked` | 400 | A guardrail blocked the request (e.g., prompt injection, toxic content). |
+| `guardrail-blocked` | 403 | A guardrail blocked the request (e.g., prompt injection, toxic content). |
 | `skill-not-found` | 404 | The requested skill (via `X-Force-Skill` or routing) does not exist. |
 | `approval-expired` | 410 | A HITL approval request was resolved after its timeout window. |
-| `schema-validation-failed` | 422 | The request body or a tool argument failed JSON Schema validation. |
+| `schema-validation-failed` | 400 | The request body or a tool argument failed JSON Schema validation. |
 | `token-budget-exceeded` | 413 | The request would exceed the configured per-request token budget. |
 | `rate-limit-exceeded` | 429 | The user or client has exceeded the configured rate limit. Includes a `Retry-After` header. |
 

@@ -59,6 +59,8 @@ public class ChatStreamController {
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId,
             @Parameter(description = "Dry run mode")
             @RequestHeader(value = "X-Dry-Run", defaultValue = "false") boolean dryRun,
+            @Parameter(description = "Force a specific skill (bypass routing)")
+            @RequestHeader(value = "X-Force-Skill", required = false) String forceSkill,
             HttpServletRequest httpRequest) {
 
         var securityContext = (SecurityContext) httpRequest.getAttribute(SecurityContextFilter.SECURITY_CONTEXT_ATTR);
@@ -75,6 +77,7 @@ public class ChatStreamController {
                         .message(request.message())
                         .userId(userId)
                         .sessionId(sessionId)
+                        .forceSkill(forceSkill)
                         .dryRunContext(dryRunContext)
                         .securityContext(securityContext)
                         .build();

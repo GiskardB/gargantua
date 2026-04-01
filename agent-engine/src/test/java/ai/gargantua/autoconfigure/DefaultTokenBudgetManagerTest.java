@@ -113,4 +113,90 @@ class DefaultTokenBudgetManagerTest {
         // Should fit system + user but may truncate knowledge
         assertTrue(alloc.knowledge().size() <= 2);
     }
+
+    @Test
+    void estimate_returnsOneForVeryShortText() {
+        // Math.max(1, 1/4) = Math.max(1, 0) = 1
+        assertEquals(1, manager.estimate("ab"));
+        assertEquals(1, manager.estimate("a"));
+    }
+
+    @Test
+    void allocate_withEmptyListsNoTruncation() {
+        BudgetRequest request = new BudgetRequest(
+                "",
+                "",
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                "",
+                1000
+        );
+
+        BudgetAllocation alloc = manager.allocate(request);
+
+        assertFalse(alloc.wasTruncated());
+        assertTrue(alloc.truncationLog().isEmpty());
+        assertEquals(0, alloc.estimatedTotal());
+        assertEquals(1000, alloc.budgetRemaining());
+    }
+
+    @Test
+    void allocate_preservesOriginalSystemPromptAndUserMessage() {
+        BudgetRequest request = new BudgetRequest(
+                "System instruction",
+                "",
+                List.of("ref1"),
+                List.of("summary1"),
+                List.of(),
+                List.of("tool1"),
+                "User query",
+                5000
+        );
+
+        BudgetAllocation alloc = manager.allocate(request);
+
+        assertEquals("System instruction", alloc.systemPrompt());
+        assertEquals("User query", alloc.userMessage());
+    }
+
+    @Test
+    void allocate_episodicTruncation() {
+        String longSummary = "s".repeat(400); // 100 tokens each
+
+        BudgetRequest request = new BudgetRequest(
+                "P",
+                "",
+                List.of(),
+                List.of(longSummary, longSummary, longSummary, longSummary),
+                List.of(),
+                List.of(),
+                "Q",
+                50 // tight budget: ~1 token for P, ~1 for Q, remaining ~48
+        );
+
+        BudgetAllocation alloc = manager.allocate(request);
+
+        assertTrue(alloc.wasTruncated());
+        // episodic gets at most remaining/2, which is ~24 tokens, each summary is 100 tokens, so 0 fit
+        assertTrue(alloc.episodicSummaries().size() < 4);
+    }
+
+    @Test
+    void allocate_enrichedContextCountsAsFixedCost() {
+        BudgetRequest request = new BudgetRequest(
+                "Sys",
+                "x".repeat(400), // 100 tokens of enriched context
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                "Hi",
+                50 // only 50 tokens budget
+        );
+
+        // enriched context (100) + system (~1) + user (~1) = ~102 > 50
+        assertThrows(TokenBudgetExceededException.class, () -> manager.allocate(request));
+    }
 }

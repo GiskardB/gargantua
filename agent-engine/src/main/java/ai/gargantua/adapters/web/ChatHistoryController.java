@@ -10,8 +10,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.data.mongodb.core.query.TextCriteria;
-import org.springframework.data.mongodb.core.query.TextQuery;
+import java.util.regex.Pattern;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -85,9 +84,9 @@ public class ChatHistoryController {
             @Parameter(description = "Page number") @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "Page size") @RequestParam(defaultValue = "20") int size) {
 
-        TextCriteria textCriteria = TextCriteria.forDefaultLanguage().matching(queryText);
-        Query query = TextQuery.queryText(textCriteria)
-                .addCriteria(Criteria.where("userId").is(userId))
+        Query query = new Query(
+                Criteria.where("userId").is(userId)
+                        .and("content").regex(Pattern.quote(queryText), "i"))
                 .with(Sort.by(Sort.Direction.DESC, "timestamp"))
                 .skip((long) page * size)
                 .limit(size);

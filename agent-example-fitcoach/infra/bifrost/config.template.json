@@ -1,0 +1,23 @@
+{
+  "$schema": "https://www.getbifrost.ai/schema",
+  "providers": {
+    "azure": {
+      "keys": [
+        {
+          "name": "azure-primary",
+          "value": "${AZURE_OPENAI_API_KEY}",
+          "models": ["${LLM_MODEL}", "${LLM_ROUTING_MODEL}"],
+          "weight": 1.0,
+          "azure_key_config": {
+            "endpoint": "${AZURE_OPENAI_BASE_URL}",
+            "deployments": {
+              "${LLM_MODEL}": "${LLM_MODEL}",
+              "${LLM_ROUTING_MODEL}": "${LLM_ROUTING_MODEL}"
+            },
+            "api_version": "${AZURE_OPENAI_API_VERSION}"
+          }
+        }
+      ]
+    }
+  }
+}

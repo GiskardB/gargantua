@@ -24,10 +24,12 @@ public class PromptInjectionGuardrail implements InputGuardrail {
             Pattern.compile("disregard\\s+(all\\s+)?prior\\s+(instructions|prompts)", Pattern.CASE_INSENSITIVE),
             Pattern.compile("you\\s+are\\s+now\\s+(?:a|an)\\s+", Pattern.CASE_INSENSITIVE),
             Pattern.compile("forget\\s+(all\\s+)?(your|previous)\\s+(instructions|rules)", Pattern.CASE_INSENSITIVE),
-            Pattern.compile("system\\s*prompt\\s*:", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("system\\s*prompt", Pattern.CASE_INSENSITIVE),
             Pattern.compile("\\bDAN\\s+mode\\b", Pattern.CASE_INSENSITIVE),
             Pattern.compile("act\\s+as\\s+if\\s+you\\s+have\\s+no\\s+(restrictions|rules|guidelines)", Pattern.CASE_INSENSITIVE),
-            Pattern.compile("override\\s+(your|the)\\s+(system|safety)\\s+(prompt|instructions)", Pattern.CASE_INSENSITIVE)
+            Pattern.compile("override\\s+(your|the)\\s+(system|safety)\\s+(prompt|instructions)", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("pretend\\s+you\\s+are", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("reveal\\s+your\\s+instructions", Pattern.CASE_INSENSITIVE)
     );
 
     private final AgentProperties agentProperties;

@@ -1,0 +1,127 @@
+# ═══════════════════════════════════════════════════════════════════
+# FitCoach AI — Docker Compose
+#
+# Two modes:
+#
+#   1) Embedded (in-memory, no DB):
+#      docker compose up -d
+#      → starts: Ollama + Bifrost (LLM Gateway)
+#      → then run the app with: start-embedded.bat
+#
+#   2) Full (with persistence):
+#      docker compose --profile full up -d
+#      → starts: Ollama + Bifrost + MongoDB + Redis
+#      → then run the app with: start-app.bat
+#
+# Ollama auto-pulls the routing model on first start.
+# Bifrost is the LLM gateway — configure real API keys in .env
+# ═══════════════════════════════════════════════════════════════════
+
+services:
+
+  # ── Bifrost (LLM Gateway / Proxy) ────────────────────────────
+  # All LLM calls (primary, fallback) go through Bifrost.
+  # Configure provider keys (Azure, OpenAI, etc.) in .env
+  bifrost:
+    image: maximhq/bifrost:latest
+    container_name: fitcoach-bifrost
+    ports:
+      - "${BIFROST_PORT:-8090}:8080"
+    volumes:
+      - ./infra/bifrost/config.template.json:/app/config.template.json:ro
+      - ./infra/bifrost/entrypoint.sh:/app/custom-entrypoint.sh:ro
+    entrypoint: ["/bin/sh", "/app/custom-entrypoint.sh"]
+    env_file: .env
+    environment:
+      APP_PORT: "8080"
+      APP_HOST: "0.0.0.0"
+      LOG_LEVEL: "info"
+    networks:
+      - fitcoach-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 15s
+    restart: unless-stopped
+
+  # ── Ollama (local LLM for skill routing) ──────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: fitcoach-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - fitcoach-net
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+  # ── Ollama Init (auto-pull routing model) ─────────────────────
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: fitcoach-ollama-init
+    entrypoint: ["/bin/sh", "-c", "until ollama list 2>/dev/null; do sleep 2; done && ollama pull ${LLM_ROUTING_MODEL:-phi4-mini} && echo 'Model ready'"]
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - fitcoach-net
+    restart: "no"
+
+  # ── MongoDB 8.0 (full mode only) ─────────────────────────────
+  mongo:
+    image: mongo:8.0
+    container_name: fitcoach-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - fitcoach-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    profiles:
+      - full
+    restart: unless-stopped
+
+  # ── Redis 7.4 (full mode only) ───────────────────────────────
+  redis:
+    image: redis:7.4-alpine
+    container_name: fitcoach-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - fitcoach-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    profiles:
+      - full
+    restart: unless-stopped
+
+networks:
+  fitcoach-net:
+
+volumes:
+  mongo-data:
+  redis-data:
+  ollama-data:
