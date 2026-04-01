@@ -26,8 +26,9 @@ public class EvalAutoConfiguration {
     @ConditionalOnMissingBean(EvalRunner.class)
     public EvalRunner evalRunner(EvalDatasetLoader datasetLoader,
                                   OrchestratorEngine orchestratorEngine,
-                                  AgentProperties properties) {
-        return new EvalRunner(datasetLoader, orchestratorEngine, properties);
+                                  AgentProperties properties,
+                                  LlmProviderFactory llmProviderFactory) {
+        return new EvalRunner(datasetLoader, orchestratorEngine, properties, llmProviderFactory);
     }
 
     @Bean

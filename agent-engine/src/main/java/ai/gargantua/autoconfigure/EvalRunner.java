@@ -60,6 +60,76 @@ public class EvalRunner {
         this.llmProviderFactory = llmProviderFactory;
     }
 
+    /** Parsed result from the LLM judge. */
+    private record JudgeResult(double score, List<String> passedBehaviors, List<String> failedBehaviors, String reason) {}
+
+    /**
+     * Build the prompt sent to the LLM judge.
+     */
+    private String buildJudgePrompt(EvalCase evalCase, String agentResponse) {
+        var sb = new StringBuilder();
+        sb.append("User input: ").append(evalCase.input()).append("\n\n");
+        sb.append("Agent response: ").append(agentResponse).append("\n\n");
+        sb.append("Expected behaviors:\n");
+        for (var b : evalCase.expectedBehaviors()) sb.append("- ").append(b).append("\n");
+        if (evalCase.forbiddenBehaviors() != null && !evalCase.forbiddenBehaviors().isEmpty()) {
+            sb.append("\nForbidden behaviors:\n");
+            for (var b : evalCase.forbiddenBehaviors()) sb.append("- ").append(b).append("\n");
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Parse the structured output from the LLM judge.
+     */
+    private JudgeResult parseJudgeOutput(String output, List<String> allExpected) {
+        double score = 0.5;
+        var passed = new ArrayList<String>();
+        var failed = new ArrayList<String>(allExpected);
+        var reason = "Could not parse judge output";
+
+        if (output == null) return new JudgeResult(score, passed, failed, reason);
+
+        for (var line : output.split("\n")) {
+            line = line.trim();
+            if (line.startsWith("SCORE:")) {
+                try { score = Double.parseDouble(line.substring(6).trim()); }
+                catch (NumberFormatException ignored) {}
+            } else if (line.startsWith("PASSED:") && !line.contains("NONE")) {
+                passed = new ArrayList<>(List.of(line.substring(7).trim().split("\\s*,\\s*")));
+                failed.removeAll(passed);
+            } else if (line.startsWith("REASON:")) {
+                reason = line.substring(7).trim();
+            }
+        }
+        return new JudgeResult(Math.max(0, Math.min(1, score)), passed, failed, reason);
+    }
+
+    /**
+     * Fallback keyword-based judge when the LLM judge is unavailable.
+     */
+    private JudgeResult keywordJudge(EvalCase evalCase, String response) {
+        if (response == null) response = "";
+        var lower = response.toLowerCase();
+        var passed = new ArrayList<String>();
+        var failed = new ArrayList<String>();
+
+        for (var expected : evalCase.expectedBehaviors()) {
+            // Simple keyword check: if any significant word from the expected behavior is in the response
+            var words = expected.toLowerCase().split("\\s+");
+            boolean found = false;
+            for (var word : words) {
+                if (word.length() > 4 && lower.contains(word)) { found = true; break; }
+            }
+            if (found) passed.add(expected); else failed.add(expected);
+        }
+
+        double score = evalCase.expectedBehaviors().isEmpty() ? 1.0 :
+                (double) passed.size() / evalCase.expectedBehaviors().size();
+        return new JudgeResult(score, passed, failed,
+                "Keyword match: %d/%d expected behaviors found".formatted(passed.size(), evalCase.expectedBehaviors().size()));
+    }
+
     /**
      * Run the eval suite for a given skill.
      */
