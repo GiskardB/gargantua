@@ -10,5 +10,7 @@ public enum SkillSource {
     /** Loaded from a JAR on the classpath (packaged skill libraries). */
     CLASSPATH_JAR,
     /** Loaded from a database (for dynamic skill management). */
-    DATABASE
+    DATABASE,
+    /** Generated from a Java class annotated with {@link AgentSkill}. */
+    ANNOTATION
 }
