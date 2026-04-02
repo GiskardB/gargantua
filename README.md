@@ -120,8 +120,12 @@ Every feature has dedicated documentation — click the link to dive deeper.
 
 **You write:**
 
-1. One or more `SKILL.md` files — each declares a skill: behavior, allowed tools, routing hints. You can also **import skills as Maven JARs** from the [SkillsJars](docs/skills-and-routing.md) ecosystem instead of writing them.
-2. `@AgentTool` classes — Java methods that implement the actual actions (API calls, database queries, business logic)
+1. **Skills** — three options, pick what fits:
+   - A `SKILL.md` file (declarative, hot-reloadable)
+   - An `@AgentSkill` annotation on a Java class (type-safe, co-located with tools — see [Agent DSL](docs/agent-dsl.md))
+   - Import skills as Maven JARs from the [SkillsJars](docs/skills-and-routing.md) ecosystem
+2. **`@AgentTool` classes** — Java methods that implement the actual actions (API calls, database queries, business logic)
+3. **`@AgentsFlow` pipelines** *(optional)* — chain multiple skills into multi-step workflows where each step's output feeds the next ([Agent DSL](docs/agent-dsl.md))
 
 **Gargantua handles everything else:**
 
