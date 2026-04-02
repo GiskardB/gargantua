@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gargantua Agent Chat</title>
+<style>
+  :root {
+    --bg: #0f0f14;
+    --surface: #1a1a24;
+    --surface2: #22222e;
+    --border: #2a2a3a;
+    --primary: #6c5ce7;
+    --primary-light: #a29bfe;
+    --text: #e0e0e8;
+    --text-dim: #8888a0;
+    --user-bg: #6c5ce7;
+    --agent-bg: #22222e;
+    --success: #00b894;
+    --warning: #fdcb6e;
+    --danger: #e17055;
+    --radius: 16px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg); color: var(--text); height: 100vh;
+    display: flex; flex-direction: column;
+  }
+
+  /* Header */
+  .header {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 12px 24px; display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+  }
+  .header-logo {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 700; color: white;
+  }
+  .header-title { font-size: 16px; font-weight: 600; }
+  .header-subtitle { font-size: 12px; color: var(--text-dim); }
+  .header-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--success); animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+  .status-text { font-size: 12px; color: var(--text-dim); }
+
+  /* Layout */
+  .main { display: flex; flex: 1; overflow: hidden; }
+
+  /* Sidebar */
+  .sidebar {
+    width: 320px; background: var(--surface); border-right: 1px solid var(--border);
+    padding: 24px; overflow-y: auto; flex-shrink: 0;
+    display: flex; flex-direction: column; gap: 20px;
+  }
+  .sidebar h2 { font-size: 14px; color: var(--primary-light); text-transform: uppercase; letter-spacing: 1px; }
+  .sidebar p { font-size: 13px; color: var(--text-dim); line-height: 1.6; }
+  .feature-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+  .feature-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    font-size: 13px; color: var(--text); padding: 8px 10px;
+    background: var(--surface2); border-radius: 10px;
+  }
+  .feature-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+  .feature-text b { color: var(--primary-light); }
+  .starter-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .starter-chip {
+    font-size: 12px; padding: 6px 12px; border-radius: 20px;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); cursor: pointer; transition: all 0.2s;
+  }
+  .starter-chip:hover { border-color: var(--primary); color: var(--primary-light); }
+
+  /* Chat Area */
+  .chat-area { flex: 1; display: flex; flex-direction: column; }
+  .messages {
+    flex: 1; overflow-y: auto; padding: 20px 24px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .msg { max-width: 75%; display: flex; flex-direction: column; gap: 4px; }
+  .msg-user { align-self: flex-end; }
+  .msg-agent { align-self: flex-start; }
+  .msg-bubble {
+    padding: 12px 16px; border-radius: var(--radius);
+    font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-break: break-word;
+  }
+  .msg-user .msg-bubble {
+    background: var(--user-bg); color: white; border-bottom-right-radius: 4px;
+  }
+  .msg-agent .msg-bubble {
+    background: var(--agent-bg); color: var(--text);
+    border: 1px solid var(--border); border-bottom-left-radius: 4px;
+  }
+  .msg-meta { font-size: 11px; color: var(--text-dim); padding: 0 4px; }
+  .msg-user .msg-meta { text-align: right; }
+  .msg-tool {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; color: var(--warning); padding: 2px 8px;
+    background: rgba(253, 203, 110, 0.1); border-radius: 8px; margin: 2px 0;
+    align-self: flex-start;
+  }
+  .typing-indicator {
+    display: flex; gap: 4px; padding: 12px 16px;
+    background: var(--agent-bg); border: 1px solid var(--border);
+    border-radius: var(--radius); border-bottom-left-radius: 4px;
+    align-self: flex-start; width: fit-content;
+  }
+  .typing-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--text-dim); animation: bounce 1.4s infinite ease-in-out;
+  }
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce { 0%,60%,100% { transform: translateY(0); } 30% { transform: translateY(-6px); } }
+
+  /* Input */
+  .input-area {
+    padding: 16px 24px; background: var(--surface);
+    border-top: 1px solid var(--border); flex-shrink: 0;
+  }
+  .input-row { display: flex; gap: 10px; align-items: flex-end; }
+  .input-box {
+    flex: 1; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 14px; padding: 12px 16px; color: var(--text);
+    font-size: 14px; font-family: inherit; resize: none;
+    min-height: 44px; max-height: 120px; outline: none; transition: border-color 0.2s;
+  }
+  .input-box:focus { border-color: var(--primary); }
+  .input-box::placeholder { color: var(--text-dim); }
+  .send-btn {
+    width: 44px; height: 44px; border-radius: 12px;
+    background: var(--primary); border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.2s; flex-shrink: 0;
+  }
+  .send-btn:hover { background: var(--primary-light); }
+  .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .send-btn svg { width: 20px; height: 20px; fill: white; }
+  .input-hint { font-size: 11px; color: var(--text-dim); margin-top: 6px; text-align: center; }
+
+  @media (max-width: 768px) {
+    .sidebar { display: none; }
+    .msg { max-width: 90%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-logo">G</div>
+  <div>
+    <div class="header-title" id="agentName">Gargantua Agent</div>
+    <div class="header-subtitle" id="agentDesc">AI Agent</div>
+  </div>
+  <div class="header-right">
+    <div class="status-dot"></div>
+    <span class="status-text">Online</span>
+  </div>
+</div>
+
+<div class="main">
+  <div class="sidebar" id="sidebar">
+    <div>
+      <h2>About this Agent</h2>
+      <p id="agentAbout">Loading agent capabilities...</p>
+    </div>
+    <div>
+      <h2>Capabilities</h2>
+      <ul class="feature-list" id="featureList"></ul>
+    </div>
+    <div>
+      <h2>Try asking</h2>
+      <div class="starter-chips" id="starterChips"></div>
+    </div>
+  </div>
+
+  <div class="chat-area">
+    <div class="messages" id="messages"></div>
+    <div class="input-area">
+      <div class="input-row">
+        <textarea class="input-box" id="inputBox" placeholder="Type a message..." rows="1"
+                  onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
+        <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+          <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </button>
+      </div>
+      <div class="input-hint">Enter to send &middot; Shift+Enter for new line</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const BASE = window.location.origin;
+let sessionId = 'sess-' + Math.random().toString(36).substr(2, 9);
+let userId = 'web-user';
+let isStreaming = false;
+
+/* ── Load Agent Card ─────────────────────── */
+async function loadAgentCard() {
+  try {
+    const res = await fetch(BASE + '/.well-known/agent.json');
+    if (!res.ok) throw new Error();
+    const card = await res.json();
+
+    document.getElementById('agentName').textContent = card.name || 'Gargantua Agent';
+    document.getElementById('agentDesc').textContent = card.description || 'AI Agent';
+    document.title = (card.name || 'Agent') + ' Chat';
+    document.getElementById('agentAbout').textContent = card.description || '';
+
+    const icons = ['🎯','🧠','🛡️','⚡','📊','🔧','🌐','💬'];
+    const fl = document.getElementById('featureList');
+    (card.skills || []).forEach((s, i) => {
+      const li = document.createElement('li');
+      li.className = 'feature-item';
+      li.innerHTML = '<span class="feature-icon">' + icons[i % icons.length] + '</span>'
+        + '<span class="feature-text"><b>' + s.name + '</b><br>' + (s.description || '') + '</span>';
+      fl.appendChild(li);
+    });
+
+    const chips = document.getElementById('starterChips');
+    ['What can you do?', 'Hello!'].concat(
+      (card.skills || []).slice(0, 4).map(s => (s.description || s.name).split('.')[0])
+    ).forEach(t => {
+      const c = document.createElement('span');
+      c.className = 'starter-chip';
+      c.textContent = t;
+      c.onclick = () => { document.getElementById('inputBox').value = t; sendMessage(); };
+      chips.appendChild(c);
+    });
+  } catch (e) {
+    document.getElementById('agentAbout').textContent = 'Could not load agent info. Make sure the agent is running.';
+  }
+}
+
+/* ── Send Message via SSE ────────────────── */
+async function sendMessage() {
+  const input = document.getElementById('inputBox');
+  const text = input.value.trim();
+  if (!text || isStreaming) return;
+
+  input.value = '';
+  input.style.height = 'auto';
+  addMessage(text, 'user');
+
+  isStreaming = true;
+  document.getElementById('sendBtn').disabled = true;
+  const typingEl = showTyping();
+  let agentBubble = null, agentText = '', meta = {}, eventType = '';
+
+  try {
+    const res = await fetch(BASE + '/api/agent/chat/stream', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'text/event-stream',
+        'X-User-Id': userId,
+        'X-Session-Id': sessionId
+      },
+      body: JSON.stringify({ message: text })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      removeEl(typingEl);
+      addMessage('Error: ' + (err.detail || err.message || res.statusText), 'agent');
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop();
+
+      for (const line of lines) {
+        if (line.startsWith('event:')) { eventType = line.substring(6).trim(); continue; }
+        if (!line.startsWith('data:')) continue;
+        const data = line.substring(5).trim();
+        if (!data) continue;
+
+        try {
+          const p = JSON.parse(data);
+          if (eventType === 'tool_call' || eventType === 'tool_result') {
+            const te = document.createElement('div');
+            te.className = 'msg-tool';
+            te.textContent = (eventType === 'tool_call' ? '🔧 calling ' : '✅ ') + (p.tool || p.toolName || 'tool');
+            document.getElementById('messages').appendChild(te);
+            scrollBottom();
+          } else if (eventType === 'done') {
+            meta = p;
+          } else if (eventType === 'error') {
+            removeEl(typingEl);
+            addMessage('Error: ' + (p.error || p.message || 'Unknown'), 'agent');
+          } else {
+            removeEl(typingEl);
+            if (!agentBubble) agentBubble = addMessage('', 'agent');
+            agentText += (p.token || p.content || '');
+            agentBubble.querySelector('.msg-bubble').textContent = agentText;
+            scrollBottom();
+          }
+        } catch (_) {
+          removeEl(typingEl);
+          if (!agentBubble) agentBubble = addMessage('', 'agent');
+          agentText += data;
+          agentBubble.querySelector('.msg-bubble').textContent = agentText;
+          scrollBottom();
+        }
+      }
+    }
+
+    /* Fallback: sync call if no streaming tokens received */
+    if (!agentBubble) {
+      removeEl(typingEl);
+      const sr = await fetch(BASE + '/api/agent/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-User-Id': userId, 'X-Session-Id': sessionId },
+        body: JSON.stringify({ message: text })
+      });
+      const sd = await sr.json();
+      agentBubble = addMessage(sd.text || sd.response || 'No response', 'agent');
+      meta = sd;
+    }
+
+    /* Show metadata */
+    if (agentBubble && (meta.skillUsed || meta.totalTokens)) {
+      const m = document.createElement('div');
+      m.className = 'msg-meta';
+      const parts = [];
+      if (meta.skillUsed) parts.push(meta.skillUsed);
+      if (meta.routingMethod) parts.push(meta.routingMethod.toLowerCase());
+      if (meta.totalTokens) parts.push(meta.totalTokens + ' tok');
+      if (meta.durationMs) parts.push(meta.durationMs + 'ms');
+      m.textContent = parts.join(' · ');
+      agentBubble.appendChild(m);
+    }
+  } catch (e) {
+    removeEl(typingEl);
+    addMessage('Connection error: ' + e.message, 'agent');
+  } finally {
+    isStreaming = false;
+    document.getElementById('sendBtn').disabled = false;
+    scrollBottom();
+  }
+}
+
+/* ── Helpers ──────────────────────────────── */
+function addMessage(text, role) {
+  const msgs = document.getElementById('messages');
+  const msg = document.createElement('div');
+  msg.className = 'msg msg-' + role;
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-bubble';
+  bubble.textContent = text;
+  msg.appendChild(bubble);
+  const m = document.createElement('div');
+  m.className = 'msg-meta';
+  m.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  msg.appendChild(m);
+  msgs.appendChild(msg);
+  scrollBottom();
+  return msg;
+}
+
+function showTyping() {
+  const el = document.createElement('div');
+  el.className = 'typing-indicator';
+  el.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
+  document.getElementById('messages').appendChild(el);
+  scrollBottom();
+  return el;
+}
+
+function removeEl(el) { if (el && el.parentNode) el.parentNode.removeChild(el); }
+function scrollBottom() { const m = document.getElementById('messages'); m.scrollTop = m.scrollHeight; }
+
+document.getElementById('inputBox').addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+
+loadAgentCard();
+</script>
+</body>
+</html>

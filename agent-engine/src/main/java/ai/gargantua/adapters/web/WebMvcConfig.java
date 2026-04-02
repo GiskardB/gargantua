@@ -13,5 +13,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Override
     public void addViewControllers(ViewControllerRegistry registry) {
         registry.addRedirectViewController("/docs", "/docs/index.html");
+        registry.addRedirectViewController("/chat", "/chat.html");
     }
 }
