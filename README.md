@@ -1,10 +1,10 @@
 # Gargantua -- AI Agent Framework
 
-**Build production-ready AI agents in Java. Write a skill file and a tool class. Ship.**
+**AI agents as a service, in Java.** Write a skill file and a tool class — Gargantua gives you a deployable REST API with streaming, persistent memory, guardrails, and multi-agent orchestration.
 
-Gargantua gives you everything you need to go from idea to deployed AI agent: multi-provider LLM orchestration, semantic skill routing, 3-layer persistent memory, guardrails pipeline, streaming, human-in-the-loop approvals, eval framework, cost tracking, and Kubernetes manifests. All as Maven dependencies — add them to your project and start building.
+Define what your agent can do in a `SKILL.md` file (or a Java `@AgentSkill` annotation), implement actions as `@AgentTool` methods, and chain them into multi-step `@AgentsFlow` pipelines. The framework handles everything else: skill routing, 3-layer memory, input/output guardrails, human-in-the-loop approvals, eval framework, cost tracking, A2A interoperability, and Kubernetes deployment.
 
-Built on Java 21, Spring Boot 4.0.4, and LangChain4j 1.12.1.
+Built on Java 21, Spring Boot 4.0.4, and LangChain4j.
 
 ---
 
