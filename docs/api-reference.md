@@ -238,6 +238,52 @@ These endpoints require MongoDB. They are conditionally registered when `MongoTe
 
 ---
 
+## Agent Flows
+
+Multi-step skill pipelines. See [Agent DSL](agent-dsl.md) for how to define flows.
+
+### GET /api/flows — List all registered flows
+
+```bash
+curl http://localhost:8080/api/flows
+```
+
+Response:
+```json
+[
+  {
+    "name": "full-fitness-plan",
+    "description": "Health assessment → Workout → Nutrition",
+    "steps": ["health-skill", "workout-skill", "nutrition-skill"]
+  }
+]
+```
+
+### POST /api/flows/{flowName}/start — Execute a flow
+
+```bash
+curl -X POST http://localhost:8080/api/flows/full-fitness-plan/start \
+  -H "Content-Type: application/json" \
+  -H "X-User-Id: user1" \
+  -d '{"input": "I want to get fit, I weigh 80kg and am 175cm tall"}'
+```
+
+Response:
+```json
+{
+  "flowName": "full-fitness-plan",
+  "finalOutput": "Here is your complete nutrition plan...",
+  "stepResults": [
+    { "skillName": "health-skill", "input": "...", "output": "BMI is 26.1...", "durationMs": 1200 },
+    { "skillName": "workout-skill", "input": "...", "output": "4-week plan...", "durationMs": 2100 },
+    { "skillName": "nutrition-skill", "input": "...", "output": "2200 cal/day...", "durationMs": 1800 }
+  ],
+  "totalDurationMs": 5100
+}
+```
+
+---
+
 ## Admin Endpoints
 
 Admin endpoints are grouped by subsystem. In production, protect these with authentication middleware or network-level access control.

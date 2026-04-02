@@ -70,6 +70,8 @@ Every feature has dedicated documentation — click the link to dive deeper.
 | Feature | What it does | Docs |
 |---------|-------------|------|
 | **Declarative Skills** | Define agent behavior in `SKILL.md` files — system prompt, allowed tools, routing hints. No code changes to add a skill. | [Skills & Routing](docs/skills-and-routing.md) |
+| **@AgentSkill** | Define skills directly in Java with annotations — auto-detects tools, prompt from `static PROMPT` field. Optional RAG, RBAC, schema, temperature. | [Agent DSL](docs/agent-dsl.md) |
+| **@AgentsFlow** | Chain multiple skills into multi-step pipelines. Each step's output feeds the next. REST API at `/api/flows`. | [Agent DSL](docs/agent-dsl.md) |
 | **@AgentTool** | Annotate Java methods as agent actions. Add `@ToolRetry` for resilience, `@RequiresApproval` for HITL, `@CacheableToolResult` for caching. | [Tools & Annotations](docs/tools-and-annotations.md) |
 | **Hybrid Routing** | Semantic similarity (all-MiniLM-L6-v2, in-process, ~2ms) + LLM fallback. The agent picks the right skill automatically. | [Skills & Routing](docs/skills-and-routing.md) |
 | **RAG / Vector Store** | Skills declare `knowledge-base` in SKILL.md — the framework retrieves relevant documents and injects them into the prompt. Pluggable `VectorStorePort`. | [Extending](docs/extending.md) |
@@ -550,6 +552,7 @@ gargantua/
 | Memory System | [docs/memory-system.md](docs/memory-system.md) |
 | Guardrails | [docs/guardrails.md](docs/guardrails.md) |
 | LLM Configuration & Routing | [docs/llm-configuration.md](docs/llm-configuration.md) |
+| Agent DSL (@AgentSkill, @AgentsFlow) | [docs/agent-dsl.md](docs/agent-dsl.md) |
 | Eval Framework | [docs/eval-framework.md](docs/eval-framework.md) |
 | API Reference | [docs/api-reference.md](docs/api-reference.md) |
 | Extending (CLI, MCP, Dry-Run, Cost, History) | [docs/extending.md](docs/extending.md) |
@@ -586,6 +589,8 @@ gargantua/
 | `GET` | `/api/admin/audit/session/{sessionId}` | Query audit events by session |
 | `GET` | `/api/admin/audit/{eventId}` | Get single audit event by ID |
 | `GET` | `/api/admin/audit/count` | Count audit events in time range |
+| `GET` | `/api/flows` | List all registered agent flows |
+| `POST` | `/api/flows/{flowName}/start` | Execute a multi-step agent flow |
 | `GET` | `/swagger-ui` | Swagger UI |
 | `GET` | `/docs` | Redoc documentation (requires static `docs/index.html` in your app) |
 
