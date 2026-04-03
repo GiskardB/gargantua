@@ -1,74 +1,118 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <!-- Gradient principale viola -->
-    <linearGradient id="mainGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#6c5ce7"/>
-      <stop offset="100%" style="stop-color:#a29bfe"/>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a1628"/>
+      <stop offset="100%" style="stop-color:#0d2137"/>
     </linearGradient>
-    <!-- Gradient cerchio interno -->
-    <linearGradient id="innerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#0f0f14"/>
-      <stop offset="100%" style="stop-color:#1a1a24"/>
+    <linearGradient id="blue1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e90ff"/>
+      <stop offset="100%" style="stop-color:#00bfff"/>
     </linearGradient>
-    <!-- Glow effect -->
+    <linearGradient id="blue2" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#00bfff"/>
+      <stop offset="100%" style="stop-color:#1e90ff"/>
+    </linearGradient>
+    <radialGradient id="star" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#ffeaa7"/>
+      <stop offset="100%" style="stop-color:#fdcb6e"/>
+    </radialGradient>
+    <radialGradient id="planet1" cx="35%" cy="35%" r="65%">
+      <stop offset="0%" style="stop-color:#74b9ff"/>
+      <stop offset="100%" style="stop-color:#0984e3"/>
+    </radialGradient>
+    <radialGradient id="planet2" cx="35%" cy="35%" r="65%">
+      <stop offset="0%" style="stop-color:#55efc4"/>
+      <stop offset="100%" style="stop-color:#00b894"/>
+    </radialGradient>
+    <radialGradient id="planet3" cx="35%" cy="35%" r="65%">
+      <stop offset="0%" style="stop-color:#fd79a8"/>
+      <stop offset="100%" style="stop-color:#e84393"/>
+    </radialGradient>
+    <radialGradient id="planet4" cx="35%" cy="35%" r="65%">
+      <stop offset="0%" style="stop-color:#ffeaa7"/>
+      <stop offset="100%" style="stop-color:#f39c12"/>
+    </radialGradient>
     <filter id="glow">
-      <feGaussianBlur stdDeviation="8" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
-    <!-- Subtle shadow -->
-    <filter id="shadow">
-      <feDropShadow dx="0" dy="4" stdDeviation="12" flood-color="#6c5ce7" flood-opacity="0.3"/>
+    <filter id="starglow">
+      <feGaussianBlur stdDeviation="12" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
 
-  <!-- Background circle -->
-  <circle cx="256" cy="256" r="240" fill="url(#mainGrad)" filter="url(#shadow)"/>
+  <!-- Deep space background -->
+  <circle cx="256" cy="256" r="250" fill="url(#bg)"/>
 
-  <!-- Inner dark circle -->
-  <circle cx="256" cy="256" r="200" fill="url(#innerGrad)"/>
+  <!-- Tiny background stars -->
+  <circle cx="80" cy="90" r="1" fill="white" opacity="0.5"/>
+  <circle cx="420" cy="70" r="1.2" fill="white" opacity="0.4"/>
+  <circle cx="60" cy="310" r="0.8" fill="white" opacity="0.6"/>
+  <circle cx="440" cy="340" r="1" fill="white" opacity="0.3"/>
+  <circle cx="150" cy="430" r="1" fill="white" opacity="0.4"/>
+  <circle cx="380" cy="440" r="0.8" fill="white" opacity="0.5"/>
+  <circle cx="110" cy="170" r="0.8" fill="white" opacity="0.3"/>
+  <circle cx="400" cy="160" r="1" fill="white" opacity="0.4"/>
+  <circle cx="200" cy="60" r="0.8" fill="white" opacity="0.5"/>
+  <circle cx="340" cy="450" r="1" fill="white" opacity="0.3"/>
+  <circle cx="460" cy="240" r="0.8" fill="white" opacity="0.4"/>
+  <circle cx="50" cy="220" r="1" fill="white" opacity="0.3"/>
 
-  <!-- Orbital rings (representing orchestration/pipeline) -->
-  <ellipse cx="256" cy="256" rx="160" ry="60" fill="none" stroke="#6c5ce7" stroke-width="2" opacity="0.3" transform="rotate(-20 256 256)"/>
-  <ellipse cx="256" cy="256" rx="160" ry="60" fill="none" stroke="#a29bfe" stroke-width="2" opacity="0.3" transform="rotate(40 256 256)"/>
-  <ellipse cx="256" cy="256" rx="160" ry="60" fill="none" stroke="#6c5ce7" stroke-width="2" opacity="0.2" transform="rotate(-70 256 256)"/>
+  <!-- Orbit 4 — outermost — the "G" orbit -->
+  <ellipse cx="256" cy="256" rx="195" ry="195" fill="none" stroke="#1e90ff" stroke-width="1" opacity="0.15"/>
 
-  <!-- Central "G" letter -->
-  <text x="256" y="290" text-anchor="middle" font-family="'SF Pro Display', 'Segoe UI', system-ui, sans-serif" font-size="180" font-weight="800" fill="url(#mainGrad)" filter="url(#glow)">G</text>
+  <!-- Orbit 3 -->
+  <ellipse cx="256" cy="256" rx="145" ry="145" fill="none" stroke="#00bfff" stroke-width="1" opacity="0.2"/>
 
-  <!-- Neural nodes (representing skills/tools) -->
-  <!-- Top node -->
-  <circle cx="256" cy="100" r="12" fill="#a29bfe" opacity="0.9"/>
-  <circle cx="256" cy="100" r="6" fill="#ffffff"/>
+  <!-- Orbit 2 -->
+  <ellipse cx="256" cy="256" rx="100" ry="100" fill="none" stroke="#1e90ff" stroke-width="1" opacity="0.25"/>
 
-  <!-- Right node -->
-  <circle cx="400" cy="200" r="10" fill="#6c5ce7" opacity="0.8"/>
-  <circle cx="400" cy="200" r="5" fill="#ffffff"/>
+  <!-- Orbit 1 — innermost -->
+  <ellipse cx="256" cy="256" rx="58" ry="58" fill="none" stroke="#00bfff" stroke-width="1" opacity="0.3"/>
 
-  <!-- Bottom-right node -->
-  <circle cx="380" cy="360" r="10" fill="#a29bfe" opacity="0.7"/>
-  <circle cx="380" cy="360" r="5" fill="#ffffff"/>
+  <!-- Central star (the LLM core) -->
+  <circle cx="256" cy="256" r="22" fill="url(#star)" filter="url(#starglow)">
+    <animate attributeName="r" values="20;24;20" dur="3s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="256" cy="256" r="12" fill="#fff5cc"/>
 
-  <!-- Bottom-left node -->
-  <circle cx="132" cy="360" r="10" fill="#6c5ce7" opacity="0.7"/>
-  <circle cx="132" cy="360" r="5" fill="#ffffff"/>
+  <!-- Planet 1 — innermost orbit, small (Skills) -->
+  <circle cx="314" cy="256" r="8" fill="url(#planet1)">
+    <animateTransform attributeName="transform" type="rotate" from="0 256 256" to="360 256 256" dur="12s" repeatCount="indefinite"/>
+  </circle>
 
-  <!-- Left node -->
-  <circle cx="112" cy="200" r="10" fill="#a29bfe" opacity="0.8"/>
-  <circle cx="112" cy="200" r="5" fill="#ffffff"/>
+  <!-- Planet 2 — second orbit, medium (Tools) -->
+  <circle cx="256" cy="156" r="12" fill="url(#planet2)">
+    <animateTransform attributeName="transform" type="rotate" from="60 256 256" to="420 256 256" dur="20s" repeatCount="indefinite"/>
+  </circle>
 
-  <!-- Connection lines from nodes to center (representing the pipeline) -->
-  <line x1="256" y1="112" x2="256" y2="190" stroke="#a29bfe" stroke-width="1.5" opacity="0.4"/>
-  <line x1="390" y1="208" x2="330" y2="240" stroke="#6c5ce7" stroke-width="1.5" opacity="0.3"/>
-  <line x1="372" y1="352" x2="310" y2="300" stroke="#a29bfe" stroke-width="1.5" opacity="0.3"/>
-  <line x1="142" y1="352" x2="202" y2="300" stroke="#6c5ce7" stroke-width="1.5" opacity="0.3"/>
-  <line x1="122" y1="208" x2="182" y2="240" stroke="#a29bfe" stroke-width="1.5" opacity="0.3"/>
+  <!-- Planet 3 — third orbit, larger (Memory) -->
+  <circle cx="111" cy="256" r="16" fill="url(#planet3)">
+    <animateTransform attributeName="transform" type="rotate" from="180 256 256" to="540 256 256" dur="30s" repeatCount="indefinite"/>
+  </circle>
 
-  <!-- Subtle "agent" text below G -->
-  <text x="256" y="340" text-anchor="middle" font-family="'SF Pro Display', 'Segoe UI', system-ui, sans-serif" font-size="28" font-weight="300" fill="#8888a0" letter-spacing="8">AGENT</text>
+  <!-- Planet 4 — outermost orbit, largest (Guardrails) with ring -->
+  <g>
+    <animateTransform attributeName="transform" type="rotate" from="270 256 256" to="630 256 256" dur="45s" repeatCount="indefinite"/>
+    <circle cx="256" cy="61" r="20" fill="url(#planet4)"/>
+    <!-- Saturn-like ring -->
+    <ellipse cx="256" cy="61" rx="30" ry="6" fill="none" stroke="#f39c12" stroke-width="1.5" opacity="0.5"/>
+  </g>
 
-  <!-- Outer glow ring -->
-  <circle cx="256" cy="256" r="238" fill="none" stroke="#6c5ce7" stroke-width="1" opacity="0.2"/>
+  <!-- The "G" — placed on the outermost orbit path, glowing blue -->
+  <text x="256" y="284" text-anchor="middle"
+        font-family="'SF Pro Display','Segoe UI',system-ui,sans-serif"
+        font-size="160" font-weight="800"
+        fill="url(#blue1)" filter="url(#glow)"
+        opacity="0.9">G</text>
+
+  <!-- Subtle outer ring glow -->
+  <circle cx="256" cy="256" r="248" fill="none" stroke="#1e90ff" stroke-width="0.5" opacity="0.15"/>
+
+  <!-- "GARGANTUA" text -->
+  <text x="256" y="480" text-anchor="middle"
+        font-family="'SF Pro Display','Segoe UI',system-ui,sans-serif"
+        font-size="20" font-weight="300"
+        fill="#4dabf7" letter-spacing="6" opacity="0.7">GARGANTUA</text>
 </svg>
