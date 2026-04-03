@@ -22,6 +22,14 @@
       <artifactId>agent-engine</artifactId>
     </dependency>
 
+    <!-- Example agent (tools, enrichers, skills on classpath for embedded mode) -->
+    <dependency>
+      <groupId>ai.gargantua.example</groupId>
+      <artifactId>agent-example</artifactId>
+      <version>${project.version}</version>
+      <optional>true</optional>
+    </dependency>
+
     <!-- Spring Shell -->
     <dependency>
       <groupId>org.springframework.shell</groupId>
