@@ -34,6 +34,7 @@ public class AgentProperties {
     private Mcp mcp = new Mcp();
     private Skillsjars skillsjars = new Skillsjars();
     private Audit audit = new Audit();
+    private ChatUi chatUi = new ChatUi();
 
     // --- getters and setters ---
 
@@ -90,6 +91,9 @@ public class AgentProperties {
 
     public Audit getAudit() { return audit; }
     public void setAudit(Audit audit) { this.audit = audit; }
+
+    public ChatUi getChatUi() { return chatUi; }
+    public void setChatUi(ChatUi chatUi) { this.chatUi = chatUi; }
 
     // ==================== Nested classes ====================
 
@@ -580,5 +584,16 @@ public class AgentProperties {
 
         public int getRetentionDays() { return retentionDays; }
         public void setRetentionDays(int retentionDays) { this.retentionDays = retentionDays; }
+    }
+
+    /**
+     * Configuration for the built-in chat web UI.
+     * Accessible at /chat when enabled.
+     */
+    public static class ChatUi {
+        private boolean enabled = true;
+
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
     }
 }

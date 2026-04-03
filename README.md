@@ -349,6 +349,9 @@ java -jar agent-shell/target/agent-shell-1.0.0.jar
 # See what skills are available
 curl http://localhost:8080/.well-known/agent.json
 
+# Chat web UI (dark theme, SSE streaming, agent intro)
+open http://localhost:8080/chat
+
 # Interactive docs
 open http://localhost:8080/swagger-ui
 ```
@@ -595,6 +598,7 @@ gargantua/
 | `GET` | `/api/admin/audit/count` | Count audit events in time range |
 | `GET` | `/api/flows` | List all registered agent flows |
 | `POST` | `/api/flows/{flowName}/start` | Execute a multi-step agent flow |
+| `GET` | `/chat` | Built-in chat web UI (SSE streaming, Telegram-style, configurable via `agent.chat-ui.enabled`) |
 | `GET` | `/swagger-ui` | Swagger UI |
 | `GET` | `/docs` | Redoc documentation (requires static `docs/index.html` in your app) |
 
@@ -669,6 +673,8 @@ All storage uses in-memory ConcurrentHashMaps. Data is lost on restart.
 | **Audit** | | |
 | `AGENT_AUDIT_ENABLED` | Enable immutable audit trail | `true` |
 | `AGENT_AUDIT_RETENTION_DAYS` | How long to retain audit events | `365` |
+| **Chat UI** | | |
+| `agent.chat-ui.enabled` | Enable built-in chat web interface at `/chat` | `true` |
 
 ---
 

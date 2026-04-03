@@ -122,6 +122,9 @@ agent:
   dry-run:
     enabled: true
 
+  chat-ui:
+    enabled: true                 # Set to false to disable /chat web interface
+
 springdoc:
   api-docs:
     enabled: true
