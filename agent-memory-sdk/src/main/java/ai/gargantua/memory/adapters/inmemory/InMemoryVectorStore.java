@@ -7,7 +7,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 /**
  * In-memory vector store using keyword matching for similarity.
@@ -66,16 +65,20 @@ public class InMemoryVectorStore implements VectorStorePort {
                 .filter(rc -> rc.score() >= minScore)
                 .sorted(Comparator.comparingDouble(RetrievedChunk::score).reversed())
                 .limit(maxResults)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     private static Set<String> tokenize(String text) {
         if (text == null || text.isBlank()) {
             return Set.of();
         }
-        return Arrays.stream(text.toLowerCase(Locale.ROOT).split("\\W+"))
-                .filter(t -> !t.isBlank() && t.length() > 1)
-                .collect(Collectors.toSet());
+        var tokens = new HashSet<String>();
+        for (var t : text.toLowerCase(Locale.ROOT).split("\\W+")) {
+            if (!t.isBlank() && t.length() > 1) {
+                tokens.add(t);
+            }
+        }
+        return tokens;
     }
 
     private static double jaccardSimilarity(Set<String> a, Set<String> b) {

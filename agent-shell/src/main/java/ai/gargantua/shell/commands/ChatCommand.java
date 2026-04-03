@@ -173,7 +173,7 @@ public class ChatCommand {
                     }
                     if (event.routingMethod() != null) {
                         renderer.printMeta("  Routing:    " + event.routingMethod()
-                                + " (confidence: " + String.format("%.2f", event.routingConfidence()) + ")");
+                                + " (confidence: " + "%.2f".formatted(event.routingConfidence()) + ")");
                     }
                     renderer.printMeta("  Tokens:     " + event.inputTokens() + " in / "
                             + event.outputTokens() + " out");

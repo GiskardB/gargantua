@@ -2,7 +2,6 @@ package ai.gargantua.autoconfigure;
 
 import ai.gargantua.core.guardrail.GuardrailInputContext;
 import ai.gargantua.core.guardrail.GuardrailOutputContext;
-import ai.gargantua.core.guardrail.GuardrailOutputResult;
 import ai.gargantua.core.guardrail.GuardrailPipelineResult;
 import ai.gargantua.core.guardrail.GuardrailResult;
 import ai.gargantua.core.guardrail.GuardrailVerdict;
@@ -45,15 +44,15 @@ public class GuardrailPipeline {
      * Iterate input guardrails in order. Skip disabled guardrails. Stop at first BLOCK.
      */
     public GuardrailPipelineResult checkInput(GuardrailInputContext ctx) {
-        List<GuardrailResult> results = new ArrayList<>();
+        var results = new ArrayList<GuardrailResult>();
 
-        for (InputGuardrail guardrail : inputGuardrails) {
+        for (var guardrail : inputGuardrails) {
             if (!guardrail.isEnabled(properties)) {
                 log.debug("Skipping disabled input guardrail: {}", guardrail.name());
                 continue;
             }
 
-            GuardrailResult result = guardrail.check(ctx);
+            var result = guardrail.check(ctx);
             results.add(result);
 
             if (result.verdict() == GuardrailVerdict.BLOCK) {
@@ -73,15 +72,15 @@ public class GuardrailPipeline {
      * Iterate output guardrails, chaining transformations on the response text.
      */
     public String processOutput(GuardrailOutputContext ctx) {
-        GuardrailOutputContext current = ctx;
+        var current = ctx;
 
-        for (OutputGuardrail guardrail : outputGuardrails) {
+        for (var guardrail : outputGuardrails) {
             if (!guardrail.isEnabled(properties)) {
                 log.debug("Skipping disabled output guardrail: {}", guardrail.name());
                 continue;
             }
 
-            GuardrailOutputResult result = guardrail.process(current);
+            var result = guardrail.process(current);
 
             if (result.processedResponse() != null) {
                 current = current.withRawResponse(result.processedResponse());

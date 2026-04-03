@@ -9,12 +9,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
-import java.lang.reflect.Method;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * Auto-discovers tools at boot by scanning all Spring beans for methods annotated
@@ -41,10 +39,10 @@ public class ToolRegistry {
 
     @PostConstruct
     public void scan() {
-        String[] beanNames = applicationContext.getBeanDefinitionNames();
-        int count = 0;
+        var beanNames = applicationContext.getBeanDefinitionNames();
+        var count = 0;
 
-        for (String beanName : beanNames) {
+        for (var beanName : beanNames) {
             Object bean;
             try {
                 bean = applicationContext.getBean(beanName);
@@ -52,23 +50,22 @@ public class ToolRegistry {
                 continue;
             }
 
-            Class<?> beanClass = bean.getClass();
-            for (Method method : beanClass.getMethods()) {
-                AgentTool annotation = method.getAnnotation(AgentTool.class);
+            for (var method : bean.getClass().getMethods()) {
+                var annotation = method.getAnnotation(AgentTool.class);
                 if (annotation == null) continue;
 
-                String toolName = annotation.name().isBlank() ? method.getName() : annotation.name();
-                boolean requiresApproval = method.isAnnotationPresent(RequiresApproval.class);
-                String approvalMessage = "";
-                boolean dangerous = false;
+                var toolName = annotation.name().isBlank() ? method.getName() : annotation.name();
+                var requiresApproval = method.isAnnotationPresent(RequiresApproval.class);
+                var approvalMessage = "";
+                var dangerous = false;
 
                 if (requiresApproval) {
-                    RequiresApproval approval = method.getAnnotation(RequiresApproval.class);
+                    var approval = method.getAnnotation(RequiresApproval.class);
                     approvalMessage = approval.message();
                     dangerous = approval.dangerous();
                 }
 
-                ToolDefinition def = new ToolDefinition(
+                var def = new ToolDefinition(
                         toolName,
                         annotation.description(),
                         annotation.parallelizable(),
@@ -106,6 +103,6 @@ public class ToolRegistry {
         return tools.entrySet().stream()
                 .filter(e -> allowedTools.contains(e.getKey()))
                 .map(Map.Entry::getValue)
-                .collect(Collectors.toList());
+                .toList();
     }
 }

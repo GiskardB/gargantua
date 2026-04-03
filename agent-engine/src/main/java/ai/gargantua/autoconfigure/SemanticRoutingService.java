@@ -76,7 +76,7 @@ public class SemanticRoutingService {
 
         for (Map.Entry<String, Embedding> entry : skillEmbeddings.entrySet()) {
             double score = cosineSimilarity(messageEmbedding.vector(), entry.getValue().vector());
-            log.trace("Semantic score for skill '{}': {}", entry.getKey(), String.format("%.4f", score));
+            log.trace("Semantic score for skill '{}': {}", entry.getKey(), "%.4f".formatted(score));
             if (score > bestScore) {
                 bestScore = score;
                 bestSkill = entry.getKey();
@@ -84,13 +84,13 @@ public class SemanticRoutingService {
         }
 
         if (bestSkill != null && bestScore >= threshold) {
-            log.debug("Semantic match: skill='{}', score={}", bestSkill, String.format("%.4f", bestScore));
+            log.debug("Semantic match: skill='{}', score={}", bestSkill, "%.4f".formatted(bestScore));
             return RoutingResult.semantic(bestSkill, bestScore);
         }
 
         // Fall back to LLM routing
         log.debug("Semantic score below threshold ({} < {}), falling back to LLM routing",
-                bestScore >= 0 ? String.format("%.4f", bestScore) : "none", threshold);
+                bestScore >= 0 ? "%.4f".formatted(bestScore) : "none", threshold);
         String llmResult = routingService.routeWithLlm(userMessage, skills);
         return RoutingResult.llm(llmResult);
     }

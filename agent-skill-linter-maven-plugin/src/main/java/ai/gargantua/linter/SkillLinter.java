@@ -7,7 +7,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Core linting engine that scans skill directories for SKILL.md files
@@ -41,10 +40,10 @@ public class SkillLinter {
         if (ruleNames == null || ruleNames.isEmpty()) {
             this.activeRules = new ArrayList<>(ALL_RULES.values());
         } else {
-            this.activeRules = ruleNames.stream()
+            this.activeRules = new ArrayList<>(ruleNames.stream()
                     .map(ALL_RULES::get)
                     .filter(Objects::nonNull)
-                    .collect(Collectors.toList());
+                    .toList());
         }
     }
 

@@ -29,7 +29,7 @@ public class AgentKitExceptionHandler {
 
     @ExceptionHandler(SkillNotFoundException.class)
     public ProblemDetail handleSkillNotFound(SkillNotFoundException ex) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        var problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
         problem.setTitle("Skill Not Found");
         problem.setType(URI.create("https://agentkit.io/errors/skill-not-found"));
         return problem;
@@ -37,7 +37,7 @@ public class AgentKitExceptionHandler {
 
     @ExceptionHandler(GuardrailBlockedException.class)
     public ProblemDetail handleGuardrailBlocked(GuardrailBlockedException ex) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        var problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
         problem.setTitle("Guardrail Blocked");
         problem.setType(URI.create("https://agentkit.io/errors/guardrail-blocked"));
         problem.setProperty("guardrailName", ex.getGuardrailName());
@@ -47,7 +47,7 @@ public class AgentKitExceptionHandler {
 
     @ExceptionHandler(RateLimitExceededException.class)
     public ProblemDetail handleRateLimitExceeded(RateLimitExceededException ex) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
+        var problem = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
         problem.setTitle("Rate Limit Exceeded");
         problem.setType(URI.create("https://agentkit.io/errors/rate-limit-exceeded"));
         problem.setProperty("userId", ex.getUserId());
@@ -57,7 +57,7 @@ public class AgentKitExceptionHandler {
 
     @ExceptionHandler(TokenBudgetExceededException.class)
     public ProblemDetail handleTokenBudgetExceeded(TokenBudgetExceededException ex) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.PAYLOAD_TOO_LARGE, ex.getMessage());
+        var problem = ProblemDetail.forStatusAndDetail(HttpStatus.PAYLOAD_TOO_LARGE, ex.getMessage());
         problem.setTitle("Token Budget Exceeded");
         problem.setType(URI.create("https://agentkit.io/errors/token-budget-exceeded"));
         problem.setProperty("fixedTokens", ex.getFixedTokens());
@@ -67,7 +67,7 @@ public class AgentKitExceptionHandler {
 
     @ExceptionHandler(ApprovalExpiredException.class)
     public ProblemDetail handleApprovalExpired(ApprovalExpiredException ex) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.GONE, ex.getMessage());
+        var problem = ProblemDetail.forStatusAndDetail(HttpStatus.GONE, ex.getMessage());
         problem.setTitle("Approval Expired");
         problem.setType(URI.create("https://agentkit.io/errors/approval-expired"));
         problem.setProperty("requestId", ex.getRequestId());
@@ -76,7 +76,7 @@ public class AgentKitExceptionHandler {
 
     @ExceptionHandler(SchemaValidationException.class)
     public ProblemDetail handleSchemaValidation(SchemaValidationException ex) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        var problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
         problem.setTitle("Schema Validation Failed");
         problem.setType(URI.create("https://agentkit.io/errors/schema-validation"));
         problem.setProperty("skillName", ex.getSkillName());
@@ -86,7 +86,7 @@ public class AgentKitExceptionHandler {
 
     @ExceptionHandler(DryRunNotAllowedException.class)
     public ProblemDetail handleDryRunNotAllowed(DryRunNotAllowedException ex) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        var problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
         problem.setTitle("Dry Run Not Allowed");
         problem.setType(URI.create("https://agentkit.io/errors/dry-run-not-allowed"));
         return problem;
@@ -94,7 +94,7 @@ public class AgentKitExceptionHandler {
 
     @ExceptionHandler(EvalSuiteNotFoundException.class)
     public ProblemDetail handleEvalSuiteNotFound(EvalSuiteNotFoundException ex) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        var problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
         problem.setTitle("Eval Suite Not Found");
         problem.setType(URI.create("https://agentkit.io/errors/eval-suite-not-found"));
         problem.setProperty("skillName", ex.getSkillName());
@@ -103,7 +103,7 @@ public class AgentKitExceptionHandler {
 
     @ExceptionHandler(NoResourceFoundException.class)
     public ProblemDetail handleNotFound(NoResourceFoundException ex) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        var problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
         problem.setTitle("Not Found");
         problem.setType(URI.create("https://agentkit.io/errors/not-found"));
         return problem;
@@ -112,7 +112,7 @@ public class AgentKitExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleGeneric(Exception ex) {
         log.error("Unhandled exception", ex);
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+        var problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred");
         problem.setTitle("Internal Server Error");
         problem.setType(URI.create("https://agentkit.io/errors/internal"));

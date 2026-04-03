@@ -74,7 +74,7 @@ public class EvalAdminController {
         evalReportRepository.save(reportWithComparison);
 
         log.info("[Eval] Completed skill='{}': score={}, passed={}, failed={}, partial={}, threshold={}",
-                skillName, String.format("%.2f", reportWithComparison.overallScore()),
+                skillName, "%.2f".formatted(reportWithComparison.overallScore()),
                 reportWithComparison.passed(), reportWithComparison.failed(),
                 reportWithComparison.partial(), failThreshold);
 
@@ -108,7 +108,7 @@ public class EvalAdminController {
                 }
 
                 log.info("[Eval] Skill '{}': score={}, verdict={}",
-                        skill.name(), String.format("%.2f", reportWithComparison.overallScore()),
+                        skill.name(), "%.2f".formatted(reportWithComparison.overallScore()),
                         reportWithComparison.overallScore() >= failThreshold ? "PASS" : "FAIL");
             } catch (EvalSuiteNotFoundException e) {
                 log.debug("[Eval] No eval suite for skill '{}', skipping", skill.name());

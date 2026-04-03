@@ -8,8 +8,10 @@ import org.yaml.snakeyaml.Yaml;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Parses SKILL.md files consisting of YAML frontmatter delimited by "---" lines
@@ -37,11 +39,10 @@ public class SkillMdParser {
 
         var allowedRolesStr = getStringList(metadata, "allowed-roles");
         var allowedRoles = allowedRolesStr.isEmpty()
-                ? java.util.Set.<String>of()
-                : new java.util.HashSet<>(allowedRolesStr);
+                ? Set.<String>of()
+                : Collections.unmodifiableSet(new HashSet<>(allowedRolesStr));
 
-        return new SkillMeta(name, description, version, active, hasSchema, domain, source,
-                allowedRoles.isEmpty() ? java.util.Set.of() : java.util.Collections.unmodifiableSet(allowedRoles));
+        return new SkillMeta(name, description, version, active, hasSchema, domain, source, allowedRoles);
     }
 
     /**
@@ -86,8 +87,8 @@ public class SkillMdParser {
 
         var allowedRolesCard = getStringList(metadata, "allowed-roles");
         var allowedRolesSet = allowedRolesCard.isEmpty()
-                ? java.util.Set.<String>of()
-                : java.util.Collections.unmodifiableSet(new java.util.HashSet<>(allowedRolesCard));
+                ? Set.<String>of()
+                : Collections.unmodifiableSet(new HashSet<>(allowedRolesCard));
 
         var meta = new SkillMeta(name, description, version, active, hasSchema, domain, source, allowedRolesSet);
 
@@ -167,16 +168,12 @@ public class SkillMdParser {
     @SuppressWarnings("unchecked")
     private Map<String, Object> getMap(Map<String, Object> map, String key) {
         if (map == null) return Collections.emptyMap();
-        Object val = map.get(key);
-        if (val instanceof Map<?, ?>) {
-            return (Map<String, Object>) val;
-        }
-        return Collections.emptyMap();
+        return map.get(key) instanceof Map<?, ?> m ? (Map<String, Object>) m : Collections.emptyMap();
     }
 
     private String getString(Map<String, Object> map, String key, String defaultValue) {
         if (map == null) return defaultValue;
-        Object val = map.get(key);
+        var val = map.get(key);
         return val != null ? val.toString() : defaultValue;
     }
 

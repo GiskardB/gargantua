@@ -18,36 +18,26 @@ public class PromptBuilder {
     public String build(SkillCard skillCard, ComposedMemory memory, EnricherContext enricherContext) {
         var sb = new StringBuilder();
 
-        // Skill system prompt
         if (skillCard != null && skillCard.systemPrompt() != null) {
             sb.append(skillCard.systemPrompt());
         }
 
-        // Enricher context (additional context sections)
         if (enricherContext != null && enricherContext.attributes() != null) {
-            for (var entry : enricherContext.attributes().entrySet()) {
-                if (entry.getValue() != null && !entry.getValue().isBlank()) {
-                    sb.append("\n\n## %s\n%s".formatted(entry.getKey(), entry.getValue()));
+            enricherContext.attributes().forEach((key, value) -> {
+                if (value != null && !value.isBlank()) {
+                    sb.append("\n\n## %s\n%s".formatted(key, value));
                 }
-            }
+            });
         }
 
-        // Memory sections
         if (memory != null) {
-            // Episodic summaries
             if (memory.episodicSummaries() != null && !memory.episodicSummaries().isEmpty()) {
                 sb.append("\n\n## Previous Conversations\n");
-                for (var summary : memory.episodicSummaries()) {
-                    sb.append("- %s\n".formatted(summary.summary()));
-                }
+                memory.episodicSummaries().forEach(s -> sb.append("- %s\n".formatted(s.summary())));
             }
-
-            // Knowledge segments
             if (memory.knowledgeSegments() != null && !memory.knowledgeSegments().isEmpty()) {
                 sb.append("\n\n## User Knowledge\n");
-                for (var segment : memory.knowledgeSegments()) {
-                    sb.append("### %s\n%s\n".formatted(segment.segmentKey(), segment.content()));
-                }
+                memory.knowledgeSegments().forEach(s -> sb.append("### %s\n%s\n".formatted(s.segmentKey(), s.content())));
             }
         }
 

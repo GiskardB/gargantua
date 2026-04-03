@@ -18,7 +18,6 @@ import ai.gargantua.core.orchestrator.EnricherContext;
 import ai.gargantua.core.orchestrator.OrchestratorEngine;
 import ai.gargantua.core.orchestrator.RoutingResult;
 import ai.gargantua.core.orchestrator.TokenBudgetManager;
-import ai.gargantua.core.session.DryRunContext;
 import ai.gargantua.core.skill.SkillCard;
 import ai.gargantua.core.skill.SkillMeta;
 import ai.gargantua.core.skill.SkillRegistry;
@@ -130,10 +129,7 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
                 request.forceSkill());
 
         // 1. Extract dry-run context
-        var dryRunContext = request.dryRunContext() != null
-                ? request.dryRunContext()
-                : DryRunContext.inactive();
-        var isDryRun = dryRunContext.active();
+        var isDryRun = request.dryRunContext() != null && request.dryRunContext().active();
         if (isDryRun) {
             log.info("[Pipeline] Dry-run mode ACTIVE — no persistence, no side effects");
         }
@@ -189,7 +185,7 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
             routingResult = semanticRoutingService.route(request.message(), skills);
             log.info("[Pipeline] Step 4 — Routing: skill='{}', method={}, confidence={}",
                     routingResult.skillName(), routingResult.method(),
-                    String.format("%.3f", routingResult.confidence()));
+                    "%.3f".formatted(routingResult.confidence()));
         }
 
         // 5. Load skill card
@@ -352,30 +348,8 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
             if (mongoTemplate != null) {
                 try {
                     var now = Instant.now();
-                    var userMsg = new HashMap<String, Object>();
-                    userMsg.put("userId", request.userId());
-                    userMsg.put("sessionId", effectiveSessionId);
-                    userMsg.put("role", "user");
-                    userMsg.put("content", request.message());
-                    userMsg.put("timestamp", now);
-                    mongoTemplate.insert(new org.bson.Document(userMsg), "chat_messages");
-                } catch (Exception e) {
-                    log.warn("Failed to persist user chat message: {}", e.getMessage());
-                }
-                try {
-                    var now = Instant.now();
-                    var assistantMsg = new HashMap<String, Object>();
-                    assistantMsg.put("userId", request.userId());
-                    assistantMsg.put("sessionId", effectiveSessionId);
-                    assistantMsg.put("role", "assistant");
-                    assistantMsg.put("content", processedResponse);
-                    assistantMsg.put("timestamp", now);
-                    mongoTemplate.insert(new org.bson.Document(assistantMsg), "chat_messages");
-                } catch (Exception e) {
-                    log.warn("Failed to persist assistant chat message: {}", e.getMessage());
-                }
-                try {
-                    var now = Instant.now();
+                    persistChatMessage(request.userId(), effectiveSessionId, "user", request.message(), now);
+                    persistChatMessage(request.userId(), effectiveSessionId, "assistant", processedResponse, now);
                     mongoTemplate.upsert(
                             Query.query(Criteria.where("userId").is(request.userId())
                                     .and("sessionId").is(effectiveSessionId)),
@@ -387,7 +361,7 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
                             "chat_sessions"
                     );
                 } catch (Exception e) {
-                    log.warn("Failed to persist chat session: {}", e.getMessage());
+                    log.warn("Failed to persist chat history: {}", e.getMessage());
                 }
             }
         }
@@ -427,5 +401,15 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
                 response.totalTokens(), durationMs, isDryRun);
 
         return response;
+    }
+
+    private void persistChatMessage(String userId, String sessionId, String role, String content, Instant timestamp) {
+        var doc = new HashMap<String, Object>();
+        doc.put("userId", userId);
+        doc.put("sessionId", sessionId);
+        doc.put("role", role);
+        doc.put("content", content);
+        doc.put("timestamp", timestamp);
+        mongoTemplate.insert(new org.bson.Document(doc), "chat_messages");
     }
 }
