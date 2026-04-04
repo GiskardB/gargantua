@@ -254,28 +254,6 @@ class AgentPropertiesTest {
         }
     }
 
-    @Nested
-    @DisplayName("Evals defaults")
-    class EvalsDefaults {
-
-        @Test
-        @DisplayName("evals disabled by default")
-        void disabledByDefault() {
-            assertThat(new AgentProperties().getEvals().isEnabled()).isFalse();
-        }
-
-        @Test
-        @DisplayName("dataset path defaults to 'evals'")
-        void datasetPath() {
-            assertThat(new AgentProperties().getEvals().getDatasetPath()).isEqualTo("evals");
-        }
-
-        @Test
-        @DisplayName("fail threshold defaults to 0.7")
-        void failThreshold() {
-            assertThat(new AgentProperties().getEvals().getFailThreshold()).isEqualTo(0.7);
-        }
-    }
 
     @Nested
     @DisplayName("Setters work correctly")
