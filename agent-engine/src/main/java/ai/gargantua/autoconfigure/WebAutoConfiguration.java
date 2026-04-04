@@ -1,7 +1,6 @@
 package ai.gargantua.autoconfigure;
 
 import ai.gargantua.adapters.cost.MongoCostTrackingRepository;
-import ai.gargantua.adapters.eval.MongoEvalReportRepository;
 import ai.gargantua.adapters.web.AgentKitExceptionHandler;
 import ai.gargantua.adapters.web.ApprovalController;
 import ai.gargantua.adapters.web.CapabilitiesController;
