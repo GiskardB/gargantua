@@ -59,27 +59,6 @@ class ExceptionsTest {
         }
     }
 
-    // ── EvalSuiteNotFoundException ───────────────────────────────────────────
-
-    @Nested
-    @DisplayName("EvalSuiteNotFoundException")
-    class EvalSuiteNotFoundExceptionTests {
-
-        @Test
-        @DisplayName("stores skillName and formats message")
-        void storesSkillName() {
-            EvalSuiteNotFoundException ex = new EvalSuiteNotFoundException("greeting");
-            assertEquals("greeting", ex.getSkillName());
-            assertTrue(ex.getMessage().contains("greeting"));
-            assertTrue(ex.getMessage().contains("not found"));
-        }
-
-        @Test
-        @DisplayName("throws NullPointerException for null skillName")
-        void nullSkillName() {
-            assertThrows(NullPointerException.class, () -> new EvalSuiteNotFoundException(null));
-        }
-    }
 
     // ── GuardrailBlockedException ───────────────────────────────────────────
 

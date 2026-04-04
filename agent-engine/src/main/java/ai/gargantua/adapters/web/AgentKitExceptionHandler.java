@@ -2,7 +2,6 @@ package ai.gargantua.adapters.web;
 
 import ai.gargantua.core.exception.ApprovalExpiredException;
 import ai.gargantua.core.exception.DryRunNotAllowedException;
-import ai.gargantua.core.exception.EvalSuiteNotFoundException;
 import ai.gargantua.core.exception.GuardrailBlockedException;
 import ai.gargantua.core.exception.RateLimitExceededException;
 import ai.gargantua.core.exception.SchemaValidationException;
@@ -92,14 +91,6 @@ public class AgentKitExceptionHandler {
         return problem;
     }
 
-    @ExceptionHandler(EvalSuiteNotFoundException.class)
-    public ProblemDetail handleEvalSuiteNotFound(EvalSuiteNotFoundException ex) {
-        var problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
-        problem.setTitle("Eval Suite Not Found");
-        problem.setType(URI.create("https://agentkit.io/errors/eval-suite-not-found"));
-        problem.setProperty("skillName", ex.getSkillName());
-        return problem;
-    }
 
     @ExceptionHandler(NoResourceFoundException.class)
     public ProblemDetail handleNotFound(NoResourceFoundException ex) {

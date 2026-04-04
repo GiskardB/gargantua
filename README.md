@@ -104,7 +104,7 @@ Every feature has dedicated documentation — click the link to dive deeper.
 
 | Feature | What it does | Docs |
 |---------|-------------|------|
-| **Eval Framework** | LLM-as-Judge: test agent behavior against golden datasets with parallel execution for faster runs. CI fails if quality drops below threshold. | [Eval Framework](docs/eval-framework.md) |
+| **Eval Framework** | Standalone LLM-as-Judge tool (`agent-eval.jar`). Calls agents via REST, judges with LLM, produces reports. CI-ready exit codes. | [Eval Framework](docs/eval-framework.md) |
 | **Cost Tracking** | Per-request token usage and cost, broken down by skill, user, provider. Admin dashboards. | [Extending](docs/extending.md) |
 | **Observability** | OpenTelemetry spans + Micrometer metrics with GenAI semantic conventions. | [Deployment](docs/deployment.md) |
 | **GraalVM Native** | < 100ms startup, ~50MB image. Multi-stage Dockerfile included. | [Deployment](docs/deployment.md) |
@@ -569,8 +569,6 @@ gargantua/
 | `POST` | `/api/admin/skills/reload` | Reload skills |
 | `GET` | `/api/admin/guardrails` | Guardrail pipeline |
 | `POST` | `/api/admin/guardrails/{name}/toggle` | Toggle guardrail |
-| `POST` | `/api/admin/evals/run/{skillName}` | Run eval suite |
-| `GET` | `/api/admin/evals/reports/{skillName}/latest` | Latest eval report |
 | `GET` | `/api/admin/costs/summary` | Cost summary |
 | `GET` | `/api/admin/llm/rules` | LLM routing rules |
 | `POST` | `/api/admin/llm/simulate` | Simulate LLM routing |

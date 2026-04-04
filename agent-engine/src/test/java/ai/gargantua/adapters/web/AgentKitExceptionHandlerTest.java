@@ -2,7 +2,6 @@ package ai.gargantua.adapters.web;
 
 import ai.gargantua.core.exception.ApprovalExpiredException;
 import ai.gargantua.core.exception.DryRunNotAllowedException;
-import ai.gargantua.core.exception.EvalSuiteNotFoundException;
 import ai.gargantua.core.exception.GuardrailBlockedException;
 import ai.gargantua.core.exception.RateLimitExceededException;
 import ai.gargantua.core.exception.SchemaValidationException;
@@ -150,20 +149,6 @@ class AgentKitExceptionHandlerTest {
         assertThat(problem.getType().toString()).isEqualTo("https://agentkit.io/errors/dry-run-not-allowed");
     }
 
-    // --- EvalSuiteNotFoundException ---
-
-    @Test
-    @DisplayName("handleEvalSuiteNotFound returns 404 with skill name")
-    void handleEvalSuiteNotFound() {
-        var ex = new EvalSuiteNotFoundException("nutrition-tracker");
-
-        ProblemDetail problem = handler.handleEvalSuiteNotFound(ex);
-
-        assertThat(problem.getStatus()).isEqualTo(HttpStatus.NOT_FOUND.value());
-        assertThat(problem.getTitle()).isEqualTo("Eval Suite Not Found");
-        assertThat(problem.getType().toString()).isEqualTo("https://agentkit.io/errors/eval-suite-not-found");
-        assertThat(problem.getProperties()).containsEntry("skillName", "nutrition-tracker");
-    }
 
     // --- NoResourceFoundException ---
 

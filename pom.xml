@@ -19,6 +19,7 @@
     <module>agent-example-fitcoach</module>
     <module>agent-skill-linter-maven-plugin</module>
     <module>agent-archetype</module>
+    <module>agent-eval</module>
   </modules>
 
   <parent>

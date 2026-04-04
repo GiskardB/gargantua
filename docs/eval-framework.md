@@ -25,7 +25,7 @@ The approach is called **LLM-as-Judge**: a second, cheaper LLM (the "judge") rea
 ## How it works, step by step
 
 1. You write a **golden dataset** — a list of test inputs with expected and forbidden behaviors
-2. The `EvalRunner` sends each input to the agent (in dry-run mode), executing cases in **parallel** using virtual threads for faster runs
+2. The standalone `agent-eval.jar` sends each input to the agent via REST (`POST /api/agent/chat`), executing cases in **parallel** using virtual threads
 3. The agent responds normally (routes to a skill, calls tools, generates a response)
 4. The **judge LLM** compares the agent's response + tool calls against your expectations
 5. The judge returns a verdict (PASS / FAIL / PARTIAL) with a score and reasoning
@@ -118,10 +118,10 @@ src/main/resources/skills/
 
 ```bash
 # Run eval suite for one skill
-curl -X POST http://localhost:8080/api/admin/evals/run/weather-skill
+java -jar agent-eval.jar --evals-dir ./evals --agent-url http://localhost:8080
 
 # Run evals for ALL skills that have evals.json
-curl -X POST http://localhost:8080/api/admin/evals/run
+java -jar agent-eval.jar --evals-dir ./evals --agent-url http://localhost:8080
 ```
 
 Both endpoints return the full `EvalReport` as JSON.

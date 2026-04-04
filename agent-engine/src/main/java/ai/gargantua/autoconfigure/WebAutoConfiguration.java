@@ -10,7 +10,6 @@ import ai.gargantua.adapters.web.ChatExportController;
 import ai.gargantua.adapters.web.ChatHistoryController;
 import ai.gargantua.adapters.web.ChatStreamController;
 import ai.gargantua.adapters.web.CostAdminController;
-import ai.gargantua.adapters.web.EvalAdminController;
 import ai.gargantua.adapters.web.GuardrailAdminController;
 import ai.gargantua.adapters.web.LlmRoutingAdminController;
 import ai.gargantua.adapters.web.OpenApiConfig;
@@ -53,7 +52,6 @@ import java.util.List;
                 CapabilitiesAutoConfiguration.class,
                 GuardrailAutoConfiguration.class,
                 CostTrackingAutoConfiguration.class,
-                EvalAutoConfiguration.class,
                 ToolCacheAutoConfiguration.class,
                 AuditAutoConfiguration.class,
                 EmbeddedProfileAutoConfiguration.class
@@ -161,17 +159,6 @@ public class WebAutoConfiguration {
         return new ChatExportController(mongoTemplate);
     }
 
-    @Bean
-    @ConditionalOnMissingBean(EvalAdminController.class)
-    @ConditionalOnBean(MongoEvalReportRepository.class)
-    public EvalAdminController evalAdminController(
-            MongoEvalReportRepository evalReportRepository,
-            SkillRegistry skillRegistry,
-            EvalRunner evalRunner,
-            AgentProperties properties) {
-        return new EvalAdminController(evalReportRepository, skillRegistry,
-                evalRunner, properties.getEvals().getFailThreshold());
-    }
 
     @Bean
     @ConditionalOnMissingBean(CostAdminController.class)

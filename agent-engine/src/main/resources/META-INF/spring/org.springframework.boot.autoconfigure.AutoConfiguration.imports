@@ -6,7 +6,6 @@ ai.gargantua.autoconfigure.TokenBudgetAutoConfiguration
 ai.gargantua.autoconfigure.AgentAutoConfiguration
 ai.gargantua.autoconfigure.HitlAutoConfiguration
 ai.gargantua.autoconfigure.CostTrackingAutoConfiguration
-ai.gargantua.autoconfigure.EvalAutoConfiguration
 ai.gargantua.autoconfigure.DryRunAutoConfiguration
 ai.gargantua.autoconfigure.CapabilitiesAutoConfiguration
 ai.gargantua.autoconfigure.ToolCacheAutoConfiguration

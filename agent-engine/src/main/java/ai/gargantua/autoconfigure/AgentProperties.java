@@ -11,7 +11,7 @@ import java.util.Map;
  * Master configuration properties for the Gargantua Agent Framework,
  * bound to the {@code agent.*} prefix. Controls all aspects of the agent:
  * API metadata, skill discovery, LLM providers, routing, memory, guardrails,
- * HITL, cost tracking, evals, dry-run, chat history, observability, and MCP.
+ * HITL, cost tracking, dry-run, chat history, observability, and MCP.
  */
 @ConfigurationProperties(prefix = "agent")
 public class AgentProperties {
@@ -25,7 +25,6 @@ public class AgentProperties {
     private Output output = new Output();
     private Hitl hitl = new Hitl();
     private CostTracking costTracking = new CostTracking();
-    private Evals evals = new Evals();
     private DryRun dryRun = new DryRun();
     private ChatHistory chatHistory = new ChatHistory();
     private Observability observability = new Observability();
@@ -64,8 +63,6 @@ public class AgentProperties {
     public CostTracking getCostTracking() { return costTracking; }
     public void setCostTracking(CostTracking costTracking) { this.costTracking = costTracking; }
 
-    public Evals getEvals() { return evals; }
-    public void setEvals(Evals evals) { this.evals = evals; }
 
     public DryRun getDryRun() { return dryRun; }
     public void setDryRun(DryRun dryRun) { this.dryRun = dryRun; }
@@ -433,28 +430,6 @@ public class AgentProperties {
         public void setPricing(Map<String, Double> pricing) { this.pricing = pricing; }
     }
 
-    public static class Evals {
-        private boolean enabled = false;
-        private String judgeModel = "gpt-4o";
-        private String datasetPath = "evals";
-        private int reportTtlDays = 30;
-        private double failThreshold = 0.7;
-
-        public boolean isEnabled() { return enabled; }
-        public void setEnabled(boolean enabled) { this.enabled = enabled; }
-
-        public String getJudgeModel() { return judgeModel; }
-        public void setJudgeModel(String judgeModel) { this.judgeModel = judgeModel; }
-
-        public String getDatasetPath() { return datasetPath; }
-        public void setDatasetPath(String datasetPath) { this.datasetPath = datasetPath; }
-
-        public int getReportTtlDays() { return reportTtlDays; }
-        public void setReportTtlDays(int reportTtlDays) { this.reportTtlDays = reportTtlDays; }
-
-        public double getFailThreshold() { return failThreshold; }
-        public void setFailThreshold(double failThreshold) { this.failThreshold = failThreshold; }
-    }
 
     public static class DryRun {
         private boolean enabled = false;
