@@ -21,8 +21,12 @@ import ai.gargantua.adapters.web.WebMvcConfig;
 import ai.gargantua.core.guardrail.InputGuardrail;
 import ai.gargantua.core.guardrail.OutputGuardrail;
 import ai.gargantua.core.hitl.ApprovalStore;
+import ai.gargantua.core.memory.WorkingMemoryPort;
+import ai.gargantua.core.orchestrator.ContextEnricher;
 import ai.gargantua.core.orchestrator.OrchestratorEngine;
+import ai.gargantua.core.orchestrator.TokenBudgetManager;
 import ai.gargantua.core.skill.SkillRegistry;
+import ai.gargantua.memory.composer.MemoryComposer;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -76,8 +80,23 @@ public class WebAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean(ChatStreamController.class)
-    public ChatStreamController chatStreamController(OrchestratorEngine orchestratorEngine) {
-        return new ChatStreamController(orchestratorEngine);
+    public ChatStreamController chatStreamController(
+            OrchestratorEngine orchestratorEngine,
+            LlmProviderFactory llmProviderFactory,
+            GuardrailPipeline guardrailPipeline,
+            SemanticRoutingService semanticRoutingService,
+            TokenBudgetManager tokenBudgetManager,
+            PromptBuilder promptBuilder,
+            ToolRegistry toolRegistry,
+            AgentProperties properties,
+            List<ContextEnricher> contextEnrichers,
+            @Nullable SkillRegistry skillRegistry,
+            @Nullable MemoryComposer memoryComposer,
+            @Nullable WorkingMemoryPort workingMemoryPort) {
+        return new ChatStreamController(orchestratorEngine, llmProviderFactory,
+                guardrailPipeline, semanticRoutingService, tokenBudgetManager,
+                promptBuilder, toolRegistry, properties, contextEnrichers,
+                skillRegistry, memoryComposer, workingMemoryPort);
     }
 
     @Bean

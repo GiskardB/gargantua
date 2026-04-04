@@ -22,6 +22,12 @@ import ai.gargantua.core.skill.SkillCard;
 import ai.gargantua.core.skill.SkillMeta;
 import ai.gargantua.core.skill.SkillRegistry;
 import ai.gargantua.core.tool.ToolDefinition;
+import dev.langchain4j.agent.tool.ToolSpecification;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.ToolExecutionResultMessage;
+import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.request.ChatRequest;
+import dev.langchain4j.model.chat.response.ChatResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -34,6 +40,7 @@ import org.springframework.stereotype.Component;
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -298,7 +305,7 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
         );
         var allocation = tokenBudgetManager.allocate(budgetRequest);
 
-        // 9. LLM call via LangChain4j
+        // 9. LLM call via LangChain4j with tool calling loop
         var llmCtx = new LlmRoutingContext(
                 request.userId(),
                 effectiveSessionId,
@@ -313,13 +320,18 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
                 request.contextAttributes() != null ? request.contextAttributes() : Map.of()
         );
 
-        var rawResponse = llmProviderFactory.generate(
-                allocation.systemPrompt(),
-                request.message(),
-                skillCard,
-                llmCtx,
-                memory.workingMessages()
-        );
+        // Build tool specifications for allowed tools
+        var toolSpecs = toolRegistry.getToolSpecifications(skillCard.allowedTools());
+        var toolsCalled = new ArrayList<String>();
+
+        String alias = llmProviderFactory.resolveModelAlias(skillCard, llmCtx);
+        ChatModel model = llmProviderFactory.getModel(alias);
+
+        var messages = llmProviderFactory.buildMessages(
+                allocation.systemPrompt(), request.message(), memory.workingMessages());
+
+        var rawResponse = executeLlmWithTools(model, messages, toolSpecs, toolsCalled);
+        log.info("[Pipeline] Step 9 — LLM call complete, tools called: {}", toolsCalled);
 
         // 10. Output guardrails
         var outputCtx = new GuardrailOutputContext(
@@ -375,7 +387,7 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
                 processedResponse,
                 effectiveSessionId,
                 routingResult.skillName(),
-                List.of(),
+                toolsCalled,
                 routingResult.method(),
                 routingResult.confidence(),
                 inputTokens,
@@ -401,6 +413,55 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
                 response.totalTokens(), durationMs, isDryRun);
 
         return response;
+    }
+
+    /**
+     * Execute the LLM with a tool calling loop. The LLM may request tool executions;
+     * each tool result is fed back until the LLM produces a final text response.
+     */
+    private String executeLlmWithTools(ChatModel model,
+                                        List<dev.langchain4j.data.message.ChatMessage> messages,
+                                        List<ToolSpecification> toolSpecs,
+                                        List<String> toolsCalled) {
+        int maxIterations = 10;
+
+        for (int i = 0; i < maxIterations; i++) {
+            ChatRequest.Builder requestBuilder = ChatRequest.builder()
+                    .messages(messages);
+            if (toolSpecs != null && !toolSpecs.isEmpty()) {
+                requestBuilder.toolSpecifications(toolSpecs);
+            }
+
+            ChatResponse chatResponse = model.chat(requestBuilder.build());
+            AiMessage aiMessage = chatResponse.aiMessage();
+            messages.add(aiMessage);
+
+            if (!aiMessage.hasToolExecutionRequests()) {
+                // No more tool calls — return the final text
+                return aiMessage.text() != null ? aiMessage.text() : "";
+            }
+
+            // Execute each tool call and feed results back
+            for (var toolRequest : aiMessage.toolExecutionRequests()) {
+                String toolName = toolRequest.name();
+                toolsCalled.add(toolName);
+                log.info("[Pipeline] Tool call: {} with args: {}", toolName, toolRequest.arguments());
+
+                String result = toolRegistry.executeTool(toolName, toolRequest.arguments());
+                log.debug("[Pipeline] Tool result for {}: {}", toolName,
+                        result != null && result.length() > 200 ? result.substring(0, 200) + "..." : result);
+
+                messages.add(ToolExecutionResultMessage.from(toolRequest, result));
+            }
+        }
+
+        // Max iterations reached — return whatever text is available
+        log.warn("[Pipeline] Tool calling loop reached max iterations ({})", maxIterations);
+        var lastMsg = messages.getLast();
+        if (lastMsg instanceof AiMessage ai) {
+            return ai.text() != null ? ai.text() : "Max tool iterations reached.";
+        }
+        return "Max tool iterations reached.";
     }
 
     private void persistChatMessage(String userId, String sessionId, String role, String content, Instant timestamp) {

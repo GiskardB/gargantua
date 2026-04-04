@@ -19,6 +19,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
 
 /**
  * Runs evaluation suites for skills. Executes each case through the orchestrator
@@ -131,94 +133,32 @@ public class EvalRunner {
     }
 
     /**
-     * Run the eval suite for a given skill.
+     * Run the eval suite for a given skill. Cases are executed in parallel
+     * using virtual threads for improved throughput.
      */
     public EvalReport runSuite(String skillName) {
         List<EvalCase> cases = datasetLoader.load(skillName);
-        List<EvalResult> results = new ArrayList<>();
+
+        // Execute all eval cases in parallel using virtual threads
+        var executor = Executors.newVirtualThreadPerTaskExecutor();
+        var futures = cases.stream()
+                .map(evalCase -> CompletableFuture.supplyAsync(
+                        () -> runSingleCase(evalCase, skillName), executor))
+                .toList();
+        var results = futures.stream()
+                .map(CompletableFuture::join)
+                .toList();
+        executor.close();
 
         int passed = 0;
         int failed = 0;
         int partial = 0;
-
-        for (EvalCase evalCase : cases) {
-            long start = System.currentTimeMillis();
-
-            // Run through orchestrator in dry-run mode with super-admin role
-            // to bypass RBAC restrictions during evaluation
-            AgentRequest request = AgentRequest.builder()
-                    .message(evalCase.input())
-                    .userId("eval-runner")
-                    .sessionId("eval-" + evalCase.id() + "-" + System.currentTimeMillis())
-                    .forceSkill(skillName)
-                    .dryRunContext(DryRunContext.active(Map.of()))
-                    .securityContext(new SecurityContext("eval-runner", null, Set.of("super-admin")))
-                    .build();
-
-            AgentResponse response;
-            try {
-                response = orchestratorEngine.invoke(request);
-            } catch (Exception e) {
-                log.warn("Eval case '{}' threw exception: {}", evalCase.id(), e.getMessage());
-                results.add(new EvalResult(
-                        evalCase.id(), evalCase.description(), evalCase.input(),
-                        "ERROR: " + e.getMessage(), List.of(),
-                        EvalVerdict.FAIL, 0.0, "Exception during execution",
-                        List.of(), evalCase.expectedBehaviors(),
-                        System.currentTimeMillis() - start
-                ));
-                failed++;
-                continue;
+        for (var result : results) {
+            switch (result.verdict()) {
+                case PASS -> passed++;
+                case FAIL -> failed++;
+                case PARTIAL -> partial++;
             }
-
-            long duration = System.currentTimeMillis() - start;
-
-            // Use LLM-as-judge via the routing model (cheap/fast)
-            List<String> passedBehaviors = new ArrayList<>();
-            List<String> failedBehaviors = new ArrayList<>();
-            double score;
-            EvalVerdict verdict;
-            String judgeReason;
-
-            try {
-                ChatModel judgeModel = llmProviderFactory.getRoutingModel();
-                String judgePrompt = buildJudgePrompt(evalCase, response.text());
-                String judgeOutput = llmProviderFactory.generate(judgeModel, JUDGE_SYSTEM_PROMPT, judgePrompt);
-                var judgeResult = parseJudgeOutput(judgeOutput, evalCase.expectedBehaviors());
-
-                score = judgeResult.score;
-                passedBehaviors = judgeResult.passedBehaviors;
-                failedBehaviors = judgeResult.failedBehaviors;
-                judgeReason = judgeResult.reason;
-            } catch (Exception e) {
-                log.warn("LLM judge failed for case '{}', falling back to keyword matching: {}",
-                        evalCase.id(), e.getMessage());
-                // Fallback to keyword matching when LLM judge is unavailable
-                var fallback = keywordJudge(evalCase, response.text());
-                score = fallback.score;
-                passedBehaviors = fallback.passedBehaviors;
-                failedBehaviors = fallback.failedBehaviors;
-                judgeReason = "Keyword fallback: " + fallback.reason;
-            }
-
-            if (score >= 1.0) {
-                verdict = EvalVerdict.PASS;
-                passed++;
-            } else if (score <= 0.0) {
-                verdict = EvalVerdict.FAIL;
-                failed++;
-            } else {
-                verdict = EvalVerdict.PARTIAL;
-                partial++;
-            }
-
-            results.add(new EvalResult(
-                    evalCase.id(), evalCase.description(), evalCase.input(),
-                    response.text(), response.toolsCalled(),
-                    verdict, score, judgeReason,
-                    passedBehaviors, failedBehaviors,
-                    duration
-            ));
         }
 
         double overallScore = results.isEmpty() ? 0.0 :
@@ -235,6 +175,80 @@ public class EvalRunner {
                 overallScore,
                 results,
                 null // comparison with previous run not yet implemented
+        );
+    }
+
+    /**
+     * Run a single eval case through the orchestrator and judge the result.
+     */
+    private EvalResult runSingleCase(EvalCase evalCase, String skillName) {
+        long start = System.currentTimeMillis();
+
+        AgentRequest request = AgentRequest.builder()
+                .message(evalCase.input())
+                .userId("eval-runner")
+                .sessionId("eval-" + evalCase.id() + "-" + System.currentTimeMillis())
+                .forceSkill(skillName)
+                .dryRunContext(DryRunContext.active(Map.of()))
+                .securityContext(new SecurityContext("eval-runner", null, Set.of("super-admin")))
+                .build();
+
+        AgentResponse response;
+        try {
+            response = orchestratorEngine.invoke(request);
+        } catch (Exception e) {
+            log.warn("Eval case '{}' threw exception: {}", evalCase.id(), e.getMessage());
+            return new EvalResult(
+                    evalCase.id(), evalCase.description(), evalCase.input(),
+                    "ERROR: " + e.getMessage(), List.of(),
+                    EvalVerdict.FAIL, 0.0, "Exception during execution",
+                    List.of(), evalCase.expectedBehaviors(),
+                    System.currentTimeMillis() - start
+            );
+        }
+
+        long duration = System.currentTimeMillis() - start;
+
+        List<String> passedBehaviors;
+        List<String> failedBehaviors;
+        double score;
+        String judgeReason;
+
+        try {
+            ChatModel judgeModel = llmProviderFactory.getRoutingModel();
+            String judgePrompt = buildJudgePrompt(evalCase, response.text());
+            String judgeOutput = llmProviderFactory.generate(judgeModel, JUDGE_SYSTEM_PROMPT, judgePrompt);
+            var judgeResult = parseJudgeOutput(judgeOutput, evalCase.expectedBehaviors());
+
+            score = judgeResult.score;
+            passedBehaviors = judgeResult.passedBehaviors;
+            failedBehaviors = judgeResult.failedBehaviors;
+            judgeReason = judgeResult.reason;
+        } catch (Exception e) {
+            log.warn("LLM judge failed for case '{}', falling back to keyword matching: {}",
+                    evalCase.id(), e.getMessage());
+            var fallback = keywordJudge(evalCase, response.text());
+            score = fallback.score;
+            passedBehaviors = fallback.passedBehaviors;
+            failedBehaviors = fallback.failedBehaviors;
+            judgeReason = "Keyword fallback: " + fallback.reason;
+        }
+
+        EvalVerdict verdict;
+        if (score >= 1.0) {
+            verdict = EvalVerdict.PASS;
+        } else if (score <= 0.0) {
+            verdict = EvalVerdict.FAIL;
+        } else {
+            verdict = EvalVerdict.PARTIAL;
+        }
+
+        return new EvalResult(
+                evalCase.id(), evalCase.description(), evalCase.input(),
+                response.text(), response.toolsCalled(),
+                verdict, score, judgeReason,
+                passedBehaviors, failedBehaviors,
+                duration
         );
     }
 }

@@ -7,12 +7,20 @@ import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.anthropic.AnthropicChatModel;
+import dev.langchain4j.model.anthropic.AnthropicStreamingChatModel;
 import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
+import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
+import io.github.resilience4j.ratelimiter.RateLimiter;
+import io.github.resilience4j.ratelimiter.RateLimiterConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.Nullable;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -30,6 +38,15 @@ public class LlmProviderFactory {
     private final AgentProperties properties;
     private final LlmRouter llmRouter;
     private final ConcurrentHashMap<String, ChatModel> modelCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, StreamingChatModel> streamingModelCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, RateLimiter> rateLimiters = new ConcurrentHashMap<>();
+
+    private final CircuitBreaker primaryCircuitBreaker = CircuitBreaker.of("primary-llm",
+            CircuitBreakerConfig.custom()
+                    .failureRateThreshold(50)
+                    .waitDurationInOpenState(Duration.ofSeconds(30))
+                    .slidingWindowSize(10)
+                    .build());
 
     public LlmProviderFactory(AgentProperties properties, LlmRouter llmRouter) {
         this.properties = properties;
@@ -97,6 +114,32 @@ public class LlmProviderFactory {
         return getModel("routing");
     }
 
+    /**
+     * Get or build a cached {@link StreamingChatModel} for the given alias.
+     */
+    public StreamingChatModel getStreamingModel(String alias) {
+        return streamingModelCache.computeIfAbsent(alias, this::buildStreamingModel);
+    }
+
+    /**
+     * Get or build the primary streaming model (used for streaming chat).
+     */
+    public StreamingChatModel getPrimaryStreamingModel() {
+        return getStreamingModel("primary");
+    }
+
+    /**
+     * Get the rate limiter for a given provider alias.
+     */
+    private RateLimiter getRateLimiter(String alias) {
+        return rateLimiters.computeIfAbsent(alias, a -> RateLimiter.of(a,
+                RateLimiterConfig.custom()
+                        .limitForPeriod(60)
+                        .limitRefreshPeriod(Duration.ofMinutes(1))
+                        .timeoutDuration(Duration.ofSeconds(10))
+                        .build()));
+    }
+
     private ChatModel buildModel(String alias) {
         var config = getModelConfig(alias);
 
@@ -134,6 +177,42 @@ public class LlmProviderFactory {
         };
     }
 
+    private StreamingChatModel buildStreamingModel(String alias) {
+        var config = getModelConfig(alias);
+
+        String apiKey = config.getApiKey();
+        if (apiKey == null || apiKey.isBlank()) {
+            apiKey = "no-key";
+        }
+
+        String provider = config.getProvider() != null ? config.getProvider() : "openai";
+
+        log.info("Building StreamingChatModel: alias={}, provider={}, model={}, endpoint={}",
+                alias, provider, config.getModel(), config.getEndpoint());
+
+        return switch (provider) {
+            case "anthropic" -> AnthropicStreamingChatModel.builder()
+                    .apiKey(apiKey)
+                    .modelName(config.getModel())
+                    .temperature(config.getTemperature())
+                    .maxTokens(config.getMaxTokens())
+                    .logRequests(log.isDebugEnabled())
+                    .logResponses(log.isDebugEnabled())
+                    .build();
+            default -> {
+                String baseUrl = normalizeEndpoint(config.getEndpoint());
+                yield OpenAiStreamingChatModel.builder()
+                        .baseUrl(baseUrl)
+                        .apiKey(apiKey)
+                        .modelName(config.getModel())
+                        .temperature(config.getTemperature())
+                        .logRequests(log.isDebugEnabled())
+                        .logResponses(log.isDebugEnabled())
+                        .build();
+            }
+        };
+    }
+
     /**
      * Ensure the endpoint URL ends with /v1 for OpenAI-compatible APIs.
      */
@@ -151,13 +230,29 @@ public class LlmProviderFactory {
     /**
      * Convenience method: generate a response from a specific model with a system prompt
      * and user message. Useful for routing, eval judging, and other non-conversation calls.
+     * Wrapped with circuit breaker for resilience.
      */
     public String generate(ChatModel model, String systemPrompt, String userMessage) {
-        var response = model.chat(
-                SystemMessage.from(systemPrompt),
-                UserMessage.from(userMessage)
-        );
-        return response.aiMessage().text();
+        try {
+            return primaryCircuitBreaker.executeSupplier(() -> {
+                var response = model.chat(
+                        SystemMessage.from(systemPrompt),
+                        UserMessage.from(userMessage)
+                );
+                return response.aiMessage().text();
+            });
+        } catch (Exception e) {
+            log.warn("LLM call failed with circuit breaker: {}", e.getMessage());
+            var fallback = getFallbackModel();
+            if (fallback != null && fallback != model) {
+                var response = fallback.chat(
+                        SystemMessage.from(systemPrompt),
+                        UserMessage.from(userMessage)
+                );
+                return response.aiMessage().text();
+            }
+            throw e instanceof RuntimeException re ? re : new RuntimeException(e);
+        }
     }
 
     /**
@@ -180,10 +275,35 @@ public class LlmProviderFactory {
 
         var model = getModel(alias);
 
+        var messages = buildMessages(systemPrompt, userMessage, conversationHistory);
+
+        try {
+            return RateLimiter.decorateSupplier(getRateLimiter(alias), () ->
+                    primaryCircuitBreaker.executeSupplier(() -> {
+                        var resp = model.chat(messages);
+                        return resp.aiMessage().text();
+                    })
+            ).get();
+        } catch (Exception e) {
+            log.warn("Primary LLM failed (alias={}), trying fallback: {}", alias, e.getMessage());
+            var fallback = getFallbackModel();
+            if (fallback != null) {
+                var resp = fallback.chat(messages);
+                return resp.aiMessage().text();
+            }
+            throw e instanceof RuntimeException re ? re : new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Build a LangChain4j message list from system prompt, user message, and conversation history.
+     * Exposed for use by streaming and tool-calling paths.
+     */
+    public List<dev.langchain4j.data.message.ChatMessage> buildMessages(
+            String systemPrompt, String userMessage, List<ChatMessage> conversationHistory) {
         var messages = new ArrayList<dev.langchain4j.data.message.ChatMessage>();
         messages.add(SystemMessage.from(systemPrompt));
 
-        // Add conversation history (working memory)
         for (var msg : conversationHistory) {
             if ("user".equals(msg.role())) {
                 messages.add(UserMessage.from(msg.content()));
@@ -192,14 +312,7 @@ public class LlmProviderFactory {
             }
         }
 
-        // Add the current user message
         messages.add(UserMessage.from(userMessage));
-
-        var response = model.chat(messages);
-        String text = response.aiMessage().text();
-
-        log.debug("LLM response ({}): {}", alias, text != null && text.length() > 200
-                ? text.substring(0, 200) + "..." : text);
-        return text;
+        return messages;
     }
 }
