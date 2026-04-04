@@ -6,19 +6,19 @@
 <title>Gargantua Agent Chat</title>
 <style>
   :root {
-    --bg: #0f0f14;
-    --surface: #1a1a24;
-    --surface2: #22222e;
-    --border: #2a2a3a;
-    --primary: #6c5ce7;
-    --primary-light: #a29bfe;
-    --text: #e0e0e8;
-    --text-dim: #8888a0;
-    --user-bg: #6c5ce7;
-    --agent-bg: #22222e;
-    --success: #00b894;
-    --warning: #fdcb6e;
-    --danger: #e17055;
+    --bg: #f8f9fa;
+    --surface: #ffffff;
+    --surface2: #f0f2f5;
+    --border: #e0e4e8;
+    --primary: #2563eb;
+    --primary-light: #3b82f6;
+    --text: #1a1a2e;
+    --text-dim: #6b7280;
+    --user-bg: #2563eb;
+    --agent-bg: #ffffff;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
     --radius: 16px;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -32,6 +32,7 @@
   .header {
     background: var(--surface); border-bottom: 1px solid var(--border);
     padding: 12px 24px; display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
   }
   .header-logo {
     width: 36px; height: 36px;
@@ -95,6 +96,7 @@
   .msg-agent .msg-bubble {
     background: var(--agent-bg); color: var(--text);
     border: 1px solid var(--border); border-bottom-left-radius: 4px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
   }
   .msg-meta { font-size: 11px; color: var(--text-dim); padding: 0 4px; }
   .msg-user .msg-meta { text-align: right; }
@@ -130,7 +132,7 @@
     font-size: 14px; font-family: inherit; resize: none;
     min-height: 44px; max-height: 120px; outline: none; transition: border-color 0.2s;
   }
-  .input-box:focus { border-color: var(--primary); }
+  .input-box:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
   .input-box::placeholder { color: var(--text-dim); }
   .send-btn {
     width: 44px; height: 44px; border-radius: 12px;

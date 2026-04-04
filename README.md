@@ -246,8 +246,6 @@ This generates:
 my-agent/
 ├── pom.xml                          -- depends on Gargantua engine
 ├── .env.example                     -- documented env vars template
-├── Dockerfile                       -- multi-stage JVM build
-├── docker-compose.yml               -- app + MongoDB + Redis + Ollama
 ├── src/main/java/com/mycompany/
 │   ├── MyAgentApplication.java      -- @SpringBootApplication
 │   └── tools/
@@ -531,8 +529,6 @@ gargantua/
 ├── agent-skill-linter-maven-plugin/ -- Build-time SKILL.md validation
 ├── agent-archetype/                 -- Maven archetype for scaffolding new projects
 ├── k8s/                             -- Kubernetes manifests (Kustomize + Helm)
-├── Dockerfile                       -- Multi-stage (JVM + GraalVM native)
-└── docker-compose.yml               -- Local dev (agent + MongoDB + Redis)
 ```
 
 ---
