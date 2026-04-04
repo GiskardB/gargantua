@@ -321,7 +321,6 @@ graph TD
 
     EXAMPLE[agent-example-fitcoach<br/><i>Reference agent<br/>standalone project</i>]
 
-    SHELL[agent-shell<br/><i>Interactive CLI</i>]
 
     LINTER[agent-skill-linter-maven-plugin<br/><i>Build-time SKILL.md validation</i>]
 
@@ -331,7 +330,6 @@ graph TD
     ENGINE --> CORE
     ENGINE --> MEMORY
     MCP --> ENGINE
-    SHELL --> ENGINE
     LINTER --> CORE
 
     EXAMPLE -.->|uses as dependency| ENGINE

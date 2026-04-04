@@ -11,7 +11,7 @@ import java.util.Map;
  * Master configuration properties for the Gargantua Agent Framework,
  * bound to the {@code agent.*} prefix. Controls all aspects of the agent:
  * API metadata, skill discovery, LLM providers, routing, memory, guardrails,
- * HITL, cost tracking, evals, dry-run, chat history, observability, shell, and MCP.
+ * HITL, cost tracking, evals, dry-run, chat history, observability, and MCP.
  */
 @ConfigurationProperties(prefix = "agent")
 public class AgentProperties {
@@ -29,7 +29,6 @@ public class AgentProperties {
     private DryRun dryRun = new DryRun();
     private ChatHistory chatHistory = new ChatHistory();
     private Observability observability = new Observability();
-    private Shell shell = new Shell();
     private Enrichers enrichers = new Enrichers();
     private Mcp mcp = new Mcp();
     private Skillsjars skillsjars = new Skillsjars();
@@ -77,8 +76,6 @@ public class AgentProperties {
     public Observability getObservability() { return observability; }
     public void setObservability(Observability observability) { this.observability = observability; }
 
-    public Shell getShell() { return shell; }
-    public void setShell(Shell shell) { this.shell = shell; }
 
     public Enrichers getEnrichers() { return enrichers; }
     public void setEnrichers(Enrichers enrichers) { this.enrichers = enrichers; }
@@ -496,47 +493,6 @@ public class AgentProperties {
         public void setLogTokenUsage(boolean logTokenUsage) { this.logTokenUsage = logTokenUsage; }
     }
 
-    public static class Shell {
-        private String mode = "interactive";
-        private String userId = "anonymous";
-        private boolean showMeta = true;
-        private boolean showTiming = true;
-        private boolean ansi = true;
-        private Remote remote = new Remote();
-
-        public String getMode() { return mode; }
-        public void setMode(String mode) { this.mode = mode; }
-
-        public String getUserId() { return userId; }
-        public void setUserId(String userId) { this.userId = userId; }
-
-        public boolean isShowMeta() { return showMeta; }
-        public void setShowMeta(boolean showMeta) { this.showMeta = showMeta; }
-
-        public boolean isShowTiming() { return showTiming; }
-        public void setShowTiming(boolean showTiming) { this.showTiming = showTiming; }
-
-        public boolean isAnsi() { return ansi; }
-        public void setAnsi(boolean ansi) { this.ansi = ansi; }
-
-        public Remote getRemote() { return remote; }
-        public void setRemote(Remote remote) { this.remote = remote; }
-
-        public static class Remote {
-            private String url = "";
-            private String apiKey = "";
-            private int timeoutMs = 30000;
-
-            public String getUrl() { return url; }
-            public void setUrl(String url) { this.url = url; }
-
-            public String getApiKey() { return apiKey; }
-            public void setApiKey(String apiKey) { this.apiKey = apiKey; }
-
-            public int getTimeoutMs() { return timeoutMs; }
-            public void setTimeoutMs(int timeoutMs) { this.timeoutMs = timeoutMs; }
-        }
-    }
 
     public static class Enrichers {
         private boolean enabled = true;

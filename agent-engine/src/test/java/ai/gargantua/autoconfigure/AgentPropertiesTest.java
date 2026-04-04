@@ -321,19 +321,6 @@ class AgentPropertiesTest {
         }
 
         @Test
-        @DisplayName("can set nested shell remote properties")
-        void shellRemoteProperties() {
-            var props = new AgentProperties();
-            props.getShell().getRemote().setUrl("http://localhost:8080");
-            props.getShell().getRemote().setApiKey("my-key");
-            props.getShell().getRemote().setTimeoutMs(60000);
-
-            assertThat(props.getShell().getRemote().getUrl()).isEqualTo("http://localhost:8080");
-            assertThat(props.getShell().getRemote().getApiKey()).isEqualTo("my-key");
-            assertThat(props.getShell().getRemote().getTimeoutMs()).isEqualTo(60000);
-        }
-
-        @Test
         @DisplayName("can replace entire nested objects via setters")
         void replaceNestedObjects() {
             var props = new AgentProperties();

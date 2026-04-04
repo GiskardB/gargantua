@@ -126,14 +126,6 @@ curl -X POST http://localhost:8080/api/admin/evals/run
 
 Both endpoints return the full `EvalReport` as JSON.
 
-### Via CLI (Agent Shell)
-
-```bash
-# Run for a specific skill
-eval run --skill weather-skill
-
-# Run all skills
-eval run --all
 ```
 
 Example CLI output:

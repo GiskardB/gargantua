@@ -13,7 +13,6 @@ COPY agent-spring-boot-starter/pom.xml       agent-spring-boot-starter/pom.xml
 COPY agent-adapters/pom.xml                  agent-adapters/pom.xml
 COPY agent-mcp-server/pom.xml                agent-mcp-server/pom.xml
 COPY agent-example-fitcoach/pom.xml                   agent-example-fitcoach/pom.xml
-COPY agent-shell/pom.xml                     agent-shell/pom.xml
 COPY agent-skill-linter-maven-plugin/pom.xml agent-skill-linter-maven-plugin/pom.xml
 
 # Download dependencies (cached unless POMs change)

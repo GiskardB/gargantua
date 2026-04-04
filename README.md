@@ -49,9 +49,6 @@ curl -X POST http://localhost:8080/api/agent/chat \
   -H "X-User-Id: me" -H "X-Session-Id: s1" -H "X-Tenant-Id: acme" \
   -d '{"message": "Hello, what can you do?"}'
 
-#    Option B — interactive shell (in a second terminal)
-java -jar agent-shell/target/agent-shell-1.0.0.jar
-#    Then type: chat
 #    You: Hello, what can you do?
 #    Agent: I can help you with...
 #    You: \exit
@@ -110,7 +107,6 @@ Every feature has dedicated documentation — click the link to dive deeper.
 | **Eval Framework** | LLM-as-Judge: test agent behavior against golden datasets with parallel execution for faster runs. CI fails if quality drops below threshold. | [Eval Framework](docs/eval-framework.md) |
 | **Cost Tracking** | Per-request token usage and cost, broken down by skill, user, provider. Admin dashboards. | [Extending](docs/extending.md) |
 | **Observability** | OpenTelemetry spans + Micrometer metrics with GenAI semantic conventions. | [Deployment](docs/deployment.md) |
-| **Interactive CLI** | Spring Shell 4 — chat, manage skills, run evals, view costs from the terminal. | [Extending](docs/extending.md) |
 | **GraalVM Native** | < 100ms startup, ~50MB image. Multi-stage Dockerfile included. | [Deployment](docs/deployment.md) |
 | **Kubernetes** | Kustomize overlays (dev/staging/prod), Helm chart, KEDA autoscaling on SSE connections. | [Deployment](docs/deployment.md) |
 
@@ -153,7 +149,6 @@ graph TB
 
     subgraph "What CLIENTS consume"
         API["REST API<br/><i>/api/agent/chat</i>"]
-        CLI["Agent Shell<br/><i>Interactive CLI</i>"]
         MCP["MCP Gateway<br/><i>Claude Desktop · Cursor</i>"]
         A2A["A2A Protocol<br/><i>Agent-to-Agent interop</i>"]
         DOCS["Swagger + Redoc<br/><i>Auto-generated docs</i>"]
@@ -179,7 +174,6 @@ graph TB
     GUARD_OUT --> STREAM
     ORCH --> HITL
     STREAM --> API
-    STREAM --> CLI
     STREAM --> MCP
     STREAM --> A2A
     API --> DOCS
@@ -341,10 +335,6 @@ curl -X POST http://localhost:8080/api/agent/chat \
   -H "X-User-Id: user1" -H "X-Session-Id: sess1" \
   -d '{"message": "Hello, what can you do?"}'
 
-# Option B — interactive shell (in a second terminal)
-java -jar agent-shell/target/agent-shell-1.0.0.jar
-# Type: chat
-# Then talk to your agent interactively. Type \exit to quit.
 
 # See what skills are available
 curl http://localhost:8080/.well-known/agent.json
@@ -426,7 +416,6 @@ Gargantua is distributed as a set of Maven libraries. You don't clone this repo 
 | `agent-memory-sdk` | `ai.gargantua` | Standalone 3-layer memory (Redis + MongoDB). Reusable in any project. |
 | `agent-engine` | `ai.gargantua` | Auto-configuration, guardrails, routing, orchestrator, tool registry, REST controllers, skill registries, admin endpoints. |
 | `agent-mcp-server` | `ai.gargantua` | MCP Server gateway (optional). |
-| `agent-shell` | `ai.gargantua` | Interactive CLI -- Spring Shell 4. |
 | `agent-skill-linter-maven-plugin` | `ai.gargantua` | Build-time SKILL.md validation. |
 | `agent-archetype` | `ai.gargantua` | Maven archetype to scaffold new agent projects. |
 
@@ -522,7 +511,6 @@ With GitHub Packages, use groupId `ai.gargantua` and version `1.0.0` (no `v` pre
 | LangChain4j | 1.12.1 |
 | MongoDB | 8.0 |
 | Redis | 7.4 |
-| Spring Shell | 4.0.1 |
 | springdoc-openapi | 3.0.2 |
 | Resilience4j | 2.3.0 |
 | Caffeine | 3.2.0 |
@@ -540,7 +528,6 @@ gargantua/
 ├── agent-engine/                    -- Core engine: auto-configuration, orchestrator, guardrails, routing, REST controllers, skill registries
 ├── agent-mcp-server/                -- MCP Server gateway (optional)
 ├── agent-example-fitcoach/                   -- FitCoach AI example agent (workout/nutrition/health tools)
-├── agent-shell/                     -- Interactive CLI (Spring Shell 4)
 ├── agent-skill-linter-maven-plugin/ -- Build-time SKILL.md validation
 ├── agent-archetype/                 -- Maven archetype for scaffolding new projects
 ├── k8s/                             -- Kubernetes manifests (Kustomize + Helm)
@@ -562,7 +549,7 @@ gargantua/
 | Agent DSL (@AgentSkill, @AgentsFlow) | [docs/agent-dsl.md](docs/agent-dsl.md) |
 | Eval Framework | [docs/eval-framework.md](docs/eval-framework.md) |
 | API Reference | [docs/api-reference.md](docs/api-reference.md) |
-| Extending (CLI, MCP, Dry-Run, Cost, History) | [docs/extending.md](docs/extending.md) |
+| Extending (MCP, Dry-Run, Cost, History, Custom Providers) | [docs/extending.md](docs/extending.md) |
 | Deployment (Docker, K8s, GraalVM) | [docs/deployment.md](docs/deployment.md) |
 | Architecture Diagrams | [docs/architecture-diagrams.md](docs/architecture-diagrams.md) |
 
