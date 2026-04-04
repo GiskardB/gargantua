@@ -62,7 +62,7 @@ Response fields: `text` (the answer), `sessionId`, `skillUsed` (which skill hand
 
 ### POST /api/agent/chat/stream -- SSE Streaming
 
-Same request format as the synchronous endpoint, but returns a Server-Sent Events stream. Ideal for chat UIs that need real-time token delivery.
+Same request format as the synchronous endpoint, but returns a Server-Sent Events stream with real token-by-token streaming from the LLM. Ideal for chat UIs that need real-time token delivery. The stream also includes `tool_call` and `tool_result` events when the agent invokes tools, enabling a multi-turn tool calling loop where the LLM can call multiple tools in sequence before producing a final answer.
 
 **Example**
 ```bash

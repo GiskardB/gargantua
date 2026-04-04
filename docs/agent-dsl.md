@@ -237,12 +237,40 @@ flow.step("analyzer")                          // no instruction — just passes
     .step("editor", "Edit for grammar and clarity");               // instruction added
 ```
 
-### FitCoach example flows
+### Loop steps
 
-The [FitCoach AI example](../agent-example-fitcoach/) includes two flows:
+A loop step repeats a skill up to a maximum number of iterations. The loop exits early if the LLM includes `[DONE]` or `[SATISFIED]` in its output, signaling that further iteration is unnecessary.
 
 ```java
-// health assessment → workout → nutrition
+@AgentsFlow(name = "iterative-review", description = "Draft and refine iteratively")
+public void iterativeReview(FlowDefinition flow) {
+    flow.step("writer", "Write an initial draft")
+        .loop("reviewer", 3);  // Review and improve up to 3 times
+}
+```
+
+Each iteration receives the previous iteration's output as context. This is useful for refinement workflows where quality improves with each pass.
+
+### Parallel steps
+
+Parallel steps execute simultaneously using virtual threads. All parallel steps receive the same input (the output of the previous step). Their outputs are combined and passed as context to the next step.
+
+```java
+@AgentsFlow(name = "multi-analysis", description = "Analyze from multiple angles in parallel")
+public void multiAnalysis(FlowDefinition flow) {
+    flow.parallel("security-reviewer", "performance-reviewer", "style-reviewer")
+        .step("summarizer", "Combine the reviews above into a single report");
+}
+```
+
+Consecutive parallel steps are grouped and executed together. The combined output is formatted as `[skill-name]: output` sections.
+
+### FitCoach example flows
+
+The [FitCoach AI example](../agent-example-fitcoach/) includes flows demonstrating all three step types:
+
+```java
+// Sequential: health assessment → workout → nutrition
 @AgentsFlow(name = "full-fitness-plan")
 public void fullFitnessPlan(FlowDefinition flow) {
     flow.step("health-skill", "Assess the user's current health and fitness level")
@@ -250,13 +278,24 @@ public void fullFitnessPlan(FlowDefinition flow) {
         .step("nutrition-skill", "Create a nutrition plan matching the workout");
 }
 
-// news research → informed workout
-@AgentsFlow(name = "research-workout")
-public void researchWorkout(FlowDefinition flow) {
-    flow.step("news-skill", "Find latest research and trends in fitness")
-        .step("workout-skill", "Create a modern evidence-based workout using the research");
+// Loop: create then iteratively refine
+@AgentsFlow(name = "iterative-workout")
+public void iterativeWorkout(FlowDefinition flow) {
+    flow.step("workout-skill", "Create an initial workout plan")
+        .loop("reviewer-skill", 3);  // Review and improve up to 3 times
+}
+
+// Parallel: assess health and nutrition simultaneously, then combine
+@AgentsFlow(name = "parallel-assessment")
+public void parallelAssessment(FlowDefinition flow) {
+    flow.parallel("health-skill", "nutrition-skill")
+        .step("workout-skill", "Create a workout plan based on the health assessment and nutrition info above");
 }
 ```
+
+### Advanced orchestration with langchain4j-agentic
+
+The `langchain4j-agentic` dependency is available on the classpath for advanced custom orchestration patterns (e.g., building untyped agent graphs, custom routing logic). The built-in `FlowExecutor` uses our own orchestrator so that guardrails, memory, and audit are applied to every step, but you can use `langchain4j-agentic` directly for specialized use cases that need lower-level control.
 
 ---
 
@@ -275,5 +314,5 @@ public void researchWorkout(FlowDefinition flow) {
 |----------|---------|-------------|------------|
 | **SKILL.md file** | Complex prompts, frequent prompt iteration, non-developers editing behavior | Yes | No |
 | **@AgentSkill** | Simple skills, co-locating tools + skill in one class, compile-time validation | No (rebuild needed) | Yes |
-| **@AgentsFlow** | Multi-step pipelines, orchestrating multiple skills, complex workflows | No (rebuild needed) | Yes |
+| **@AgentsFlow** | Multi-step pipelines (sequential, loop, parallel), orchestrating multiple skills, complex workflows | No (rebuild needed) | Yes |
 | **Both** | Use @AgentSkill for simple skills, SKILL.md for complex ones — they coexist | Mixed | Mixed |

@@ -353,6 +353,8 @@ agent-example-fitcoach/
 ├── src/main/java/ai/gargantua/example/
 │   ├── ExampleAgentApplication.java       @SpringBootApplication
 │   ├── AgentKitRuntimeHints.java          GraalVM reflection hints
+│   ├── flows/
+│   │   └── FitnessFlows.java             @AgentsFlow pipelines (sequential, loop, parallel)
 │   ├── enrichers/
 │   │   └── FitnessProfileEnricher.java    ContextEnricher — user profile
 │   └── tools/

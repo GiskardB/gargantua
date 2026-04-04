@@ -250,7 +250,7 @@ public class DelegationTools {
 }
 ```
 
-The sub-agent uses its own skill routing, memory, and guardrails — completely independent from the parent agent.
+The sub-agent uses its own skill routing, memory, and guardrails — completely independent from the parent agent. Tool calling uses a real multi-turn loop: the LLM can invoke a tool, receive the result, then decide to call another tool or generate a final answer. This loop continues until the LLM produces a text response, enabling complex multi-step reasoning chains.
 
 ---
 

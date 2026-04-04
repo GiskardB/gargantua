@@ -156,6 +156,20 @@ Request → Primary LLM
 
 The circuit breaker tracks failures. After repeated failures, it **opens** and routes directly to fallback without waiting for primary to timeout. It periodically retries primary to check if it's recovered.
 
+### Rate limiting
+
+Each LLM provider is rate-limited via Resilience4j to prevent API quota exhaustion. The default is 60 requests per minute per provider. When a rate limit is exceeded, the request is queued or rejected depending on configuration.
+
+```yaml
+agent:
+  llm:
+    rate-limit:
+      max-requests: 60          # requests per window per provider
+      window-seconds: 60        # sliding window size
+```
+
+Rate limiting works in conjunction with the circuit breaker: if the provider returns a `429 Too Many Requests` response, the circuit breaker counts it as a failure, accelerating the switch to fallback.
+
 ---
 
 ## Advanced Setup — Model Catalog + Routing Rules

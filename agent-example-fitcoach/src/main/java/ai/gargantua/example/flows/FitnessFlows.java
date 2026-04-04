@@ -34,4 +34,24 @@ public class FitnessFlows {
         flow.step("news-skill", "Find the latest research and trends in fitness training")
             .step("workout-skill", "Using the latest research above, create a modern evidence-based workout plan");
     }
+
+    /**
+     * Iterative workout refinement: create a plan, then review and improve it
+     * up to 3 times. The reviewer skill exits early if it signals [DONE] or [SATISFIED].
+     */
+    @AgentsFlow(name = "iterative-workout", description = "Creates and refines a workout plan iteratively")
+    public void iterativeWorkout(FlowDefinition flow) {
+        flow.step("workout-skill", "Create an initial workout plan")
+            .loop("reviewer-skill", 3);  // Review and improve up to 3 times
+    }
+
+    /**
+     * Parallel assessment: run health assessment and nutrition lookup simultaneously,
+     * then create a combined workout plan from both results.
+     */
+    @AgentsFlow(name = "parallel-assessment", description = "Parallel health + nutrition assessment, then combined workout")
+    public void parallelAssessment(FlowDefinition flow) {
+        flow.parallel("health-skill", "nutrition-skill")
+            .step("workout-skill", "Create a workout plan based on the health assessment and nutrition info above");
+    }
 }

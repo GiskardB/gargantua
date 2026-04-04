@@ -25,7 +25,7 @@ The approach is called **LLM-as-Judge**: a second, cheaper LLM (the "judge") rea
 ## How it works, step by step
 
 1. You write a **golden dataset** — a list of test inputs with expected and forbidden behaviors
-2. The `EvalRunner` sends each input to the agent (in dry-run mode)
+2. The `EvalRunner` sends each input to the agent (in dry-run mode), executing cases in **parallel** using virtual threads for faster runs
 3. The agent responds normally (routes to a skill, calls tools, generates a response)
 4. The **judge LLM** compares the agent's response + tool calls against your expectations
 5. The judge returns a verdict (PASS / FAIL / PARTIAL) with a score and reasoning

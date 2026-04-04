@@ -71,7 +71,7 @@ Every feature has dedicated documentation — click the link to dive deeper.
 |---------|-------------|------|
 | **Declarative Skills** | Define agent behavior in `SKILL.md` files — system prompt, allowed tools, routing hints. No code changes to add a skill. | [Skills & Routing](docs/skills-and-routing.md) |
 | **@AgentSkill** | Define skills directly in Java with annotations — auto-detects tools, prompt from `static PROMPT` field. Optional RAG, RBAC, schema, temperature. | [Agent DSL](docs/agent-dsl.md) |
-| **@AgentsFlow** | Chain multiple skills into multi-step pipelines. Each step's output feeds the next. REST API at `/api/flows`. | [Agent DSL](docs/agent-dsl.md) |
+| **@AgentsFlow** | Chain multiple skills into multi-step pipelines with sequential, loop, and parallel steps. Each step's output feeds the next. REST API at `/api/flows`. | [Agent DSL](docs/agent-dsl.md) |
 | **@AgentTool** | Annotate Java methods as agent actions. Add `@ToolRetry` for resilience, `@RequiresApproval` for HITL, `@CacheableToolResult` for caching. | [Tools & Annotations](docs/tools-and-annotations.md) |
 | **Hybrid Routing** | Semantic similarity (all-MiniLM-L6-v2, in-process, ~2ms) + LLM fallback. The agent picks the right skill automatically. | [Skills & Routing](docs/skills-and-routing.md) |
 | **RAG / Vector Store** | Skills declare `knowledge-base` in SKILL.md — the framework retrieves relevant documents and injects them into the prompt. Pluggable `VectorStorePort`. | [Extending](docs/extending.md) |
@@ -98,16 +98,16 @@ Every feature has dedicated documentation — click the link to dive deeper.
 
 | Feature | What it does | Docs |
 |---------|-------------|------|
-| **Multi-Provider LLM** | OpenAI, Anthropic, Azure OpenAI, Ollama built-in. Add Google Gemini, Mistral, Cohere, AWS Bedrock, or any LangChain4j provider with one dependency. Any OpenAI-compatible endpoint works out of the box. | [LLM Configuration](docs/llm-configuration.md) |
+| **Multi-Provider LLM** | OpenAI, Anthropic, Azure OpenAI, Ollama built-in. Circuit breaker with automatic primary-to-fallback failover and per-provider rate limiting (60 req/min default). Add Google Gemini, Mistral, Cohere, AWS Bedrock, or any LangChain4j provider with one dependency. Any OpenAI-compatible endpoint works out of the box. | [LLM Configuration](docs/llm-configuration.md) |
 | **A2A Protocol** | Agent-to-Agent interop. Discovery via `/.well-known/agent.json`, tasks via JSON-RPC 2.0. Call remote agents with `HttpA2AClient`. | [Extending](docs/extending.md) |
 | **MCP Server** | Expose the agent to Claude Desktop, Cursor, VS Code via the Model Context Protocol. | [Extending](docs/extending.md) |
-| **SSE Streaming** | Real-time token delivery, tool call events, approval requests — all via Server-Sent Events. | [API Reference](docs/api-reference.md) |
+| **SSE Streaming** | Real token-by-token streaming from the LLM, plus `tool_call`/`tool_result` events and approval requests — all via Server-Sent Events. | [API Reference](docs/api-reference.md) |
 
 ### Operations & Quality
 
 | Feature | What it does | Docs |
 |---------|-------------|------|
-| **Eval Framework** | LLM-as-Judge: test agent behavior against golden datasets. CI fails if quality drops below threshold. | [Eval Framework](docs/eval-framework.md) |
+| **Eval Framework** | LLM-as-Judge: test agent behavior against golden datasets with parallel execution for faster runs. CI fails if quality drops below threshold. | [Eval Framework](docs/eval-framework.md) |
 | **Cost Tracking** | Per-request token usage and cost, broken down by skill, user, provider. Admin dashboards. | [Extending](docs/extending.md) |
 | **Observability** | OpenTelemetry spans + Micrometer metrics with GenAI semantic conventions. | [Deployment](docs/deployment.md) |
 | **Interactive CLI** | Spring Shell 4 — chat, manage skills, run evals, view costs from the terminal. | [Extending](docs/extending.md) |
