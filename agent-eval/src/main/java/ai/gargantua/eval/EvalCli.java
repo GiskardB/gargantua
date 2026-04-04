@@ -2,12 +2,10 @@ package ai.gargantua.eval;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -94,13 +92,13 @@ public class EvalCli {
         System.out.println("\n  Score: %.2f | %d passed, %d failed, %d partial".formatted(
                 overallScore, passed, failed, partial));
 
-        var report = new EvalReport(config.agentUrl, Instant.now(),
+        var report = new EvalReport(config.agentUrl, java.time.Instant.now().toString(),
                 allCases.size(), passed, failed, partial, overallScore, results);
 
         // Save report
-        var reportJson = new ObjectMapper().registerModule(new JavaTimeModule());
+        var reportJson = new ObjectMapper();
         var reportFile = new File("eval-report-%s.json".formatted(
-                Instant.now().toString().substring(0, 10)));
+                java.time.Instant.now().toString().substring(0, 10)));
         reportJson.writerWithDefaultPrettyPrinter().writeValue(reportFile, report);
         System.out.println("  Report: " + reportFile.getAbsolutePath());
 

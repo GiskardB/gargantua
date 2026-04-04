@@ -1,11 +1,11 @@
 package ai.gargantua.eval;
 
-import java.time.Instant;
+
 import java.util.List;
 
 public record EvalReport(
     String agentUrl,
-    Instant runAt,
+    String runAt,
     int totalCases,
     int passed,
     int failed,
