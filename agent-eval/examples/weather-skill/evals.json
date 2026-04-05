@@ -1,0 +1,47 @@
+[
+  {
+    "id": "weather-basic",
+    "description": "Ask for current weather in a specific city",
+    "input": "What's the weather like in San Francisco?",
+    "expectedBehaviors": [
+      "Mentions San Francisco",
+      "Includes temperature or weather condition",
+      "Provides a helpful response"
+    ],
+    "forbiddenBehaviors": [
+      "Makes up specific numbers without a data source",
+      "Says it cannot help"
+    ],
+    "tags": ["weather", "basic"]
+  },
+  {
+    "id": "weather-comparison",
+    "description": "Compare weather between two cities",
+    "input": "Compare the weather in Tokyo and London right now",
+    "expectedBehaviors": [
+      "Mentions both Tokyo and London",
+      "Provides weather details for each city",
+      "Makes some form of comparison"
+    ],
+    "forbiddenBehaviors": [
+      "Only discusses one city",
+      "Refuses to answer"
+    ],
+    "tags": ["weather", "comparison"]
+  },
+  {
+    "id": "weather-forecast",
+    "description": "Ask for a multi-day forecast",
+    "input": "What will the weather be like in New York this weekend?",
+    "expectedBehaviors": [
+      "Mentions New York",
+      "References the weekend or multiple days",
+      "Includes forecast information"
+    ],
+    "forbiddenBehaviors": [
+      "Provides only current weather without forecast",
+      "Says it has no access to weather data without trying"
+    ],
+    "tags": ["weather", "forecast"]
+  }
+]
