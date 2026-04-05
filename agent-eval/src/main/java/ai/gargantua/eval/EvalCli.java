@@ -1,45 +1,69 @@
 package ai.gargantua.eval;
 
+import ai.gargantua.eval.plugin.EvalPlugin;
+import ai.gargantua.eval.plugin.PluginContext;
+
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.ServiceLoader;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
+import java.util.stream.Collectors;
 
 /**
  * Standalone CLI for evaluating AI agents.
  *
  * Usage:
- *   java -jar agent-eval.jar \
- *     --evals-dir ./evals \
- *     --agent-url http://localhost:8080 \
- *     --judge-endpoint https://api.openai.com/v1 \
- *     --judge-model gpt-4o-mini \
- *     --judge-key sk-... \
- *     --threshold 0.70
+ *   java -jar agent-eval.jar [options]
+ *
+ * Configuration priority: CLI args > eval-config.yml > defaults
  *
  * Exit code: 0 = passed, 1 = failed (score < threshold)
  */
 public class EvalCli {
 
     public static void main(String[] args) throws Exception {
-        var config = parseArgs(args);
+        // 1. Load config: defaults -> YAML file -> CLI overrides
+        var config = loadConfig(args);
+
+        // 2. Discover plugins via ServiceLoader
+        var plugins = ServiceLoader.load(EvalPlugin.class).stream()
+                .map(ServiceLoader.Provider::get)
+                .collect(Collectors.toMap(EvalPlugin::name, p -> p));
+
+        var activePlugin = plugins.get(config.plugin);
+        if (activePlugin == null) {
+            // Fallback to keyword-match
+            activePlugin = plugins.get("keyword-match");
+            if (activePlugin == null) {
+                System.err.println("  ERROR: Plugin '%s' not found. Available: %s".formatted(
+                        config.plugin, plugins.keySet()));
+                System.exit(1);
+                return;
+            }
+            System.out.println("  WARN: Plugin '%s' not found, falling back to 'keyword-match'".formatted(
+                    config.plugin));
+        }
 
         System.out.println("\n  Gargantua Agent Eval");
         System.out.println("  Agent:     " + config.agentUrl);
         System.out.println("  Evals dir: " + config.evalsDir);
-        System.out.println("  Judge:     " + config.judgeModel + " @ " + config.judgeEndpoint);
+        System.out.println("  Plugin:    " + activePlugin.name() + " - " + activePlugin.description());
         System.out.println("  Threshold: " + config.threshold);
+        System.out.println("  Parallel:  " + config.parallelism);
         System.out.println();
 
         var json = new ObjectMapper();
         var agent = new AgentClient(config.agentUrl);
-        var judge = new LlmJudge(config.judgeEndpoint, config.judgeKey, config.judgeModel);
 
         // Find all evals.json files
         var evalFiles = Files.walk(Path.of(config.evalsDir))
@@ -61,10 +85,27 @@ public class EvalCli {
 
         System.out.println("\n  Running %d eval cases...\n".formatted(allCases.size()));
 
-        // Execute in parallel
+        // Execute in parallel with concurrency limit
         var executor = Executors.newVirtualThreadPerTaskExecutor();
+        var semaphore = new Semaphore(config.parallelism);
+        final EvalPlugin plugin = activePlugin;
+        final Map<String, String> pluginCfg = config.pluginConfig;
+
         var futures = allCases.stream()
-                .map(c -> CompletableFuture.supplyAsync(() -> runCase(c, agent, judge), executor))
+                .map(c -> CompletableFuture.supplyAsync(() -> {
+                    try {
+                        semaphore.acquire();
+                        try {
+                            return runCase(c, agent, plugin, pluginCfg);
+                        } finally {
+                            semaphore.release();
+                        }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return new EvalResult(c.id(), c.input(), "ERROR: interrupted",
+                                "FAIL", 0.0, e.getMessage(), List.of(), c.expectedBehaviors(), 0);
+                    }
+                }, executor))
                 .toList();
 
         var results = futures.stream().map(CompletableFuture::join).toList();
@@ -73,12 +114,12 @@ public class EvalCli {
         int passed = 0, failed = 0, partial = 0;
         for (var r : results) {
             var icon = switch (r.verdict()) {
-                case "PASS" -> "✓";
-                case "FAIL" -> "✗";
-                default -> "~";
+                case "PASS" -> "PASS";
+                case "FAIL" -> "FAIL";
+                default -> "PART";
             };
-            System.out.println("  [%s] %s  %s  (%.2f)  %dms".formatted(
-                    r.caseId(), icon, r.verdict(), r.score(), r.durationMs()));
+            System.out.println("  [%s] %-6s (%.2f)  %dms  %s".formatted(
+                    r.caseId(), icon, r.score(), r.durationMs(), r.reason()));
             switch (r.verdict()) {
                 case "PASS" -> passed++;
                 case "FAIL" -> failed++;
@@ -95,15 +136,28 @@ public class EvalCli {
         var report = new EvalReport(config.agentUrl, java.time.Instant.now().toString(),
                 allCases.size(), passed, failed, partial, overallScore, results);
 
-        // Save report
-        var reportJson = new ObjectMapper();
-        var reportFile = new File("eval-report-%s.json".formatted(
-                java.time.Instant.now().toString().substring(0, 10)));
-        reportJson.writerWithDefaultPrettyPrinter().writeValue(reportFile, report);
-        System.out.println("  Report: " + reportFile.getAbsolutePath());
+        // Ensure output directory exists
+        var outputDir = Path.of(config.report.outputDir);
+        Files.createDirectories(outputDir);
+
+        var timestamp = java.time.Instant.now().toString().substring(0, 10);
+
+        // Save JSON report
+        if (config.report.json) {
+            var reportFile = outputDir.resolve("eval-report-%s.json".formatted(timestamp)).toFile();
+            new ObjectMapper().writerWithDefaultPrettyPrinter().writeValue(reportFile, report);
+            System.out.println("  JSON report: " + reportFile.getAbsolutePath());
+        }
+
+        // Save HTML report
+        if (config.report.html) {
+            var htmlPath = outputDir.resolve("eval-report-%s.html".formatted(timestamp));
+            HtmlReportGenerator.generate(report, htmlPath);
+            System.out.println("  HTML report: " + htmlPath.toAbsolutePath());
+        }
 
         if (overallScore < config.threshold) {
-            System.out.println("\n  FAILED — score %.2f < threshold %.2f".formatted(
+            System.out.println("\n  FAILED -- score %.2f < threshold %.2f".formatted(
                     overallScore, config.threshold));
             System.exit(1);
         } else {
@@ -112,18 +166,17 @@ public class EvalCli {
         }
     }
 
-    private static EvalResult runCase(EvalCase c, AgentClient agent, LlmJudge judge) {
+    private static EvalResult runCase(EvalCase c, AgentClient agent,
+                                       EvalPlugin plugin, Map<String, String> pluginConfig) {
         long start = System.currentTimeMillis();
         try {
             var response = agent.chat(c.input());
-            var judgeResult = judge.judge(c, response);
-
-            var verdict = judgeResult.score() >= 0.85 ? "PASS"
-                    : judgeResult.score() <= 0.3 ? "FAIL" : "PARTIAL";
+            var ctx = new PluginContext(c, response, pluginConfig);
+            var result = plugin.evaluate(ctx);
 
             return new EvalResult(c.id(), c.input(), response,
-                    verdict, judgeResult.score(), judgeResult.reason(),
-                    judgeResult.passed(), judgeResult.failed(),
+                    result.verdict(), result.score(), result.reason(),
+                    result.passed(), result.failed(),
                     System.currentTimeMillis() - start);
         } catch (Exception e) {
             return new EvalResult(c.id(), c.input(), "ERROR: " + e.getMessage(),
@@ -132,28 +185,67 @@ public class EvalCli {
         }
     }
 
-    private static Config parseArgs(String[] args) {
-        var config = new Config();
+    /**
+     * Load configuration with priority: CLI args > eval-config.yml > defaults.
+     */
+    static EvalConfig loadConfig(String[] args) throws Exception {
+        EvalConfig config;
+
+        // Try loading eval-config.yml from current directory
+        var yamlFile = new File("eval-config.yml");
+        if (yamlFile.exists()) {
+            var yamlMapper = new ObjectMapper(new YAMLFactory());
+            config = yamlMapper.readValue(yamlFile, EvalConfig.class);
+            System.out.println("  Loaded config from " + yamlFile.getAbsolutePath());
+        } else {
+            config = new EvalConfig();
+        }
+
+        // CLI args override YAML config
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
                 case "--evals-dir" -> config.evalsDir = args[++i];
                 case "--agent-url" -> config.agentUrl = args[++i];
-                case "--judge-endpoint" -> config.judgeEndpoint = args[++i];
-                case "--judge-model" -> config.judgeModel = args[++i];
-                case "--judge-key" -> config.judgeKey = args[++i];
                 case "--threshold" -> config.threshold = Double.parseDouble(args[++i]);
+                case "--parallelism" -> config.parallelism = Integer.parseInt(args[++i]);
+                case "--plugin" -> config.plugin = args[++i];
+                case "--judge-endpoint" -> config.pluginConfig.put("judge.endpoint", args[++i]);
+                case "--judge-model" -> config.pluginConfig.put("judge.model", args[++i]);
+                case "--judge-key" -> config.pluginConfig.put("judge.key", args[++i]);
+                case "--output-dir" -> config.report.outputDir = args[++i];
+                case "--no-html" -> config.report.html = false;
+                case "--no-json" -> config.report.json = false;
+                case "--config" -> {
+                    var customYaml = new File(args[++i]);
+                    if (customYaml.exists()) {
+                        var yamlMapper = new ObjectMapper(new YAMLFactory());
+                        config = yamlMapper.readValue(customYaml, EvalConfig.class);
+                    } else {
+                        System.err.println("  Config file not found: " + customYaml);
+                        System.exit(1);
+                    }
+                }
                 case "--help", "-h" -> {
                     System.out.println("""
                         Usage: java -jar agent-eval.jar [options]
-                        
+
                         Options:
+                          --config <path>          Path to eval-config.yml (default: ./eval-config.yml)
                           --evals-dir <path>       Directory containing evals.json files (default: ./evals)
                           --agent-url <url>        Agent REST API base URL (default: http://localhost:8080)
+                          --plugin <name>          Scoring plugin: llm-judge, keyword-match, regex (default: llm-judge)
                           --judge-endpoint <url>   LLM judge endpoint, OpenAI-compatible (default: http://localhost:11434/v1)
                           --judge-model <name>     Judge model name (default: phi4-mini)
                           --judge-key <key>        Judge API key (default: empty)
                           --threshold <0.0-1.0>    Minimum passing score (default: 0.70)
-                        
+                          --parallelism <n>        Max concurrent eval cases (default: 4)
+                          --output-dir <path>      Report output directory (default: ./eval-reports)
+                          --no-html                Disable HTML report
+                          --no-json                Disable JSON report
+
+                        Configuration is loaded from eval-config.yml if present.
+                        CLI arguments override YAML configuration.
+
                         Exit codes: 0 = passed, 1 = failed
                         """);
                     System.exit(0);
@@ -161,14 +253,5 @@ public class EvalCli {
             }
         }
         return config;
-    }
-
-    private static class Config {
-        String evalsDir = "./evals";
-        String agentUrl = "http://localhost:8080";
-        String judgeEndpoint = "http://localhost:11434/v1";
-        String judgeModel = "phi4-mini";
-        String judgeKey = "";
-        double threshold = 0.70;
     }
 }
