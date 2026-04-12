@@ -95,128 +95,6 @@ BIFROST_PORT=8090
 LLM_ROUTING_MODEL=phi4-mini
 ```
 
-### Option 3: Interactive Shell — Embedded mode
-
-Runs the **agent-shell** CLI with the agent engine running in-process (no separate server). Best for quick testing and debugging.
-
-```bash
-# Start infrastructure + launch shell
-start-shell-embedded.bat
-```
-
-Or manually:
-```bash
-docker compose up -d
-mvn spring-boot:run -pl agent-shell -Dspring-boot.run.profiles=embedded -Dspring-boot.run.jvmArguments="-Dagent.shell.mode=embedded"
-```
-
-### Option 4: Interactive Shell — Remote mode (Full)
-
-Connects the **agent-shell** CLI to a running FitCoach server via HTTP. The agent runs as a separate process; the shell is a thin client.
-
-```bash
-# First, start infra + app in another terminal
-start-infra.bat
-start-app.bat
-
-# Then start the shell
-start-shell-full.bat
-```
-
-Or manually:
-```bash
-docker compose --profile full up -d
-mvn spring-boot:run -pl agent-example-fitcoach   # terminal 1 — server
-mvn spring-boot:run -pl agent-shell -Dspring-boot.run.jvmArguments="-Dagent.shell.mode=remote -Dagent.shell.remote.url=http://localhost:8080"  # terminal 2 — shell
-```
-
-### Shell Commands
-
-Once the shell is running, type `chat` to start an interactive conversation:
-
-```
-shell:> chat
-
-  ╔═══════════════════════════════════╗
-  ║  FitCoach AI — Interactive Chat   ║
-  ╚═══════════════════════════════════╝
-  Session: abc-123  User: dev-user  Dry: OFF
-
-agent> Create a workout plan for muscle gain
-
-  [tool: generateWorkout] ...
-  Here's your 4-week muscle gain plan:
-  ...
-
-  --- Response Meta ---
-    Skill:      workout-skill
-    Routing:    llm (confidence: 0.95)
-    Tokens:     245 in / 512 out
-    Duration:   2341ms
-
-agent> \help
-  Available commands:
-    \exit     - Exit the chat session
-    \new      - Start a new session
-    \dry      - Toggle dry run mode
-    \skill <name> - Force a specific skill (empty to clear)
-    \history  - Show message history
-    \info     - Show session info
-    \clear    - Clear screen
-    \help     - Show this help
-
-agent> \skill nutrition-skill
-  Skill forced: nutrition-skill
-
-agent> Give me a meal plan for 2000 calories
-  [Forced to nutrition-skill, bypassing routing]
-  ...
-
-agent> \exit
-  Session ended.
-```
-
-Other shell commands (outside chat mode):
-
-| Command | Description |
-|---------|-------------|
-| `skill list` | Show all available skills in table format |
-| `skill show <name>` | Show detailed info for a specific skill |
-| `skill reload` | Hot-reload all SKILL.md files |
-| `session list` | List recent sessions |
-| `eval run <skill>` | Run eval suite for a skill |
-| `eval run` | Run all eval suites |
-| `cost report` | Show token/cost usage report |
-
-### Shell Configuration
-
-In `agent-shell/src/main/resources/application.yml`:
-
-```yaml
-agent:
-  shell:
-    mode: embedded              # "embedded" or "remote"
-    user-id: dev-user           # Default user ID for requests
-    show-meta: true             # Show skill/routing/tokens after each response
-    show-timing: true           # Show request duration
-    ansi: true                  # ANSI color support (true/false)
-    remote:
-      url: http://localhost:8080  # Agent server URL (remote mode only)
-      api-key: ""                 # API key if required
-      timeout-ms: 30000           # Request timeout
-```
-
-### Embedded vs Remote Shell — When to use
-
-| | Embedded Shell | Remote Shell |
-|---|---|---|
-| **Use when** | Quick testing, debugging tools, skill dev | Testing against running server, team demo |
-| **Agent runs** | In-process (same JVM) | Separate server process |
-| **Database** | In-memory (no MongoDB/Redis) | Full persistence |
-| **Startup** | `start-shell-embedded.bat` | `start-infra.bat` + `start-app.bat` + `start-shell-full.bat` |
-| **HITL support** | Yes (inline approval prompts) | Yes (inline approval prompts via SSE) |
-| **Hot reload** | `\skill reload` in shell | `\skill reload` calls server API |
-
 ### Stop everything
 
 ```bash
@@ -231,8 +109,8 @@ docker compose --profile full down
 
 | Skill | Domain | Special features |
 |-------|--------|-----------------|
-| **workout-skill** | fitness | Structured output (`assets/schema.json`), eval suite (3 cases) |
-| **nutrition-skill** | medical | RAG knowledge-base (`nutrition-docs`), eval suite (2 cases) |
+| **workout-skill** | fitness | Structured output (`assets/schema.json`) |
+| **nutrition-skill** | medical | RAG knowledge-base (`nutrition-docs`) |
 | **health-skill** | medical | HITL (`@RequiresApproval` on recordMetric), RBAC (`allowed-roles`) |
 | **news-skill** | general | Low temperature (0.3) for factual reporting |
 | **admin-skill** | general | RBAC restricted to `fitness-admin` and `super-admin` roles |
@@ -298,17 +176,10 @@ The `workout-skill` declares `output-schema: assets/schema.json`. The LLM is ins
 
 ### Eval Framework
 
-Golden datasets for automated quality testing:
+Use the standalone [agent-eval](../agent-eval/) tool to test skill quality:
 
 ```bash
-# Run evals for workout skill
-curl -X POST http://localhost:8080/api/admin/evals/run/workout-skill
-
-# Run evals for nutrition skill
-curl -X POST http://localhost:8080/api/admin/evals/run/nutrition-skill
-
-# Run all
-curl -X POST http://localhost:8080/api/admin/evals/run
+java -jar agent-eval.jar --evals-dir ./evals --agent-url http://localhost:8080
 ```
 
 ### LLM Routing Rules

@@ -149,6 +149,7 @@ graph TB
 
     subgraph "What CLIENTS consume"
         API["REST API<br/><i>/api/agent/chat</i>"]
+        CHAT["Chat Web UI<br/><i>/chat</i>"]
         MCP["MCP Gateway<br/><i>Claude Desktop · Cursor</i>"]
         A2A["A2A Protocol<br/><i>Agent-to-Agent interop</i>"]
         DOCS["Swagger + Redoc<br/><i>Auto-generated docs</i>"]
@@ -174,6 +175,7 @@ graph TB
     GUARD_OUT --> STREAM
     ORCH --> HITL
     STREAM --> API
+    STREAM --> CHAT
     STREAM --> MCP
     STREAM --> A2A
     API --> DOCS
@@ -184,10 +186,10 @@ graph TB
 
     style SKILL fill:#4CAF50,color:#fff,stroke:#388E3C
     style TOOL fill:#4CAF50,color:#fff,stroke:#388E3C
-    style API fill:#2196F3,color:#fff,stroke:#1565C0
-    style CLI fill:#2196F3,color:#fff,stroke:#1565C0
-    style MCP fill:#2196F3,color:#fff,stroke:#1565C0
-    style DOCS fill:#2196F3,color:#fff,stroke:#1565C0
+    style API fill:#1d72e8,color:#fff,stroke:#1558b8
+    style CHAT fill:#1d72e8,color:#fff,stroke:#1558b8
+    style MCP fill:#1d72e8,color:#fff,stroke:#1558b8
+    style DOCS fill:#1d72e8,color:#fff,stroke:#1558b8
 ```
 
 ### What happens when a user sends a message
