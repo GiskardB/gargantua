@@ -33,12 +33,18 @@ if exist ".env" (
 )
 
 echo  [INFO] Starting infrastructure (Ollama + Bifrost)...
-docker compose up -d
+docker compose up -d --remove-orphans
 
 if %ERRORLEVEL% NEQ 0 (
-    echo  [ERROR] Failed to start infrastructure. Is Docker running?
-    pause
-    exit /b 1
+    echo  [WARN] Initial start failed. Likely stale containers from a previous run.
+    echo  [WARN] Cleaning up and retrying...
+    docker compose down --remove-orphans >nul 2>&1
+    docker compose up -d
+    if !ERRORLEVEL! NEQ 0 (
+        echo  [ERROR] Failed to start infrastructure. Is Docker running?
+        pause
+        exit /b 1
+    )
 )
 
 echo  [INFO] Waiting for Ollama model pull...

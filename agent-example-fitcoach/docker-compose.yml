@@ -30,6 +30,10 @@ services:
     volumes:
       - ./infra/bifrost/config.template.json:/app/config.template.json:ro
       - ./infra/bifrost/entrypoint.sh:/app/custom-entrypoint.sh:ro
+      # Persist Bifrost dashboard state (virtual keys, providers, etc.)
+      # across `docker compose down`. Without this, virtual keys you
+      # create in the dashboard are lost on every restart.
+      - bifrost-data:/app/data
     entrypoint: ["/bin/sh", "/app/custom-entrypoint.sh"]
     env_file: .env
     environment:
@@ -125,3 +129,4 @@ volumes:
   mongo-data:
   redis-data:
   ollama-data:
+  bifrost-data:

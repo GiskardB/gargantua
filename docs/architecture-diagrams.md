@@ -272,42 +272,7 @@ sequenceDiagram
     Pipeline-->>Engine: PASSED (all results)
 ```
 
-## 7. Eval Framework — LLM-as-Judge
-
-```mermaid
-sequenceDiagram
-    participant Admin as Admin / CI
-    participant Runner as EvalRunner
-    participant Engine as OrchestratorEngine
-    participant Judge as Judge LLM<br/>(Ollama / phi4-mini)
-    participant Repo as EvalReportRepository<br/>(MongoDB)
-
-    Admin->>Runner: POST /api/admin/evals/run/weather-skill
-    Runner->>Runner: load evals/evals.json
-
-    loop For each EvalCase
-        Runner->>Engine: invoke(input, dryRun=true, forceSkill)
-        Engine-->>Runner: AgentResponse
-
-        Runner->>Judge: evaluate(input, response, expected, forbidden)
-        Judge-->>Runner: {verdict: PASS, score: 0.95, reasoning: ...}
-    end
-
-    Runner->>Repo: findLatest(skillName)
-    Repo-->>Runner: previousReport (for comparison)
-
-    Runner->>Runner: buildReport(results, comparison)
-    Runner->>Repo: save(EvalReport)
-
-    alt overallScore >= threshold (0.70)
-        Runner-->>Admin: 200 OK + EvalReport
-    else overallScore < threshold
-        Runner-->>Admin: 422 Unprocessable + EvalReport
-        Note over Admin: CI pipeline fails
-    end
-```
-
-## 8. Project Architecture — Module Dependencies
+## 7. Project Architecture — Module Dependencies
 
 ```mermaid
 graph TD
@@ -342,7 +307,7 @@ graph TD
     style ARCHETYPE fill:#f3e5f5,stroke-dasharray: 5 5
 ```
 
-## 9. A2A Protocol — Agent-to-Agent Interaction
+## 8. A2A Protocol — Agent-to-Agent Interaction
 
 ```mermaid
 sequenceDiagram

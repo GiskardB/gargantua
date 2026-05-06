@@ -5,56 +5,53 @@
 #   runtime-jvm    — Eclipse Temurin 21 JRE + ZGC (~250 MB, ~2s startup)
 #   runtime-native — GraalVM native binary on distroless (~50 MB, <100ms)
 #
-# Usage:
-#   docker build --target runtime-jvm    -t fitcoach:jvm .
-#   docker build --target runtime-native -t fitcoach:native .
+# Usage (run from monorepo root):
+#   docker build -f agent-example-fitcoach/Dockerfile --target runtime-jvm    -t fitcoach:jvm .
+#   docker build -f agent-example-fitcoach/Dockerfile --target runtime-native -t fitcoach:native .
 #
-# NOTE: must be built from the monorepo root (context = ../)
-#       because agent-example depends on agent-engine, agent-mcp-server, etc.
-#       The docker-compose.yml handles this automatically.
+# NOTE: build context MUST be the monorepo root because fitcoach depends on
+#       the local Gargantua modules (agent-engine, agent-mcp-server, etc.).
+#       The docker-compose.yml in this directory handles this automatically.
 # ═══════════════════════════════════════════════════════════════════
 
 # ─────────────────────────────────────────────────────────────────
-# Stage 1 — Builder (Maven + JDK 21)
+# Stage 1 — Builder (Maven 3.9 + JDK 21)
 # ─────────────────────────────────────────────────────────────────
-FROM eclipse-temurin:21-jdk-alpine AS builder
+FROM maven:3.9-eclipse-temurin-21-alpine AS builder
 
 WORKDIR /workspace
 
-# Copy all POMs first for dependency-cache layer
+# Copy all module POMs first for dependency-cache layer
 COPY pom.xml .
 COPY agent-core/pom.xml                      agent-core/pom.xml
 COPY agent-memory-sdk/pom.xml                agent-memory-sdk/pom.xml
-COPY agent-spring-boot-starter/pom.xml       agent-spring-boot-starter/pom.xml
-COPY agent-adapters/pom.xml                  agent-adapters/pom.xml
 COPY agent-engine/pom.xml                    agent-engine/pom.xml
 COPY agent-mcp-server/pom.xml                agent-mcp-server/pom.xml
 COPY agent-example-fitcoach/pom.xml          agent-example-fitcoach/pom.xml
-COPY agent-shell/pom.xml                     agent-shell/pom.xml
 COPY agent-skill-linter-maven-plugin/pom.xml agent-skill-linter-maven-plugin/pom.xml
-
-# Maven wrapper
-COPY mvnw .
-COPY .mvn .mvn
-RUN chmod +x mvnw
+COPY agent-archetype/pom.xml                 agent-archetype/pom.xml
 
 # Download dependencies (cached unless POMs change)
 RUN --mount=type=cache,target=/root/.m2 \
-    ./mvnw dependency:go-offline -B 2>/dev/null || true
+    mvn dependency:go-offline -B 2>/dev/null || true
 
 # Copy full source
 COPY . .
 
-# Build the example JAR (with all framework modules)
+# Build the example JAR (with all framework modules it transitively needs)
 RUN --mount=type=cache,target=/root/.m2 \
-    ./mvnw clean package -pl agent-example-fitcoach -am -DskipTests -B
+    mvn clean package -pl agent-example-fitcoach -am -DskipTests -B
 
 # ─────────────────────────────────────────────────────────────────
-# Stage 2A — JVM Runtime (Eclipse Temurin 21 JRE)
+# Stage 2A — JVM Runtime (Eclipse Temurin 21 JRE on Ubuntu Jammy)
+# Glibc-based (NOT Alpine/musl) because Gargantua's semantic routing
+# pulls in ONNX Runtime (via langchain4j-embeddings), whose native
+# libonnxruntime.so depends on libstdc++.so.6 — which is not available
+# on Alpine. Ubuntu Jammy ships libstdc++ by default.
 # ─────────────────────────────────────────────────────────────────
-FROM eclipse-temurin:21-jre-alpine AS runtime-jvm
+FROM eclipse-temurin:21-jre-jammy AS runtime-jvm
 
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN groupadd --system appgroup && useradd --system --gid appgroup appuser
 
 WORKDIR /app
 
@@ -81,7 +78,7 @@ WORKDIR /workspace
 COPY --from=builder /workspace /workspace
 
 RUN --mount=type=cache,target=/root/.m2 \
-    ./mvnw -Pnative native:compile -pl agent-example-fitcoach -am -DskipTests -B
+    mvn -Pnative native:compile -pl agent-example-fitcoach -am -DskipTests -B
 
 # ─────────────────────────────────────────────────────────────────
 # Stage 2C — Distroless Native Runtime

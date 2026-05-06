@@ -8,6 +8,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -54,49 +55,45 @@ public class PiiInputGuardrail implements InputGuardrail {
         }
 
         var piiMap = new HashMap<String, String>();
-        var masked = ctx.userMessage();
-        int counter = 0;
+        var counter = new int[]{0}; // shared counter across passes
+        String masked = ctx.userMessage();
 
-        // Mask emails
-        Matcher emailMatcher = EMAIL_PATTERN.matcher(masked);
-        while (emailMatcher.find()) {
-            var original = emailMatcher.group();
-            var placeholder = "[EMAIL_%d]".formatted(counter);
-            piiMap.put(placeholder, original);
-            masked = masked.replace(original, placeholder);
-            counter++;
-        }
+        masked = maskPattern(masked, EMAIL_PATTERN, "EMAIL", counter, piiMap);
+        masked = maskPattern(masked, IBAN_PATTERN, "IBAN", counter, piiMap);
+        masked = maskPattern(masked, PHONE_PATTERN, "PHONE", counter, piiMap);
 
-        // Mask IBANs
-        Matcher ibanMatcher = IBAN_PATTERN.matcher(masked);
-        while (ibanMatcher.find()) {
-            var original = ibanMatcher.group();
-            var placeholder = "[IBAN_%d]".formatted(counter);
-            piiMap.put(placeholder, original);
-            masked = masked.replace(original, placeholder);
-            counter++;
-        }
-
-        // Mask phones
-        Matcher phoneMatcher = PHONE_PATTERN.matcher(masked);
-        while (phoneMatcher.find()) {
-            var original = phoneMatcher.group();
-            var placeholder = "[PHONE_%d]".formatted(counter);
-            piiMap.put(placeholder, original);
-            masked = masked.replace(original, placeholder);
-            counter++;
-        }
-
-        // Store pii_map in context attributes for potential de-anonymization later
         if (!piiMap.isEmpty()) {
             ctx.attributes().put("pii_map", piiMap);
             ctx.attributes().put("original_message", ctx.userMessage());
             ctx.attributes().put("masked_message", masked);
         }
 
-        // Always returns PASS - masking is informational, not blocking
         return GuardrailResult.pass(name())
                 .withMetadata("pii_detected", !piiMap.isEmpty())
                 .withMetadata("pii_count", piiMap.size());
+    }
+
+    /**
+     * Single-pass replacement: walks {@code input} once with the matcher and builds the
+     * masked string in a single {@link StringBuilder}. Returns {@code input} unchanged
+     * (no allocation) when the pattern doesn't match.
+     */
+    private static String maskPattern(String input, Pattern pattern, String prefix,
+                                      int[] counter, Map<String, String> piiMap) {
+        Matcher m = pattern.matcher(input);
+        if (!m.find()) {
+            return input;
+        }
+        StringBuilder sb = new StringBuilder(input.length() + 16);
+        int last = 0;
+        do {
+            String original = m.group();
+            String placeholder = "[" + prefix + "_" + counter[0]++ + "]";
+            piiMap.put(placeholder, original);
+            sb.append(input, last, m.start()).append(placeholder);
+            last = m.end();
+        } while (m.find());
+        sb.append(input, last, input.length());
+        return sb.toString();
     }
 }

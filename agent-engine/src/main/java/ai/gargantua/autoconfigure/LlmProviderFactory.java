@@ -220,7 +220,14 @@ public class LlmProviderFactory {
         if (endpoint == null || endpoint.isBlank()) {
             return "https://api.openai.com/v1";
         }
-        String url = endpoint.replaceAll("/+$", "");
+        String url = endpoint;
+        int end = url.length();
+        while (end > 0 && url.charAt(end - 1) == '/') {
+            end--;
+        }
+        if (end != url.length()) {
+            url = url.substring(0, end);
+        }
         if (!url.endsWith("/v1")) {
             url = url + "/v1";
         }
@@ -229,7 +236,7 @@ public class LlmProviderFactory {
 
     /**
      * Convenience method: generate a response from a specific model with a system prompt
-     * and user message. Useful for routing, eval judging, and other non-conversation calls.
+     * and user message. Useful for routing, summaries, and other non-conversation calls.
      * Wrapped with circuit breaker for resilience.
      */
     public String generate(ChatModel model, String systemPrompt, String userMessage) {

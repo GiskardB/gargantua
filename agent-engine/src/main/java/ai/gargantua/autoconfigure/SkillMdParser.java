@@ -1,15 +1,20 @@
 package ai.gargantua.autoconfigure;
 
+import ai.gargantua.core.memory.MemoryLayer;
 import ai.gargantua.core.rag.RagConfig;
 import ai.gargantua.core.skill.SkillCard;
 import ai.gargantua.core.skill.SkillMeta;
 import ai.gargantua.core.skill.SkillSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -19,6 +24,7 @@ import java.util.Set;
  */
 public class SkillMdParser {
 
+    private static final Logger log = LoggerFactory.getLogger(SkillMdParser.class);
     private static final String FRONTMATTER_DELIMITER = "---";
 
     /**
@@ -90,6 +96,8 @@ public class SkillMdParser {
                 ? Set.<String>of()
                 : Collections.unmodifiableSet(new HashSet<>(allowedRolesCard));
 
+        var memoryLayers = parseMemoryLayers(getStringList(metadata, "memory-layers"));
+
         var meta = new SkillMeta(name, description, version, active, hasSchema, domain, source, allowedRolesSet);
 
         return new SkillCard(
@@ -101,8 +109,30 @@ public class SkillMdParser {
                 maxTokens,
                 temperature,
                 preferredModel,
-                ragConfig
+                ragConfig,
+                memoryLayers
         );
+    }
+
+    /**
+     * Parses an optional {@code memory-layers} list from frontmatter into a {@link MemoryLayer}
+     * set. Returns {@code null} (meaning "fetch all layers") when the list is absent or empty,
+     * preserving the historical default behaviour. Unknown values are logged and ignored.
+     */
+    private Set<MemoryLayer> parseMemoryLayers(List<String> raw) {
+        if (raw == null || raw.isEmpty()) {
+            return null;
+        }
+        var result = EnumSet.noneOf(MemoryLayer.class);
+        for (String s : raw) {
+            if (s == null || s.isBlank()) continue;
+            try {
+                result.add(MemoryLayer.valueOf(s.trim().toUpperCase(Locale.ROOT)));
+            } catch (IllegalArgumentException ignored) {
+                log.warn("Unknown memory-layers value '{}' — ignoring", s);
+            }
+        }
+        return result.isEmpty() ? null : Collections.unmodifiableSet(result);
     }
 
     // ---- internal helpers ----

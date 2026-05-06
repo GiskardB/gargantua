@@ -1,0 +1,141 @@
+##############################################################################
+# Gargantua Agent Configuration
+#
+# Environment variables:
+#
+#   MONGODB_URI              MongoDB connection string (default: mongodb://localhost:27017/...)
+#   REDIS_URL                Redis connection URL (default: redis://localhost:6379)
+#   SERVER_PORT              HTTP port (default: 8080)
+#
+#   LLM_PRIMARY_PROVIDER     Primary LLM: openai | azure-openai | anthropic (default: openai)
+#   LLM_PRIMARY_MODEL        Model name, e.g. gpt-4o, claude-sonnet-4-... (default: gpt-4o)
+#   LLM_PRIMARY_API_KEY      API key for the primary LLM provider (REQUIRED)
+#   LLM_PRIMARY_ENDPOINT     Base URL (required for azure-openai, optional otherwise)
+#   LLM_PRIMARY_TEMPERATURE  Sampling temperature 0.0-1.0 (default: 0.7)
+#   LLM_PRIMARY_MAX_TOKENS   Max response tokens (default: 1000)
+#
+#   LLM_FALLBACK_PROVIDER    Fallback provider when primary fails (default: anthropic)
+#   LLM_FALLBACK_MODEL       Fallback model name (default: claude-sonnet-4-20250514)
+#   LLM_FALLBACK_API_KEY     Fallback API key (optional)
+#
+#   LLM_ROUTING_PROVIDER     Routing model provider (default: ollama / phi4-mini, local)
+#   LLM_ROUTING_MODEL        Routing model name (default: phi4-mini)
+#   LLM_ROUTING_API_KEY      Not needed for Ollama
+#
+##############################################################################
+
+spring:
+  application:
+    name: agent-example-weather
+  threads:
+    virtual:
+      enabled: true
+  # Spring Boot 4 split MongoDB connection settings out of `spring.data.mongodb`
+  # into the new `spring.mongodb` namespace. Set BOTH so the configuration is
+  # robust against either autoconfiguration class winning.
+  mongodb:
+    uri: ${MONGODB_URI:mongodb://localhost:27017/agent-example-weather}
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/agent-example-weather}
+    redis:
+      url: ${REDIS_URL:redis://localhost:6379}
+
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+
+agent:
+  llm:
+    primary:
+      provider: ${LLM_PRIMARY_PROVIDER:openai}
+      model: ${LLM_PRIMARY_MODEL:gpt-4o}
+      api-key: ${LLM_PRIMARY_API_KEY:}
+      endpoint: ${LLM_PRIMARY_ENDPOINT:}
+      temperature: ${LLM_PRIMARY_TEMPERATURE:0.7}
+      max-tokens: ${LLM_PRIMARY_MAX_TOKENS:1000}
+    fallback:
+      provider: ${LLM_FALLBACK_PROVIDER:anthropic}
+      model: ${LLM_FALLBACK_MODEL:claude-sonnet-4-20250514}
+      api-key: ${LLM_FALLBACK_API_KEY:}
+      endpoint: ${LLM_FALLBACK_ENDPOINT:}
+    routing-model:
+      provider: ${LLM_ROUTING_PROVIDER:ollama}
+      model: ${LLM_ROUTING_MODEL:phi4-mini}
+      api-key: ${LLM_ROUTING_API_KEY:}
+      endpoint: ${LLM_ROUTING_ENDPOINT:http://localhost:11434}
+      temperature: 0.0
+      max-tokens: 50
+
+  skill:
+    path: classpath:skills/
+    hot-reload: false
+    cache-ttl-minutes: 60
+
+  routing:
+    strategy: hybrid
+    fallback-skill: default-skill
+    semantic:
+      threshold: 0.82
+
+  memory:
+    working:
+      max-messages: 20
+      ttl-minutes: 30
+    episodic:
+      max-summaries: 5
+      ttl-days: 365
+    knowledge:
+      max-segments: 10
+    composer:
+      max-context-tokens: 3000
+
+  guardrail:
+    input:
+      max-chars: 2000
+      injection-guard:
+        enabled: true
+      pii-masking:
+        enabled: true
+    output:
+      pii-redaction:
+        enabled: true
+      schema-validator:
+        enabled: true
+
+  hitl:
+    enabled: true
+    default-ttl-minutes: 5
+
+  cost-tracking:
+    enabled: true
+    retention-days: 365
+
+  audit:
+    enabled: true
+    retention-days: 365
+
+  dry-run:
+    enabled: true
+
+  chat-ui:
+    enabled: true                 # Set to false to disable /chat web interface
+
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui
+
+logging:
+  level:
+    root: INFO
+    ai.gargantua.example.weather: DEBUG

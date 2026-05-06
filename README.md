@@ -2,7 +2,7 @@
 
 **AI agents as a service, in Java.** Write a skill file and a tool class — Gargantua gives you a deployable REST API with streaming, persistent memory, guardrails, and multi-agent orchestration.
 
-Define what your agent can do in a `SKILL.md` file (or a Java `@AgentSkill` annotation), implement actions as `@AgentTool` methods, and chain them into multi-step `@AgentsFlow` pipelines. The framework handles everything else: skill routing, 3-layer memory, input/output guardrails, human-in-the-loop approvals, eval framework, cost tracking, A2A interoperability, and Kubernetes deployment.
+Define what your agent can do in a `SKILL.md` file (or a Java `@AgentSkill` annotation), implement actions as `@AgentTool` methods, and chain them into multi-step `@AgentsFlow` pipelines. The framework handles everything else: skill routing, 3-layer memory, input/output guardrails, human-in-the-loop approvals, cost tracking, A2A interoperability, and Kubernetes deployment.
 
 Built on Java 21, Spring Boot 4.0.4, and LangChain4j.
 
@@ -104,7 +104,6 @@ Every feature has dedicated documentation — click the link to dive deeper.
 
 | Feature | What it does | Docs |
 |---------|-------------|------|
-| **Eval Framework** | Standalone LLM-as-Judge tool (`agent-eval.jar`). Calls agents via REST, judges with LLM, produces reports. CI-ready exit codes. | [Eval Framework](docs/eval-framework.md) |
 | **Cost Tracking** | Per-request token usage and cost, broken down by skill, user, provider. Admin dashboards. | [Extending](docs/extending.md) |
 | **Observability** | OpenTelemetry spans + Micrometer metrics with GenAI semantic conventions. | [Deployment](docs/deployment.md) |
 | **GraalVM Native** | < 100ms startup, ~50MB image. Multi-stage Dockerfile included. | [Deployment](docs/deployment.md) |
@@ -157,7 +156,6 @@ graph TB
 
     subgraph "Operations"
         AUDIT["Audit Trail<br/><i>Immutable decision log</i>"]
-        EVAL["Eval Framework<br/><i>LLM-as-Judge</i>"]
         COST["Cost Tracking<br/><i>Per skill · user · provider</i>"]
         OTEL["Observability<br/><i>OTel · Micrometer</i>"]
         K8S["Kubernetes<br/><i>Kustomize · Helm · KEDA</i>"]
@@ -180,7 +178,6 @@ graph TB
     STREAM --> A2A
     API --> DOCS
     ORCH --> AUDIT
-    ORCH --> EVAL
     ORCH --> COST
     ORCH --> OTEL
 
@@ -213,7 +210,7 @@ When a client calls `POST /api/agent/chat/stream`, the Orchestrator Engine execu
   SSE stream → client (token by token)
 ```
 
-Each step is a pluggable component — replace any part by declaring your own `@Bean`. For the full sequence diagrams of every flow (routing, memory, HITL, eval, A2A), see [Architecture Diagrams](docs/architecture-diagrams.md).
+Each step is a pluggable component — replace any part by declaring your own `@Bean`. For the full sequence diagrams of every flow (routing, memory, HITL, A2A), see [Architecture Diagrams](docs/architecture-diagrams.md).
 
 ---
 
@@ -272,7 +269,7 @@ docker compose exec ollama ollama pull phi4-mini
 
 | Service | What it does | Port |
 |---------|-------------|------|
-| **MongoDB** | Stores chat history, session summaries, user profiles, eval reports, costs | 27017 |
+| **MongoDB** | Stores chat history, session summaries, user profiles, costs | 27017 |
 | **Redis** | Session memory, HITL approvals, tool cache, rate limits | 6379 |
 | **Ollama** | Local routing model (zero API cost for skill routing and session summaries) | 11434 |
 
@@ -284,7 +281,7 @@ Gargantua uses **three LLM roles** — each can be a different provider and mode
 |------|---------|---------|------|
 | **Primary** | Agent conversations — answers the user | OpenAI `gpt-4o` | Per-token API cost |
 | **Fallback** | Auto-failover when primary fails | Anthropic `claude-sonnet` | Per-token (only on failure) |
-| **Routing** | Internal: skill routing, session summaries, eval judge | Ollama `phi4-mini` (local) | **Free** (if local) |
+| **Routing** | Internal: skill routing, session summaries | Ollama `phi4-mini` (local) | **Free** (if local) |
 
 By default the routing model runs locally via Ollama — but this is just a suggestion. All three roles accept **any OpenAI-compatible endpoint**. You can configure routing to use OpenAI, Azure OpenAI, or any OpenAI-compatible gateway exactly like primary and fallback — just set `LLM_ROUTING_PROVIDER`, `LLM_ROUTING_MODEL`, `LLM_ROUTING_API_KEY`, and `LLM_ROUTING_ENDPOINT`.
 
@@ -528,6 +525,8 @@ gargantua/
 ├── agent-engine/                    -- Core engine: auto-configuration, orchestrator, guardrails, routing, REST controllers, skill registries
 ├── agent-mcp-server/                -- MCP Server gateway (optional)
 ├── agent-example-fitcoach/                   -- FitCoach AI example agent (workout/nutrition/health tools)
+├── agent-example-cookbook/                   -- Cookbook AI example agent (recipes/ingredients/pantry/meal-plan)
+├── agent-example-weather/                    -- Weather example agent (minimal — one skill + Open-Meteo HTTP integration)
 ├── agent-skill-linter-maven-plugin/ -- Build-time SKILL.md validation
 ├── agent-archetype/                 -- Maven archetype for scaffolding new projects
 ├── k8s/                             -- Kubernetes manifests (Kustomize + Helm)
@@ -545,7 +544,6 @@ gargantua/
 | Guardrails | [docs/guardrails.md](docs/guardrails.md) |
 | LLM Configuration & Routing | [docs/llm-configuration.md](docs/llm-configuration.md) |
 | Agent DSL (@AgentSkill, @AgentsFlow) | [docs/agent-dsl.md](docs/agent-dsl.md) |
-| Eval Framework | [docs/eval-framework.md](docs/eval-framework.md) |
 | API Reference | [docs/api-reference.md](docs/api-reference.md) |
 | Extending (MCP, Dry-Run, Cost, History, Custom Providers) | [docs/extending.md](docs/extending.md) |
 | Deployment (Docker, K8s, GraalVM) | [docs/deployment.md](docs/deployment.md) |
@@ -645,7 +643,7 @@ All storage uses in-memory ConcurrentHashMaps. Data is lost on restart.
 | `LLM_FALLBACK_MODEL` | Fallback model | *(optional)* |
 | `LLM_FALLBACK_API_KEY` | Fallback API key | *(optional)* |
 | `LLM_FALLBACK_ENDPOINT` | Fallback endpoint (OpenAI-compatible) | *(optional)* |
-| **Routing LLM** | Local model for skill routing, eval judge, session summaries (zero API cost via Ollama) | |
+| **Routing LLM** | Local model for skill routing and session summaries (zero API cost via Ollama) | |
 | `LLM_ROUTING_PROVIDER` | Routing model provider: `ollama`, `openai`, or any OpenAI-compatible endpoint | `ollama` |
 | `LLM_ROUTING_MODEL` | Routing model name | `phi4-mini` |
 | `LLM_ROUTING_ENDPOINT` | Routing model endpoint (Ollama URL when running locally) | `http://localhost:11434` |

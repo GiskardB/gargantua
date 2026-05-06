@@ -11,9 +11,9 @@ Before extending, make sure your agent runs correctly with the base setup:
 
 | Requirement | Purpose | How to start |
 |-------------|---------|-------------|
-| **MongoDB** | Episodic memory, chat history, knowledge, evals, costs | `docker compose up -d mongo` |
+| **MongoDB** | Episodic memory, chat history, knowledge, costs | `docker compose up -d mongo` |
 | **Redis** | Working memory, HITL approvals, tool cache, rate limits | `docker compose up -d redis` |
-| **Ollama** | Local routing model (skill routing, session summaries, eval judge) | `docker compose up -d ollama` |
+| **Ollama** | Local routing model (skill routing, session summaries) | `docker compose up -d ollama` |
 | **LLM API key** | Primary model for agent responses | `export LLM_PRIMARY_API_KEY=sk-...` |
 
 ```bash
@@ -314,22 +314,27 @@ agent:
 
 ### Gateway mode (default)
 
-One MCP tool: `chat`. The client sends a message, the agent routes it through the full pipeline (guardrails, routing, memory, tools) and returns the response.
+One MCP tool — name configurable via `agent.mcp.gateway.tool-name` (default `agent-chat`). The client sends a message, the agent routes it through the full pipeline (guardrails, routing, memory, tools) and returns the response.
 
 ```
-MCP Client → tool: chat(message, sessionId?, skillName?) → OrchestratorEngine → response
+MCP Client → tool: agent-chat(userMessage, userId?, sessionId?) → OrchestratorEngine → response.text
 ```
 
-### Transparent mode
+The `userId` defaults to `mcp-client` and `sessionId` is auto-generated as a UUID when the client doesn't supply one. Pass a stable `sessionId` from the client to enable working memory across calls.
 
-Exposes fine-grained primitives for advanced integrations:
+### Capabilities resource
 
-| MCP primitive | What it maps to |
-|---------------|-----------------|
-| Tool `invoke_skill` | OrchestratorEngine with forceSkill |
-| Resource `gargantua://capabilities` | AgentCardService |
-| Resource `gargantua://skill/{name}` | SkillRegistry (description only, no system prompt) |
-| Prompt `use-skill` | SKILL.md body as prompt template |
+The MCP resource `agent://capabilities` returns a live snapshot of the agent — sourced from the running `SkillRegistry` and `ToolRegistry` so it always reflects the current configuration (including hot-reloaded skills):
+
+```jsonc
+{
+  "name": "my-agent", "version": "1.0.0", "description": "...",
+  "mode": "standalone",
+  "tools":      { "agent-chat": "Send a message to the AI agent for processing" },
+  "skills":     [ { "name": "default-skill", "description": "...", "version": "1.0.0", "domain": "general", "active": true } ],
+  "agentTools": [ { "name": "getOrderStatus", "description": "...", "requiresApproval": false, "dangerous": false, "parallelizable": true } ]
+}
+```
 
 ### Connect Claude Desktop
 
@@ -346,7 +351,7 @@ Add to your `claude_desktop_config.json`:
 }
 ```
 
-After restarting Claude Desktop, a `chat` tool appears in the tool list.
+After restarting Claude Desktop, the configured MCP gateway tool appears in the tool list (default `agent-chat`, configurable via `agent.mcp.gateway.tool-name`).
 
 ### SSE endpoints
 
@@ -408,7 +413,7 @@ agent:
 
 ## Cost Tracking
 
-Every LLM call is tracked in MongoDB with provider, model, token counts, estimated cost, skill, user, and phase (routing / agent / summarizer / eval).
+Every LLM call is tracked in MongoDB with provider, model, token counts, estimated cost, skill, user, and phase (routing / agent / summarizer).
 
 ### Configuration
 

@@ -7,7 +7,9 @@ import java.lang.annotation.Target;
 
 /**
  * Defines a Skill directly in Java — an alternative to writing a SKILL.md file.
- * The system prompt is taken from the class-level Javadoc comment.
+ * The system prompt is read from a {@code public static final String PROMPT}
+ * field on the annotated class (Javadoc is not retained at runtime in JVM
+ * bytecode, so a string field is used instead).
  *
  * <p>If both @AgentSkill and a SKILL.md file exist for the same skill name,
  * the SKILL.md file takes priority.</p>
@@ -17,20 +19,22 @@ import java.lang.annotation.Target;
  *
  * <p>Example:</p>
  * <pre>{@code
- * /**
- *  * ## Role
- *  * You are a senior software engineer.
- *  *
- *  * ## Behavior
- *  * - Write clean, tested code
- *  * - Always explain your reasoning
- *  *
- *  * ## Scope
- *  * Code only. No infrastructure questions.
- *  * /
  * @AgentSkill(name = "coder", description = "Writes and reviews code")
  * @Component
  * public class CoderAgent {
+ *
+ *     public static final String PROMPT = """
+ *         ## Role
+ *         You are a senior software engineer.
+ *
+ *         ## Behavior
+ *         - Write clean, tested code
+ *         - Always explain your reasoning
+ *
+ *         ## Scope
+ *         Code only. No infrastructure questions.
+ *         """;
+ *
  *     @AgentTool(description = "Writes code from spec")
  *     public String writeCode(String spec) { ... }
  * }

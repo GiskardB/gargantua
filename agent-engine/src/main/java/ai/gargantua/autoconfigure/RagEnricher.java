@@ -83,12 +83,13 @@ public class RagEnricher implements ContextEnricher {
             return null;
         }
 
-        var sb = new StringBuilder();
+        var sb = new StringBuilder(256 + chunks.size() * 128);
         sb.append("The following documents are relevant to the user's question:\n\n");
         for (int i = 0; i < chunks.size(); i++) {
             var chunk = chunks.get(i);
-            sb.append("%d. [Source: %s | Score: %.2f]\n%s\n\n".formatted(
-                    i + 1, chunk.source(), chunk.score(), chunk.content()));
+            sb.append(i + 1).append(". [Source: ").append(chunk.source())
+                    .append(" | Score: ").append(String.format("%.2f", chunk.score()))
+                    .append("]\n").append(chunk.content()).append("\n\n");
         }
 
         log.debug("RAG enrichment for skill '{}': {} documents retrieved", ctx.skillName(), chunks.size());

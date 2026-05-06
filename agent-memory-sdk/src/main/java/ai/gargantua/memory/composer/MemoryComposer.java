@@ -5,26 +5,37 @@ import ai.gargantua.core.memory.ComposedMemory;
 import ai.gargantua.core.memory.EpisodicMemoryPort;
 import ai.gargantua.core.memory.KnowledgeMemoryPort;
 import ai.gargantua.core.memory.KnowledgeSegment;
+import ai.gargantua.core.memory.MemoryLayer;
 import ai.gargantua.core.memory.SessionSummary;
 import ai.gargantua.core.memory.WorkingMemoryPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 /**
  * Composes all three memory layers (working, episodic, knowledge) in parallel,
  * then applies priority-based token truncation.
  *
- * <p>Priority order (highest first): working > episodic > knowledge.
+ * <p>Priority order (highest first): working &gt; episodic &gt; knowledge.
  * When the total exceeds {@code maxContextTokens}, knowledge segments are
- * trimmed first, then episodic summaries (oldest first).
+ * trimmed first, then episodic summaries (oldest first).</p>
+ *
+ * <p>A skill can opt out of layers it doesn't need by passing a restricted
+ * {@link MemoryLayer} set to {@link #compose(String, String, int, Set)} —
+ * useful for stateless skills (greetings, simple Q&amp;A) that don't benefit
+ * from past sessions or stored user knowledge. Skipped layers avoid the
+ * Redis/MongoDB round-trip entirely.</p>
  */
 public class MemoryComposer {
 
     private static final Logger log = LoggerFactory.getLogger(MemoryComposer.class);
+
+    private static final Set<MemoryLayer> ALL_LAYERS = EnumSet.allOf(MemoryLayer.class);
 
     private final WorkingMemoryPort workingMemory;
     private final EpisodicMemoryPort episodicMemory;
@@ -46,18 +57,36 @@ public class MemoryComposer {
      * truncating to fit within the token budget.
      */
     public ComposedMemory compose(String userId, String sessionId, int maxTokens) {
+        return compose(userId, sessionId, maxTokens, ALL_LAYERS);
+    }
+
+    /**
+     * Composes memory from the {@code enabledLayers} only, fetching in parallel.
+     * Disabled layers are returned as empty lists; their backing port is never called.
+     *
+     * @param enabledLayers layers to fetch; {@code null} or empty is treated as
+     *                      "all layers" for backward-compatibility.
+     */
+    public ComposedMemory compose(String userId, String sessionId, int maxTokens, Set<MemoryLayer> enabledLayers) {
+        Set<MemoryLayer> layers = (enabledLayers == null || enabledLayers.isEmpty())
+                ? ALL_LAYERS
+                : enabledLayers;
+
         int budget = Math.min(maxTokens, maxContextTokens);
 
-        log.debug("[MemoryComposer] Composing memory for userId={}, sessionId={}, budget={}",
-                userId, sessionId, budget);
+        log.debug("[MemoryComposer] Composing memory for userId={}, sessionId={}, budget={}, layers={}",
+                userId, sessionId, budget, layers);
 
-        // Parallel fetch
-        var workingFuture = CompletableFuture.supplyAsync(() ->
-                workingMemory.getMessages(sessionId));
-        var episodicFuture = CompletableFuture.supplyAsync(() ->
-                episodicMemory.getRecentSummaries(userId, 10));
-        var knowledgeFuture = CompletableFuture.supplyAsync(() ->
-                knowledgeMemory.getSegments(userId));
+        // Parallel fetch — only for enabled layers
+        CompletableFuture<List<ChatMessage>> workingFuture = layers.contains(MemoryLayer.WORKING)
+                ? CompletableFuture.supplyAsync(() -> workingMemory.getMessages(sessionId))
+                : CompletableFuture.completedFuture(List.of());
+        CompletableFuture<List<SessionSummary>> episodicFuture = layers.contains(MemoryLayer.EPISODIC)
+                ? CompletableFuture.supplyAsync(() -> episodicMemory.getRecentSummaries(userId, 10))
+                : CompletableFuture.completedFuture(List.of());
+        CompletableFuture<List<KnowledgeSegment>> knowledgeFuture = layers.contains(MemoryLayer.KNOWLEDGE)
+                ? CompletableFuture.supplyAsync(() -> knowledgeMemory.getSegments(userId))
+                : CompletableFuture.completedFuture(List.of());
 
         CompletableFuture.allOf(workingFuture, episodicFuture, knowledgeFuture).join();
 

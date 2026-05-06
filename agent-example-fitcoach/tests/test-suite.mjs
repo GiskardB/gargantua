@@ -481,56 +481,11 @@ async function run() {
     });
 
     // ════════════════════════════════════════════════════════════════
-    // 13. EVAL FRAMEWORK
-    // ════════════════════════════════════════════════════════════════
-    console.log('\n  --- EVAL FRAMEWORK ---');
-
-    await test('Eval', '43. POST /api/admin/evals/run/workout-skill starts eval', async () => {
-        const r = await http('POST', '/api/admin/evals/run/workout-skill');
-        assert([200, 202].includes(r.status), `HTTP ${r.status}: ${r.text}`);
-    });
-
-    await test('Eval', '44. POST /api/admin/evals/run/nutrition-skill starts eval', async () => {
-        const r = await http('POST', '/api/admin/evals/run/nutrition-skill');
-        assert([200, 202].includes(r.status), `HTTP ${r.status}: ${r.text}`);
-    });
-
-    await test('Eval', '45. POST /api/admin/evals/run runs all evals', async () => {
-        const r = await http('POST', '/api/admin/evals/run');
-        assert([200, 202].includes(r.status), `HTTP ${r.status}: ${r.text}`);
-    });
-
-    await test('Eval', '46. GET /api/admin/evals/skills lists skills with evals', async () => {
-        const r = await http('GET', '/api/admin/evals/skills');
-        assertEquals(r.status, 200, 'HTTP status');
-        assert(Array.isArray(r.json), 'Should be array');
-        // workout-skill and nutrition-skill have evals
-        const names = r.json.map(s => s.name || s);
-        assert(names.includes('workout-skill') || r.json.length >= 1, 'Should list skills with evals');
-    });
-
-    await test('Eval', '47. GET /api/admin/evals/reports/workout-skill returns report', async () => {
-        // Wait briefly for async eval to complete
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        const r = await http('GET', '/api/admin/evals/reports/workout-skill');
-        // May be 200 with data or 404 if eval hasn't completed yet
-        assert([200, 404].includes(r.status), `HTTP ${r.status}: ${r.text}`);
-        if (r.status === 200) {
-            assert(Array.isArray(r.json) || r.json.overallScore !== undefined, 'Should contain eval results');
-        }
-    });
-
-    await test('Eval', '48. GET /api/admin/evals/reports/workout-skill/latest returns latest', async () => {
-        const r = await http('GET', '/api/admin/evals/reports/workout-skill/latest');
-        assert([200, 404].includes(r.status), `HTTP ${r.status}: ${r.text}`);
-    });
-
-    // ════════════════════════════════════════════════════════════════
-    // 14. STREAMING
+    // 13. STREAMING
     // ════════════════════════════════════════════════════════════════
     console.log('\n  --- STREAMING ---');
 
-    await test('Streaming', '49. POST /api/agent/chat/stream returns SSE events', async () => {
+    await test('Streaming', '43. POST /api/agent/chat/stream returns SSE events', async () => {
         const url = `${BASE}/api/agent/chat/stream`;
         const res = await fetch(url, {
             method: 'POST',

@@ -1,0 +1,201 @@
+##############################################################################
+# Gargantua Agent Configuration
+#
+# Environment variables:
+#
+#   MONGODB_URI              MongoDB connection string (default: mongodb://localhost:27017/...)
+#   REDIS_URL                Redis connection URL (default: redis://localhost:6379)
+#   SERVER_PORT              HTTP port (default: 8080)
+#
+#   LLM_PRIMARY_PROVIDER     Primary LLM: openai | azure-openai | anthropic (default: openai)
+#   LLM_PRIMARY_MODEL        Model name, e.g. gpt-4o, claude-sonnet-4-... (default: gpt-4o)
+#   LLM_PRIMARY_API_KEY      API key for the primary LLM provider (REQUIRED)
+#   LLM_PRIMARY_ENDPOINT     Base URL (required for azure-openai, optional otherwise)
+#   LLM_PRIMARY_TEMPERATURE  Sampling temperature 0.0-1.0 (default: 0.7)
+#   LLM_PRIMARY_MAX_TOKENS   Max response tokens (default: 1000)
+#
+#   LLM_FALLBACK_PROVIDER    Fallback provider when primary fails (default: anthropic)
+#   LLM_FALLBACK_MODEL       Fallback model name (default: claude-sonnet-4-20250514)
+#   LLM_FALLBACK_API_KEY     Fallback API key (optional)
+#
+#   LLM_ROUTING_PROVIDER     Routing model provider (default: ollama / phi4-mini, local)
+#   LLM_ROUTING_MODEL        Routing model name (default: phi4-mini)
+#   LLM_ROUTING_API_KEY      Not needed for Ollama
+#
+##############################################################################
+
+spring:
+  application:
+    name: agent-example-cookbook
+  threads:
+    virtual:
+      enabled: true
+  # Spring Boot 4 split MongoDB connection settings out of `spring.data.mongodb`
+  # into the new `spring.mongodb` namespace. Set BOTH so the configuration is
+  # robust against either the legacy or the new autoconfiguration class winning.
+  mongodb:
+    uri: ${MONGODB_URI:mongodb://localhost:27017/cookbook_ai}
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/cookbook_ai}
+    redis:
+      url: ${REDIS_URL:redis://localhost:6379}
+
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # `env` and `configprops` are useful for diagnosing how property
+        # placeholders (MONGODB_URI, REDIS_URL, …) actually resolve at runtime.
+        # Tighten this in production.
+        include: health,info,metrics,prometheus,env,configprops
+  endpoint:
+    env:
+      show-values: ALWAYS
+    configprops:
+      show-values: ALWAYS
+
+agent:
+  llm:
+    primary:
+      provider: ${LLM_PRIMARY_PROVIDER:openai}
+      model: ${LLM_PRIMARY_MODEL:gpt-4o}
+      api-key: ${LLM_PRIMARY_API_KEY:}
+      endpoint: ${LLM_PRIMARY_ENDPOINT:}
+      temperature: ${LLM_PRIMARY_TEMPERATURE:0.7}
+      max-tokens: ${LLM_PRIMARY_MAX_TOKENS:1000}
+    fallback:
+      provider: ${LLM_FALLBACK_PROVIDER:anthropic}
+      model: ${LLM_FALLBACK_MODEL:claude-sonnet-4-20250514}
+      api-key: ${LLM_FALLBACK_API_KEY:}
+      endpoint: ${LLM_FALLBACK_ENDPOINT:}
+    routing-model:
+      provider: ${LLM_ROUTING_PROVIDER:ollama}
+      model: ${LLM_ROUTING_MODEL:phi4-mini}
+      api-key: ${LLM_ROUTING_API_KEY:}
+      endpoint: ${LLM_ROUTING_ENDPOINT:http://localhost:11434}
+      temperature: 0.0
+      max-tokens: 50
+
+    # Domain-driven model routing — cooking and admin take the strong primary,
+    # greetings and small talk go to the cheaper fallback.
+    routing-rules:
+      - name: cooking-domain-best-model
+        description: "Recipes & ingredients benefit from the strongest model"
+        condition:
+          domain: cooking
+        target-model: primary
+        priority: 10
+      - name: admin-domain-best-model
+        description: "Admin actions need precise instruction-following"
+        condition:
+          domain: admin
+        target-model: primary
+        priority: 15
+      - name: general-domain-cheaper-model
+        description: "Greetings can run on the cheaper fallback model"
+        condition:
+          domain: general
+        target-model: fallback
+        priority: 20
+
+  skill:
+    path: classpath:skills/
+    hot-reload: false
+    cache-ttl-minutes: 60
+
+  routing:
+    strategy: hybrid
+    fallback-skill: default-skill
+    semantic:
+      threshold: 0.78
+
+  memory:
+    working:
+      max-messages: 20
+      ttl-minutes: 30
+    episodic:
+      max-summaries: 5
+      ttl-days: 365
+    knowledge:
+      max-segments: 10
+    composer:
+      max-context-tokens: 3000
+
+  guardrail:
+    input:
+      max-chars: 2000
+      injection-guard:
+        enabled: true
+      pii-masking:
+        enabled: true
+    output:
+      pii-redaction:
+        enabled: true
+      schema-validator:
+        enabled: true
+
+  hitl:
+    enabled: true
+    default-ttl-minutes: 5
+
+  cost-tracking:
+    enabled: true
+    retention-days: 365
+    pricing:
+      openai:
+        gpt-4o:
+          input-per-1k: 0.005
+          output-per-1k: 0.015
+        gpt-4o-mini:
+          input-per-1k: 0.00015
+          output-per-1k: 0.0006
+      ollama:
+        phi4-mini:
+          input-per-1k: 0.0
+          output-per-1k: 0.0
+
+  audit:
+    enabled: true
+    retention-days: 365
+
+  dry-run:
+    enabled: true
+
+  chat-ui:
+    enabled: true                 # Set to false to disable /chat web interface
+
+  # MCP Server — set MCP_ENABLED=true to expose the agent via the Model Context Protocol.
+  mcp:
+    enabled: ${MCP_ENABLED:false}
+    server:
+      name: cookbook-ai
+      version: 1.0.0
+      description: Cookbook AI MCP gateway
+    transport:
+      type: sse
+      path: /mcp
+    gateway:
+      tool-name: cookbook-chat
+      tool-description: Talk to the Cookbook AI for recipes, ingredients and meal plans
+
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui
+
+logging:
+  level:
+    root: INFO
+    # All Gargantua framework + the cookbook example at DEBUG so you can see
+    # routing decisions, guardrail verdicts, memory composition, tool calls, etc.
+    ai.gargantua: DEBUG
+    # Tone down noisy MongoDB driver chatter at DEBUG level.
+    org.mongodb.driver: INFO

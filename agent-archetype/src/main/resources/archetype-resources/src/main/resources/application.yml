@@ -33,6 +33,11 @@ spring:
   threads:
     virtual:
       enabled: true
+  ${symbol_pound} Spring Boot 4 split MongoDB connection settings out of `spring.data.mongodb`
+  ${symbol_pound} into the new `spring.mongodb` namespace. Set BOTH so the configuration is
+  ${symbol_pound} robust against either autoconfiguration class winning.
+  mongodb:
+    uri: ${symbol_dollar}{MONGODB_URI:mongodb://localhost:27017/${artifactId}}
   data:
     mongodb:
       uri: ${symbol_dollar}{MONGODB_URI:mongodb://localhost:27017/${artifactId}}

@@ -181,6 +181,5 @@ jobs:
           echo "| agent-memory-sdk | ai.gargantua |" >> $GITHUB_STEP_SUMMARY
           echo "| agent-engine | ai.gargantua |" >> $GITHUB_STEP_SUMMARY
           echo "| agent-mcp-server | ai.gargantua |" >> $GITHUB_STEP_SUMMARY
-          echo "| agent-shell | ai.gargantua |" >> $GITHUB_STEP_SUMMARY
           echo "| agent-skill-linter-maven-plugin | ai.gargantua |" >> $GITHUB_STEP_SUMMARY
           echo "| agent-archetype | ai.gargantua |" >> $GITHUB_STEP_SUMMARY

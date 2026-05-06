@@ -139,7 +139,7 @@ nginx.ingress.kubernetes.io/proxy-buffering: "off"
 ```
 
 ### Why Pods Are Stateless
-All state is in Redis (working memory, HITL, tool cache) and MongoDB (episodic, knowledge, history, evals, costs, audit trail). No session affinity needed.
+All state is in Redis (working memory, HITL, tool cache) and MongoDB (episodic, knowledge, history, costs, audit trail). No session affinity needed.
 
 ### Audit Trail for Compliance
 The audit trail (`AGENT_AUDIT_ENABLED=true` by default) writes an immutable `AuditEvent` for every agent decision to the `audit_trail` MongoDB collection. This append-only log captures input, routing, guardrails, tools, output, tokens, cost, and duration -- suitable for SOC 2 and GDPR compliance requirements. Set `AGENT_AUDIT_RETENTION_DAYS` to control retention (default 365). Query audit events via `GET /api/admin/audit`.

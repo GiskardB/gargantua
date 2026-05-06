@@ -162,6 +162,21 @@ The `MemoryComposer` is the central piece that fetches all three layers and merg
 
 **Parallel fetch.** All three layers are fetched simultaneously using `CompletableFuture.allOf()`. This means memory retrieval takes as long as the slowest layer, not the sum of all three.
 
+**Per-skill opt-out.** A skill can declare which layers it actually needs via `memory-layers` in `SKILL.md` frontmatter (under `metadata`). Layers omitted from the list are skipped entirely — their backing port (Redis or MongoDB) is never queried. When the field is absent, all three layers are fetched (default).
+
+```yaml
+---
+name: greeting-skill
+description: Lightweight greeting handler for hello/goodbye messages.
+version: 1.0.0
+metadata:
+  active: true
+  memory-layers: [working]   # skip episodic + knowledge — saves ~1 MongoDB round-trip
+---
+```
+
+Allowed values are `working`, `episodic`, `knowledge` (case-insensitive). Use this for stateless skills — greetings, simple Q&A, status checks — where past sessions and stored user knowledge add no value to the prompt.
+
 **Token budget truncation.** The composed result must fit within `maxContextTokens`. When the total exceeds the budget, layers are truncated in priority order:
 
 1. **Knowledge segments** are trimmed first (lowest priority). Segments are removed one at a time until the budget fits.
@@ -227,14 +242,14 @@ agent:
 
 ## Infrastructure requirements
 
-The memory system requires **MongoDB** and **Redis** to be running (unless you use embedded mode):
+The memory system uses **MongoDB** and **Redis** in standard mode. In **embedded mode** (`SPRING_PROFILES_ACTIVE=embedded`) those layers are replaced by in-memory `ConcurrentHashMap` adapters and no infrastructure is needed.
 
-| Service | Used by | What happens if it is down |
-|---------|---------|---------------------------|
-| **Redis** | Working Memory | Agent will fail to start -- working memory has no fallback |
-| **MongoDB** | Episodic Memory, Knowledge Memory | Agent will fail to start -- no persistent storage available |
+| Service | Used by | What happens if it is missing |
+|---------|---------|-------------------------------|
+| **Redis** | Working Memory | The Redis-backed adapter does not register (its bean is `@ConditionalOnBean(StringRedisTemplate.class)`). With no replacement bean, working memory is unavailable; in embedded mode `EmbeddedProfileAutoConfiguration` registers an in-memory `WorkingMemoryPort` instead. |
+| **MongoDB** | Episodic Memory, Knowledge Memory | Same pattern: the MongoDB adapters are `@ConditionalOnBean(MongoTemplate.class)` and silently skip registration when MongoDB isn't on the classpath / not configured. Embedded mode supplies in-memory replacements. |
 
-Start both with Docker:
+Start the stores with Docker (standard mode):
 ```bash
 docker compose up -d mongo redis
 ```
@@ -275,7 +290,7 @@ agentkit:
       max-context-tokens: 3000
 ```
 
-Every bean in the auto-configuration uses `@ConditionalOnMissingBean`, so you can override any adapter by declaring your own bean in your application context.
+Every bean in the auto-configuration uses `@ConditionalOnBean` to require its backing template (`MongoTemplate` for episodic/knowledge, `StringRedisTemplate` for working) and `@ConditionalOnMissingBean` so you can override any adapter by declaring your own bean. When the backing template isn't available the adapter simply isn't registered — `EmbeddedProfileAutoConfiguration` (active under the `embedded` profile) provides in-memory drop-ins instead.
 
 ## Override adapters
 

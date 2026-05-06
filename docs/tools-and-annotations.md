@@ -130,6 +130,42 @@ When `auto-deny-on-expiry` is `true` and the TTL elapses, the agent receives the
 
 ---
 
+## @RequiresRole — Role-Based Access Control on tools
+
+Restricts a tool method to callers that have at least one of the listed roles in their `SecurityContext`. When the caller doesn't satisfy the role check, the framework refuses the tool call before execution and surfaces a denial back to the LLM (so it can either pick a different tool or apologise).
+
+```java
+import ai.gargantua.core.security.RequiresRole;
+
+@AgentTool(description = "Permanently deletes a user profile")
+@RequiresRole({"fitness-admin", "super-admin"})
+@RequiresApproval(message = "Delete this user?", dangerous = true)
+public void deleteProfile(String userId) { ... }
+```
+
+### Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `value` | `String[]` | — (required) | One or more role names. Caller needs **at least one** match. The reserved role `super-admin` bypasses every per-tool check. |
+
+### How roles arrive at the agent
+
+Roles are read from the `X-User-Roles` HTTP header on the chat endpoints (comma-separated) and propagated into the request `SecurityContext` by the `SecurityContextFilter`. The same context drives the skill-level `allowed-roles` check in `RbacGuardrail`.
+
+```bash
+curl -X POST http://localhost:8080/api/agent/chat \
+  -H "X-User-Id: alice" -H "X-Session-Id: s1" \
+  -H "X-User-Roles: fitness-admin" \
+  -d '{"message": "delete the test profile"}'
+```
+
+### Combining with @RequiresApproval
+
+`@RequiresRole` is checked **before** `@RequiresApproval` — so dangerous admin tools typically carry both annotations: the role gate filters out unauthorised callers entirely, and the HITL gate makes authorised admins confirm explicitly before the destructive action runs.
+
+---
+
 ## @CacheableToolResult -- Tool Output Caching
 
 Caches tool return values in Redis to avoid redundant external calls. Particularly useful for tools that query slow or rate-limited APIs with predictable outputs.

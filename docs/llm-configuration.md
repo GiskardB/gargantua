@@ -134,7 +134,7 @@ agent:
 |------|--------------------|------------------|---------|------|
 | **Primary** | Agent conversations — the LLM that answers the user | Every chat request | `openai` / `gpt-4o` | Per-token API cost |
 | **Fallback** | Automatic failover when primary fails (timeout, HTTP 5xx, rate limit) | Only on primary failure | `anthropic` / `claude-sonnet` | Per-token API cost |
-| **Routing** | Skill routing, session summaries, eval judge, topic scope guardrail | Multiple times per request (internally) | `ollama` / `phi4-mini` | **Free** (local) |
+| **Routing** | Skill routing, session summaries, topic scope guardrail | Multiple times per request (internally) | `ollama` / `phi4-mini` | **Free** (local) |
 
 > **Why Ollama for routing?** The routing model is called frequently (every request for skill selection, periodically for session summaries). Using a local model eliminates API costs for these internal operations. The `phi4-mini` model is small (~2GB) and fast enough for classification tasks.
 
@@ -230,7 +230,7 @@ agent:
     # Failover model when the selected model fails
     fallback: claude-sonnet
 
-    # Local model for internal operations (skill routing, summaries, eval)
+    # Local model for internal operations (skill routing, summaries)
     routing-model:
       provider: ollama
       model: phi4-mini
@@ -402,7 +402,7 @@ When a request comes in, the model is selected in this order:
    │  Primary failed → automatic switch to fallback
 ```
 
-The **routing model** (Ollama / phi4-mini) is separate from this chain — it's only used for internal operations (skill routing, session summaries, eval judge), never for user-facing conversations.
+The **routing model** (Ollama / phi4-mini) is separate from this chain — it's only used for internal operations (skill routing, session summaries), never for user-facing conversations.
 
 ---
 

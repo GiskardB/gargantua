@@ -303,16 +303,6 @@ Admin endpoints are grouped by subsystem. In production, protect these with auth
 | GET | `/api/admin/guardrails` | List all guardrails and their enabled/disabled state. |
 | POST | `/api/admin/guardrails/{guardrailName}/toggle` | Toggle a guardrail on or off at runtime. |
 
-### Evals Admin
-
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/admin/evals/run/{skillName}` | Run the evaluation suite for a specific skill. |
-| POST | `/api/admin/evals/run` | Run evaluations for all skills. |
-| GET | `/api/admin/evals/reports/{skillName}/latest` | Get the most recent eval report for a skill. |
-| GET | `/api/admin/evals/reports/{skillName}?limit=N` | List recent eval reports (default limit: 10). |
-| GET | `/api/admin/evals/skills` | List skills that have eval suites configured. |
-
 ### Costs Admin
 
 All cost endpoints default to the last 30 days when `from`/`to` are omitted. Dates are ISO-8601.

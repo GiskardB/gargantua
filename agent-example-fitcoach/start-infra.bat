@@ -17,13 +17,27 @@ echo.
 
 cd /d "%~dp0"
 
+REM Load .env so we can echo the configured ports back to the user
+if exist ".env" (
+    for /f "usebackq eol=# tokens=1,* delims==" %%A in (".env") do (
+        if not "%%A"=="" set "%%A=%%B"
+    )
+)
+if "%BIFROST_PORT%"=="" set "BIFROST_PORT=8090"
+
 echo  [INFO] Starting all infrastructure services...
-docker compose --profile full up -d
+docker compose --profile full up -d --remove-orphans
 
 if %ERRORLEVEL% NEQ 0 (
-    echo  [ERROR] Failed to start infrastructure. Is Docker running?
-    pause
-    exit /b 1
+    echo  [WARN] Initial start failed. Likely stale containers from a previous run.
+    echo  [WARN] Cleaning up and retrying...
+    docker compose --profile full down --remove-orphans >nul 2>&1
+    docker compose --profile full up -d
+    if !ERRORLEVEL! NEQ 0 (
+        echo  [ERROR] Failed to start infrastructure. Is Docker running?
+        pause
+        exit /b 1
+    )
 )
 
 echo.
@@ -41,7 +55,7 @@ echo  [OK] Bifrost is ready
 
 echo.
 echo  ==========================================
-echo   Infrastructure is ready!
+echo   Infrastructure is ready^^!
 echo.
 echo   Bifrost:   localhost:%BIFROST_PORT%
 echo   Ollama:    localhost:11434

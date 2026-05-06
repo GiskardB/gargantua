@@ -19,6 +19,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Auto-discovers tools at boot by scanning all Spring beans for methods annotated
@@ -36,10 +37,13 @@ public class ToolRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(ToolRegistry.class);
 
+    private static final List<String> ALL_TOOLS_KEY = List.of();
+
     private final ApplicationContext applicationContext;
     private final ObjectMapper objectMapper;
     private final Map<String, ToolDefinition> tools = new HashMap<>();
     private final Map<String, ToolInvocation> toolInvocations = new HashMap<>();
+    private final Map<List<String>, List<ToolSpecification>> specCache = new ConcurrentHashMap<>();
 
     /** Holds the bean instance and method needed to invoke a tool at runtime. */
     private record ToolInvocation(Object bean, Method method) {}
@@ -122,9 +126,24 @@ public class ToolRegistry {
     /**
      * Build LangChain4j {@link ToolSpecification} objects for tools matching the allowed list.
      * If allowedTools is null or empty, returns specs for all registered tools.
+     *
+     * <p>Specifications are cached per normalized allowed-tools list, so repeated calls
+     * for the same skill incur no reflection cost.</p>
      */
     public List<ToolSpecification> getToolSpecifications(List<String> allowedTools) {
-        var filtered = getFilteredTools(allowedTools);
+        List<String> cacheKey = (allowedTools == null || allowedTools.isEmpty())
+                ? ALL_TOOLS_KEY
+                : allowedTools.stream().distinct().sorted().toList();
+        return specCache.computeIfAbsent(cacheKey, this::buildToolSpecifications);
+    }
+
+    private List<ToolSpecification> buildToolSpecifications(List<String> normalizedAllowed) {
+        var filtered = normalizedAllowed.isEmpty()
+                ? tools.values()
+                : tools.entrySet().stream()
+                        .filter(e -> normalizedAllowed.contains(e.getKey()))
+                        .map(Map.Entry::getValue)
+                        .toList();
         return filtered.stream().map(td -> {
             var invocation = toolInvocations.get(td.name());
             var builder = ToolSpecification.builder()

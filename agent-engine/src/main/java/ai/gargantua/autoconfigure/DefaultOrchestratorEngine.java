@@ -231,14 +231,15 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
         }
         log.debug("[Pipeline] Step 5b — Post-routing RBAC passed for skill '{}'", routingResult.skillName());
 
-        // 6. Compose memory from all three layers
+        // 6. Compose memory from layers the skill needs
         ComposedMemory memory;
         if (memoryComposer != null) {
             try {
                 memory = memoryComposer.compose(
                         request.userId(),
                         effectiveSessionId,
-                        properties.getMemory().getComposer().getMaxContextTokens()
+                        properties.getMemory().getComposer().getMaxContextTokens(),
+                        skillCard.enabledMemoryLayers()
                 );
             } catch (Exception e) {
                 log.warn("Memory composition failed, using empty memory: {}", e.getMessage());

@@ -193,7 +193,8 @@ public class ChatStreamController {
                 if (memoryComposer != null) {
                     try {
                         memory = memoryComposer.compose(userId, effectiveSessionId,
-                                properties.getMemory().getComposer().getMaxContextTokens());
+                                properties.getMemory().getComposer().getMaxContextTokens(),
+                                skillCard.enabledMemoryLayers());
                     } catch (Exception e) {
                         memory = new ComposedMemory(List.of(), List.of(), List.of(), 0);
                     }

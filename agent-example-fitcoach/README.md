@@ -79,21 +79,29 @@ mvn spring-boot:run -pl agent-example-fitcoach
 
 ### Configuration (.env)
 
-Copy `.env.example` to `.env` and configure:
+Copy `.env.example` to `.env` and fill in the secrets:
+
+```bash
+cp .env.example .env
+$EDITOR .env
+```
+
+Minimum required edits:
 
 ```env
-# Bifrost LLM Gateway — provider keys
+# Bifrost gateway — your real Azure OpenAI credentials
 AZURE_OPENAI_API_KEY=your-azure-key
-AZURE_OPENAI_BASE_URL=https://your-resource.openai.azure.com
+AZURE_OPENAI_BASE_URL=https://your-resource.openai.azure.com/
 AZURE_OPENAI_API_VERSION=2024-02-01
-LLM_MODEL=gpt-4o
-LLM_ROUTING_MODEL=gpt-4o-mini
+LLM_MODEL=gpt-4o-mini              # the Azure deployment name Bifrost will route to
 
-# App settings
-SERVER_PORT=8080
-BIFROST_PORT=8090
-LLM_ROUTING_MODEL=phi4-mini
+# App-side virtual key that Gargantua uses to talk to Bifrost.
+# Bifrost generates these in its dashboard; the value here is opaque to the app.
+LLM_PRIMARY_API_KEY=sk-bf-…
+LLM_FALLBACK_API_KEY=sk-bf-…
 ```
+
+The Ollama routing model (`phi4-mini`) is auto-pulled by the `ollama-init` service on first start — no manual step needed.
 
 ### Stop everything
 
@@ -174,14 +182,6 @@ When the agent calls `recordMetric` or `deleteProfile`, the SSE stream emits an 
 
 The `workout-skill` declares `output-schema: assets/schema.json`. The LLM is instructed to respond in JSON matching the WorkoutPlan schema. If validation fails, the framework retries automatically (up to 2 times).
 
-### Eval Framework
-
-Use the standalone [agent-eval](../agent-eval/) tool to test skill quality:
-
-```bash
-java -jar agent-eval.jar --evals-dir ./evals --agent-url http://localhost:8080
-```
-
 ### LLM Routing Rules
 
 The `application.yml` configures rule-based model selection:
@@ -243,18 +243,16 @@ agent-example-fitcoach/
 │       ├── workout-skill/
 │       │   ├── SKILL.md                   Structured output
 │       │   ├── assets/schema.json         JSON Schema for WorkoutPlan
-│       │   └── evals/evals.json           3 eval cases
+│       │   └── evals/evals.json           3 golden test cases (consumed by external eval tools)
 │       ├── nutrition-skill/
 │       │   ├── SKILL.md                   RAG knowledge-base
-│       │   └── evals/evals.json           2 eval cases
+│       │   └── evals/evals.json           2 golden test cases (consumed by external eval tools)
 │       ├── health-skill/SKILL.md          HITL + RBAC
 │       ├── news-skill/SKILL.md            Low temperature
 │       └── admin-skill/SKILL.md           RBAC restricted
 ├── start-embedded.bat                     Embedded mode (Ollama + Bifrost only)
 ├── start-infra.bat                        Start full infra (+ MongoDB + Redis)
 ├── start-app.bat                          Run app against full infra
-├── start-shell-embedded.bat               Interactive shell — embedded agent engine
-├── start-shell-full.bat                   Interactive shell — connects to running server
 ├── stop.bat                               Stop all Docker services
 └── src/test/java/
     └── ExampleAgentApplicationTest.java   Context load + tool unit tests

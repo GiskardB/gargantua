@@ -49,6 +49,7 @@ Do NOT answer questions unrelated to weather. Politely redirect the user.
 | `metadata.rag-max-results` | integer | No | Maximum number of RAG documents to retrieve. Default `5`. |
 | `metadata.rag-min-score` | float | No | Minimum similarity score for RAG results. Default `0.3`. |
 | `metadata.allowed-roles` | list of strings | No | Roles permitted to use this skill (e.g. `[financial-advisor, super-admin]`). If set, `RbacGuardrail` blocks users without a matching role. The `super-admin` role bypasses all restrictions. |
+| `metadata.memory-layers` | list of strings | No | Subset of memory layers to fetch for this skill: `working`, `episodic`, `knowledge` (case-insensitive). When set, layers not listed are skipped — their port (Redis or MongoDB) is not queried. Defaults to all three layers. Use it for stateless skills (greetings, simple Q&A) to save a Redis/MongoDB round-trip. See [Memory System](memory-system.md). |
 
 ### Folder Structure
 
@@ -67,7 +68,7 @@ skills/
 
 - **references/**: Every file in this directory is appended to the system prompt when the skill is activated. Use it for domain knowledge, style guides, or API documentation that the LLM should always have in context.
 - **assets/**: Static resources referenced by frontmatter fields (e.g. `output-schema`).
-- **evals/**: Golden input/output pairs for automated evaluation. The linter warns if this directory is missing.
+- **evals/**: Optional golden input/output pairs consumed by external evaluation tooling (such as [Gavel](https://github.com/giskardb/gavel)). The skill linter warns if this directory is missing.
 
 ### Naming Rules
 

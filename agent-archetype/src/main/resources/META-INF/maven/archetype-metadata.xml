@@ -34,13 +34,23 @@
         <include>**/*.html</include>
       </includes>
     </fileSet>
+    <!-- Files that MUST be Velocity-filtered (use ${artifactId}, ${symbol_dollar}, etc.) -->
+    <fileSet filtered="true" encoding="UTF-8">
+      <directory></directory>
+      <includes>
+        <include>docker-compose.yml</include>
+      </includes>
+    </fileSet>
+    <!-- Static files copied verbatim. Note: .gitignore ships as "gitignore"
+         (no leading dot) in the archetype JAR because Maven's DirectoryScanner
+         DEFAULTEXCLUDES drop ".git*" entries; the archetype-post-generate.groovy
+         script renames it to .gitignore in the generated project. -->
     <fileSet filtered="false" encoding="UTF-8">
       <directory></directory>
       <includes>
-        <include>.gitignore</include>
+        <include>gitignore</include>
         <include>.env.example</include>
         <include>Dockerfile</include>
-        <include>docker-compose.yml</include>
       </includes>
     </fileSet>
   </fileSets>
