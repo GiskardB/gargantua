@@ -16,12 +16,13 @@
     <module>agent-memory-sdk</module>
     <module>agent-engine</module>
     <module>agent-mcp-server</module>
-    <module>agent-example-fitcoach</module>
-    <module>agent-example-cookbook</module>
-    <module>agent-example-weather</module>
     <module>agent-skill-linter-maven-plugin</module>
     <module>agent-archetype</module>
   </modules>
+
+  <!-- Reference agents live in a sibling repo:
+       https://github.com/GiskardB/gargantua-examples -->
+
 
   <parent>
     <groupId>org.springframework.boot</groupId>

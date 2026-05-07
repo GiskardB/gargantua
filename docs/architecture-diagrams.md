@@ -284,9 +284,6 @@ graph TD
 
     MCP[agent-mcp-server<br/><i>MCP protocol gateway</i>]
 
-    EXAMPLE[agent-example-fitcoach<br/><i>Reference agent<br/>standalone project</i>]
-
-
     LINTER[agent-skill-linter-maven-plugin<br/><i>Build-time SKILL.md validation</i>]
 
     ARCHETYPE[agent-archetype<br/><i>Maven archetype for new projects</i>]

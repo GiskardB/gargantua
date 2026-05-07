@@ -267,7 +267,7 @@ Consecutive parallel steps are grouped and executed together. The combined outpu
 
 ### FitCoach example flows
 
-The [FitCoach AI example](../agent-example-fitcoach/) includes flows demonstrating all three step types:
+The [FitCoach AI example](https://github.com/GiskardB/gargantua-examples/tree/main/agent-example-fitcoach) includes flows demonstrating all three step types:
 
 ```java
 // Sequential: health assessment → workout → nutrition

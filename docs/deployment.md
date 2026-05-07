@@ -90,8 +90,9 @@ docker build --target runtime-native -t my-agent:native .
 
 ### Maven profile
 ```bash
-./mvnw clean package -Pnative -pl agent-example-fitcoach -am -DskipTests
+./mvnw clean package -Pnative -DskipTests
 ```
+(run from your agent project — see the [examples repo](https://github.com/GiskardB/gargantua-examples) for a working `native` profile.)
 
 ### RuntimeHints
 GargantuaRuntimeHints registers reflection hints for records and resource patterns for skills. If you add custom records used in JSON serialization, register them:

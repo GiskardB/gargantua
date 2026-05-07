@@ -524,13 +524,13 @@ gargantua/
 ├── agent-memory-sdk/                -- Standalone memory library (Redis + MongoDB)
 ├── agent-engine/                    -- Core engine: auto-configuration, orchestrator, guardrails, routing, REST controllers, skill registries
 ├── agent-mcp-server/                -- MCP Server gateway (optional)
-├── agent-example-fitcoach/                   -- FitCoach AI example agent (workout/nutrition/health tools)
-├── agent-example-cookbook/                   -- Cookbook AI example agent (recipes/ingredients/pantry/meal-plan)
-├── agent-example-weather/                    -- Weather example agent (minimal — one skill + Open-Meteo HTTP integration)
 ├── agent-skill-linter-maven-plugin/ -- Build-time SKILL.md validation
 ├── agent-archetype/                 -- Maven archetype for scaffolding new projects
 ├── k8s/                             -- Kubernetes manifests (Kustomize + Helm)
 ```
+
+Reference agents (weather, cookbook, fitcoach) live in a sibling repo:
+[GiskardB/gargantua-examples](https://github.com/GiskardB/gargantua-examples).
 
 ---
 
