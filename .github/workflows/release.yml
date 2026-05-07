@@ -98,14 +98,12 @@ jobs:
         run: >
           mvn clean install -DskipTests
           --batch-mode --no-transfer-progress
-          -pl '!agent-example'
 
       # ── Run tests ──────────────────────────────────────────────────────────
       - name: Test
         run: >
           mvn test
           --batch-mode --no-transfer-progress
-          -pl '!agent-example'
 
       # ── Publish to GitHub Packages ─────────────────────────────────────────
       - name: Publish to GitHub Packages
@@ -114,7 +112,6 @@ jobs:
           mvn deploy
           --batch-mode --no-transfer-progress
           -DskipTests
-          -pl '!agent-example'
           -DaltDeploymentRepository=github-gargantua::default::https://maven.pkg.github.com/${{ github.repository }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
