@@ -5,9 +5,13 @@
              http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>ai.gargantua</groupId>
+  <parent>
+    <groupId>ai.gargantua</groupId>
+    <artifactId>gargantua-parent</artifactId>
+    <version>1.0.0</version>
+  </parent>
+
   <artifactId>agent-archetype</artifactId>
-  <version>1.0.0</version>
   <packaging>maven-archetype</packaging>
   <name>Gargantua AI Agent Archetype</name>
   <description>Maven archetype to scaffold a new AI agent project using the Gargantua framework</description>
@@ -27,6 +31,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-archetype-plugin</artifactId>
+        <version>3.4.1</version>
         <configuration>
           <skip>true</skip>
         </configuration>
