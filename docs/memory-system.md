@@ -88,7 +88,19 @@ Episodic memory stores compressed summaries of past sessions. It gives the agent
 
 When working memory TTL expires, the `SessionSummarizer` is triggered. It receives the full list of messages from the expiring session and produces a `SessionSummary` containing a text summary, extracted key topics, and any unresolved items (open questions or pending tasks).
 
-> 🚧 **Two pieces are still planned:** (a) the current `LlmSessionSummarizer` is a placeholder that concatenates messages — the production version will use the routing model (Ollama) for true summaries at zero API cost; and (b) the TTL-expiry → summarize trigger (Redis keyspace listener or scheduled job) is not yet wired, so today the summarizer is invoked only when an upstream caller decides to.
+The default implementation is `RoutingModelSessionSummarizer` (registered automatically when an `LlmProviderFactory` is on the classpath). It calls the routing model (`agent.llm.routing-model.*`, typically a small local model like Ollama) with a structured prompt that requests a single JSON object — `summary`, `keyTopics` (≤ 5), `unresolvedItems` (≤ 5). Malformed or partial responses fall back to a deterministic concatenation of the transcript so the caller always gets a non-null summary. Override with your own `SessionSummarizer` `@Bean` to swap the prompt, the model, or the parsing.
+
+The TTL-expiry trigger is `SessionExpirySummarizationScheduler`: a Spring-`@Scheduled` job that scans the `chat_sessions` Mongo collection (populated by `DefaultOrchestratorEngine`) for documents where `lastMessageAt` is older than the working-memory TTL plus a grace window and `summarized != true`. Each match is summarised via `SessionSummarizer.summarize` and the resulting `SessionSummary` is persisted via `EpisodicMemoryPort`. Configure with:
+
+```yaml
+agent:
+  summarization:
+    enabled: true            # master switch (default true)
+    scan-interval-minutes: 5 # scheduler period
+    grace-minutes: 1         # extra wait beyond working.ttlMinutes before summarising
+```
+
+The scheduler is conditional on `MongoTemplate` being available — embedded-mode deployments without Mongo skip it and must invoke the summarizer manually.
 
 **MongoDB collection:** `session_summaries`
 

@@ -16,3 +16,4 @@ ai.gargantua.autoconfigure.SecurityAutoConfiguration
 ai.gargantua.autoconfigure.AuditAutoConfiguration
 ai.gargantua.autoconfigure.WebAutoConfiguration
 ai.gargantua.autoconfigure.FlowAutoConfiguration
+ai.gargantua.autoconfigure.SummarizationAutoConfiguration

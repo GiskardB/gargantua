@@ -89,6 +89,10 @@ public class AgentProperties {
     public ChatUi getChatUi() { return chatUi; }
     public void setChatUi(ChatUi chatUi) { this.chatUi = chatUi; }
 
+    private Summarization summarization = new Summarization();
+    public Summarization getSummarization() { return summarization; }
+    public void setSummarization(Summarization summarization) { this.summarization = summarization; }
+
     // ==================== Nested classes ====================
 
     public static class Api {
@@ -558,6 +562,27 @@ public class AgentProperties {
 
         public int getRetentionDays() { return retentionDays; }
         public void setRetentionDays(int retentionDays) { this.retentionDays = retentionDays; }
+    }
+
+    /**
+     * Triggers automatic session summarisation after a working-memory TTL has elapsed.
+     * The scheduler scans the {@code chat_sessions} Mongo collection (populated by
+     * {@code DefaultOrchestratorEngine}) and summarises sessions whose
+     * {@code lastMessageAt} is older than the working-memory TTL plus a grace window.
+     */
+    public static class Summarization {
+        private boolean enabled = true;
+        private int scanIntervalMinutes = 5;
+        private int graceMinutes = 1;
+
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
+
+        public int getScanIntervalMinutes() { return scanIntervalMinutes; }
+        public void setScanIntervalMinutes(int scanIntervalMinutes) { this.scanIntervalMinutes = scanIntervalMinutes; }
+
+        public int getGraceMinutes() { return graceMinutes; }
+        public void setGraceMinutes(int graceMinutes) { this.graceMinutes = graceMinutes; }
     }
 
     /**
