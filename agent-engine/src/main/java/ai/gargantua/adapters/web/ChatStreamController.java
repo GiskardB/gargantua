@@ -130,7 +130,12 @@ public class ChatStreamController {
         this.promptBuilder = promptBuilder;
         this.toolRegistry = toolRegistry;
         this.properties = properties;
-        this.contextEnrichers = contextEnrichers != null ? contextEnrichers : List.of();
+        // Pre-sort enrichers once — see DefaultOrchestratorEngine for the same rationale.
+        this.contextEnrichers = (contextEnrichers == null || contextEnrichers.isEmpty())
+                ? List.of()
+                : contextEnrichers.stream()
+                        .sorted(Comparator.comparingInt(ContextEnricher::order))
+                        .toList();
         this.skillRegistry = skillRegistry;
         this.memoryComposer = memoryComposer;
         this.workingMemoryPort = workingMemoryPort;
@@ -230,7 +235,6 @@ public class ChatStreamController {
                         userId, effectiveSessionId, skillCard.meta().name(),
                         skillCard.meta().domain(), request.message(), headerAttrs);
                 contextEnrichers.stream()
-                        .sorted(Comparator.comparingInt(ContextEnricher::order))
                         .filter(e -> e.targetSkill() == null || e.targetSkill().equals(skillCard.meta().name()))
                         .forEach(e -> {
                             try {
@@ -439,9 +443,9 @@ public class ChatStreamController {
                             ? costTracker.estimateUsd(provider, modelName, inputTokens, outputTokens)
                             : 0.0;
 
-                    String toolsJson = toolsCalled.stream()
+                    String toolsJson = String.join(",", toolsCalled.stream()
                             .map(t -> "\"" + escapeJson(t) + "\"")
-                            .reduce((a, b) -> a + "," + b).orElse("");
+                            .toList());
                     sink.tryEmitNext(ServerSentEvent.<String>builder()
                             .event("done")
                             .data(("{\"sessionId\":\"%s\",\"skillUsed\":\"%s\","
@@ -565,12 +569,7 @@ public class ChatStreamController {
     }
 
     private static String escapeJson(String value) {
-        if (value == null) return "";
-        return value.replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r")
-                .replace("\t", "\\t");
+        return JsonUtils.escapeJson(value);
     }
 
     public record ChatRequest(String message) {

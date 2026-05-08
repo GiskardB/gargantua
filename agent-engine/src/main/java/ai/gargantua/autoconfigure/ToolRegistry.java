@@ -65,8 +65,18 @@ public class ToolRegistry {
     private final Map<String, ToolInvocation> toolInvocations = new HashMap<>();
     private final Map<List<String>, List<ToolSpecification>> specCache = new ConcurrentHashMap<>();
 
-    /** Holds the bean instance and method needed to invoke a tool at runtime. */
-    private record ToolInvocation(Object bean, Method method) {}
+    /**
+     * Holds the bean + method plus the three method-level annotations evaluated on
+     * every invocation. Caching them at scan time turns three reflective lookups
+     * per tool call ({@link RequiresRole}, {@link CacheableToolResult},
+     * {@link ToolRetry}) into pure field reads on the hot path.
+     */
+    private record ToolInvocation(
+            Object bean,
+            Method method,
+            @org.springframework.lang.Nullable RequiresRole requiresRole,
+            @org.springframework.lang.Nullable CacheableToolResult cacheable,
+            @org.springframework.lang.Nullable ToolRetry retry) {}
 
     public ToolRegistry(ApplicationContext applicationContext,
                         ObjectProvider<ToolResultCache> toolResultCacheProvider,
@@ -116,7 +126,12 @@ public class ToolRegistry {
                 );
 
                 tools.put(toolName, def);
-                toolInvocations.put(toolName, new ToolInvocation(bean, method));
+                toolInvocations.put(toolName, new ToolInvocation(
+                        bean, method,
+                        method.getAnnotation(RequiresRole.class),
+                        method.getAnnotation(CacheableToolResult.class),
+                        method.getAnnotation(ToolRetry.class)
+                ));
                 count++;
                 log.debug("Registered tool: {}", toolName);
             }
@@ -203,13 +218,12 @@ public class ToolRegistry {
     public String executeTool(String toolName, String jsonArguments, ToolExecutionContext context) {
         var invocation = toolInvocations.get(toolName);
         if (invocation == null) {
-            return "{\"error\":\"Tool not found: " + toolName + "\"}";
+            return errorJson("Tool not found: " + toolName);
         }
         ToolExecutionContext ctx = context != null ? context : ToolExecutionContext.empty();
-        var method = invocation.method();
 
-        // 1. RBAC gate via @RequiresRole
-        var requiresRole = method.getAnnotation(RequiresRole.class);
+        // 1. RBAC gate via cached @RequiresRole
+        RequiresRole requiresRole = invocation.requiresRole();
         if (requiresRole != null && requiresRole.value().length > 0) {
             String denial = checkRequiresRole(toolName, requiresRole, ctx.securityContext());
             if (denial != null) return denial;
@@ -222,13 +236,14 @@ public class ToolRegistry {
             return errorJson("Invalid tool arguments: " + e.getMessage());
         }
 
-        // 2. Cacheable read-through
-        var cacheable = method.getAnnotation(CacheableToolResult.class);
+        // 2. Cacheable read-through (cached @CacheableToolResult)
+        CacheableToolResult cacheable = invocation.cacheable();
         ToolResultCache cache = toolResultCacheProvider.getIfAvailable();
         MeterRegistry meters = meterRegistryProvider.getIfAvailable();
         String cacheKey = null;
         if (cacheable != null && cache != null) {
-            cacheKey = cache.buildKey(toolName, method, args, cacheable, ctx.securityContext(), ctx.sessionId());
+            cacheKey = cache.buildKey(toolName, invocation.method(), args, cacheable,
+                    ctx.securityContext(), ctx.sessionId());
             if (cacheKey != null) {
                 String hit = cache.get(cacheKey);
                 if (hit != null) {
@@ -245,9 +260,9 @@ public class ToolRegistry {
             }
         }
 
-        // 3. Retry-wrapped invocation
+        // 3. Retry-wrapped invocation (cached @ToolRetry)
         Supplier<String> call = () -> doInvoke(invocation, args);
-        var retryAnn = method.getAnnotation(ToolRetry.class);
+        ToolRetry retryAnn = invocation.retry();
         String result = retryAnn != null
                 ? executeWithRetry(toolName, retryAnn, call)
                 : call.get();

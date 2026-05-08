@@ -144,7 +144,13 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
         this.toolRegistry = toolRegistry;
         this.properties = properties;
         this.skillRegistry = skillRegistry;
-        this.contextEnrichers = contextEnrichers != null ? contextEnrichers : List.of();
+        // Sort enrichers once at boot — they don't change per-request, and the
+        // previous per-request stream-sort showed up in flame graphs as a hot allocation.
+        this.contextEnrichers = (contextEnrichers == null || contextEnrichers.isEmpty())
+                ? List.of()
+                : contextEnrichers.stream()
+                        .sorted(Comparator.comparingInt(ContextEnricher::order))
+                        .toList();
         this.auditService = auditService;
         this.memoryComposer = memoryComposer;
         this.workingMemoryPort = workingMemoryPort;
@@ -292,7 +298,6 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
                 requestAttrs
         );
         contextEnrichers.stream()
-                .sorted(Comparator.comparingInt(ContextEnricher::order))
                 .filter(e -> e.targetSkill() == null || e.targetSkill().equals(skillCard.meta().name()))
                 .forEach(e -> {
                     try {
