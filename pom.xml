@@ -10,6 +10,15 @@
   <version>1.0.0</version>
   <packaging>pom</packaging>
   <name>Gargantua AI Agent Framework</name>
+  <url>https://github.com/GiskardB/gargantua</url>
+
+  <licenses>
+    <license>
+      <name>MIT License</name>
+      <url>https://opensource.org/licenses/MIT</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
 
   <modules>
     <module>agent-core</module>
