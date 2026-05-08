@@ -15,8 +15,8 @@ Every push to `main` or PR triggers the CI workflow (`.github/workflows/ci.yml`)
 Create a version tag to trigger the release workflow (`.github/workflows/release.yml`):
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag vX.Y.Z          # e.g. v1.1.2
+git push origin vX.Y.Z
 ```
 
 This will:
@@ -43,7 +43,7 @@ This will:
 <dependency>
     <groupId>com.github.giskardb.gargantua</groupId>
     <artifactId>agent-engine</artifactId>
-    <version>v1.0.0</version>
+    <version>v1.1.2</version>
 </dependency>
 ```
 
@@ -56,46 +56,46 @@ See the [Repository setup section in README](../README.md#repository-setup--jitp
 
 ## Local Development — Docker Compose
 
-### JVM mode (default, fast rebuild ~30s)
-```bash
-docker compose up agent-jvm mongo redis ollama
-```
+The framework repo does not ship a root-level `docker-compose.yml` — Docker Compose lives **inside the agent project generated from the archetype**. Once you have generated `my-agent`:
 
-### GraalVM Native (startup < 100ms, build ~5min)
 ```bash
-docker compose --profile native up agent-native mongo redis ollama
-```
+cd my-agent
 
-### Infrastructure only (for running app from IDE)
-```bash
+# Build and run the app + dependencies
+docker compose up
+
+# Infrastructure only (run the app from your IDE)
 docker compose up mongo redis ollama
 ```
 
-## Dockerfile — Multi-Stage Build
+The generated compose defines four services: `app` (your agent), `mongo` (8.0), `redis` (7.4-alpine), `ollama` (latest, with the routing model volume).
 
-| Target | Base Image | Size | Startup |
-|--------|-----------|------|---------|
-| runtime-jvm | eclipse-temurin:21-jre-alpine | ~300MB | ~3-5s |
-| runtime-native | distroless/base-debian12 | ~50-80MB | <100ms |
+## Dockerfile
+
+The archetype-generated `Dockerfile` is a two-stage build:
+
+| Stage | Base Image | Size | Startup |
+|-------|-----------|------|---------|
+| `builder` | maven:3.9-eclipse-temurin-21-alpine | — | (build only) |
+| runtime | eclipse-temurin:21-jre-jammy | ~300MB | ~3-5s |
+
+> **Why `jammy`, not `alpine`?** The semantic routing path pulls in ONNX Runtime via `langchain4j-embeddings`, whose native `libonnxruntime.so` depends on `libstdc++.so.6` — not available on Alpine/musl. Ubuntu Jammy ships glibc.
 
 ```bash
-# Build JVM image
-docker build --target runtime-jvm -t my-agent:jvm .
-
-# Build native image
-docker build --target runtime-native -t my-agent:native .
+# From inside your generated agent project
+docker build -t my-agent:latest .
 ```
 
 ## GraalVM Native Image
 
-### Maven profile
+### Maven profile (in the generated agent project)
 ```bash
 ./mvnw clean package -Pnative -DskipTests
 ```
-(run from your agent project — see the [examples repo](https://github.com/GiskardB/gargantua-examples) for a working `native` profile.)
+The `native` profile is included by default in archetype-generated projects. See [gargantua-examples](https://github.com/GiskardB/gargantua-examples) for working examples.
 
 ### RuntimeHints
-GargantuaRuntimeHints registers reflection hints for records and resource patterns for skills. If you add custom records used in JSON serialization, register them:
+🚧 **Planned — not yet wired.** A `GargantuaRuntimeHints` class to register reflection hints for records and resource patterns for skills is on the roadmap. Until it lands, you must register your own hints in your application:
 
 ```java
 hints.reflection().registerType(MyRecord.class, MemberCategory.values());
@@ -128,7 +128,7 @@ helm install my-agent k8s/helm -f k8s/helm/values-prod.yaml
 - **Deployment** — non-root container, topology spread, pod anti-affinity, graceful shutdown (30s for SSE)
 - **Service** — ClusterIP 80→8080
 - **HPA** — CPU/memory fallback autoscaler
-- **KEDA ScaledObject** — scales on SSE connections + LLM latency p95 (recommended)
+- **KEDA ScaledObject** — scales on Prometheus query `sum(rate(http_server_requests_seconds_count{app="gargantua-parent"}[2m]))` (HTTP request rate, not SSE-specific — see `k8s/base/keda-scaledobject.yaml`)
 - **PDB** — minAvailable: 1 during disruptions
 - **ServiceMonitor** — Prometheus scraping at /actuator/prometheus
 
@@ -160,7 +160,7 @@ The audit trail (`AGENT_AUDIT_ENABLED=true` by default) writes an immutable `Aud
 | `MONGODB_URI` | MongoDB connection string | `mongodb://localhost:27017/gargantua` |
 | `REDIS_URL` | Redis connection URL | `redis://localhost:6379` |
 | `SERVER_PORT` | HTTP server port | `8080` |
-| `LLM_PRIMARY_PROVIDER` | Primary LLM: `openai` / `azure-openai` / `anthropic` | `openai` |
+| `LLM_PRIMARY_PROVIDER` | Primary LLM: `openai` / `azure-openai` / `anthropic` / `ollama` / any OpenAI-compatible | `openai` |
 | `LLM_PRIMARY_MODEL` | Primary model name (e.g. `gpt-4o`) | `gpt-4o` |
 | `LLM_PRIMARY_API_KEY` | API key for the primary LLM provider | **(required)** |
 | `LLM_PRIMARY_ENDPOINT` | Base URL (required for `azure-openai`) | provider default |
@@ -186,7 +186,9 @@ Custom indicators: LLM provider reachability, skill registry loaded.
 ## Observability
 
 ### Metrics (Micrometer → Prometheus)
-Key metrics:
+
+> 🚧 **Planned — not yet wired.** The metric names below describe the intended observability surface. Currently only the standard Spring Boot / Micrometer HTTP and JVM metrics are exposed at `/actuator/prometheus`. Domain-level counters listed here are not yet registered.
+
 - agent.request.total{skill, status}
 - agent.request.duration{skill}
 - agent.llm.tokens.input/output{skill, provider}

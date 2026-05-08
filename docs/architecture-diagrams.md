@@ -288,19 +288,21 @@ graph TD
 
     ARCHETYPE[agent-archetype<br/><i>Maven archetype for new projects</i>]
 
+    EXAMPLES[agent-example-*<br/><i>Reference agents — sibling repo:<br/>GiskardB/gargantua-examples</i>]
+
     MEMORY --> CORE
     ENGINE --> CORE
     ENGINE --> MEMORY
     MCP --> ENGINE
     LINTER --> CORE
 
-    EXAMPLE -.->|uses as dependency| ENGINE
-    EXAMPLE -.->|uses as dependency| MCP
+    EXAMPLES -.->|uses as dependency| ENGINE
+    EXAMPLES -.->|uses as dependency| MCP
 
     style CORE fill:#e1f5fe
     style MEMORY fill:#e8f5e9
     style ENGINE fill:#fff3e0
-    style EXAMPLE fill:#f3e5f5,stroke-dasharray: 5 5
+    style EXAMPLES fill:#f3e5f5,stroke-dasharray: 5 5
     style ARCHETYPE fill:#f3e5f5,stroke-dasharray: 5 5
 ```
 

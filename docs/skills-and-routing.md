@@ -38,7 +38,8 @@ Do NOT answer questions unrelated to weather. Politely redirect the user.
 | `name` | string | Yes | Unique identifier for the skill. Must match the folder name exactly. Lowercase, letters/numbers/hyphens only, max 64 characters. |
 | `description` | string | Yes | Short description used by the router to decide whether this skill matches a user query. Keep it under 512 characters for best results. |
 | `version` | string | Yes | Semantic version (e.g. `1.2.0`). Enforced by the linter. |
-| `allowed-tools` | list of strings | Yes | Tool method names this skill is permitted to call. Only these tools are exposed to the LLM when the skill is active. |
+| `allowed-tools` | list of strings (or whitespace-separated string) | Yes | Tool method names this skill is permitted to call. Only these tools are exposed to the LLM when the skill is active. Both `["a", "b"]` and `"a b"` are accepted. |
+| `references` | list of strings | No | File paths whose content is appended to the system prompt at activation time. |
 | `metadata.active` | boolean | No | Whether the skill is available for routing. Defaults to `true`. Set to `false` to disable without deleting. |
 | `metadata.domain` | string | No | Logical grouping label (e.g. `weather`, `finance`, `devops`). Used for filtering and observability. |
 | `metadata.output-schema` | string | No | Relative path to a JSON Schema file for structured output. When set, the LLM response is validated against this schema. |
@@ -57,16 +58,18 @@ Do NOT answer questions unrelated to weather. Politely redirect the user.
 skills/
 └── weather-skill/
     ├── SKILL.md              # Required — skill definition
-    ├── references/           # Optional — files injected into the system prompt
-    │   ├── api-notes.md
-    │   └── unit-guide.md
+    ├── api-notes.md          # Referenced via `references:` in frontmatter
+    ├── unit-guide.md
     ├── assets/
     │   └── schema.json       # Optional — JSON Schema for structured output
     └── evals/
         └── evals.json        # Optional — evaluation golden dataset
 ```
 
-- **references/**: Every file in this directory is appended to the system prompt when the skill is activated. Use it for domain knowledge, style guides, or API documentation that the LLM should always have in context.
+- **`references:` (top-level frontmatter list)**: each path listed is appended to the system prompt when the skill is activated. Use it for domain knowledge, style guides, or API documentation that the LLM should always have in context.
+
+  > 🚧 **Planned — not yet wired.** Auto-scanning of a `references/` folder (i.e. "every file under `references/`") is on the roadmap. Today only the explicit list in frontmatter is honored.
+
 - **assets/**: Static resources referenced by frontmatter fields (e.g. `output-schema`).
 - **evals/**: Optional golden input/output pairs consumed by external evaluation tooling (such as [Gavel](https://github.com/giskardb/gavel)). The skill linter warns if this directory is missing.
 
@@ -81,7 +84,7 @@ skills/
 
 The skill named `default-skill` acts as the fallback. When the router cannot match any skill above the confidence threshold, the request is handled by `default-skill`. It should contain a general-purpose system prompt and a broad set of allowed tools suitable for open-ended conversations.
 
-Every project should include a `default-skill`. If none is present, unmatched requests will fail with a `NoSkillMatchedException`.
+Every project should include a fallback skill (the framework default name is `default`, configurable via `agent.routing.fallback-skill`). If neither a matching skill nor the configured fallback skill exists, unmatched requests will fail.
 
 ---
 
@@ -100,10 +103,10 @@ A decorator that wraps any other registry with a [Caffeine](https://github.com/b
 ```yaml
 agent:
   skill:
-    cache:
-      ttl-seconds: 600       # Time-to-live for cached entries
-      max-size: 100           # Maximum number of cached skills
+    cache-ttl-minutes: 60     # Time-to-live for cached entries
 ```
+
+The cache size is currently fixed at 200 entries (Caffeine `maximumSize`). Per-cache size configuration is not exposed yet.
 
 ### HotReloadSkillRegistry
 
@@ -155,13 +158,14 @@ Input → Embedding (all-MiniLM-L6-v2-quantized, in-process, ~2-5ms)
 agent:
   routing:
     strategy: hybrid          # semantic | llm | hybrid
-    fallback-skill: default-skill
-    semantic:
-      threshold: 0.82         # Minimum cosine similarity for semantic match
+    fallback-skill: default   # Skill name to route to when no match meets threshold
+    threshold: 0.6            # Minimum cosine similarity for semantic match
 ```
 
-| Strategy | Behavior |
-|----------|----------|
+> 🚧 **`strategy` is currently informational.** The framework default is `semantic`, but the orchestrator always runs the hybrid path (`SemanticRoutingService` does semantic matching with an LLM fallback). Pure-semantic and pure-LLM modes are roadmap; today every `strategy` value behaves like `hybrid`.
+
+| Strategy | Behavior (intended) |
+|----------|---------------------|
 | `semantic` | Embedding similarity only. Falls back to `fallback-skill` if no skill meets the threshold. |
 | `llm` | LLM-based routing only. Every request incurs the LLM call. |
 | `hybrid` | Tries semantic first; if below threshold, falls back to LLM routing. Recommended default. |
@@ -231,12 +235,12 @@ A Maven plugin is available for build-time validation of all `SKILL.md` files (b
 
 The linter enforces the following rules:
 
-| Rule | Severity | Description |
-|------|----------|-------------|
-| `NAME_MATCHES_FOLDER` | ERROR | The `name` field in frontmatter must match the containing folder name. |
-| `VERSION_SEMVER` | ERROR | The `version` field must be valid semantic versioning (e.g. `1.0.0`). |
-| `DESCRIPTION_LENGTH` | WARN | Descriptions longer than 512 characters may degrade routing accuracy. |
-| `EVALS_PRESENT` | WARN | The `evals/` directory is missing or `evals.json` is empty. |
-| `ACTIVE_MISSING` | WARN | The `metadata.active` field is not set. The skill will default to active, but being explicit is preferred. |
+| Rule ID | Severity | Description |
+|---------|----------|-------------|
+| `name-matches-folder` | ERROR | The `name` field in frontmatter must match the containing folder name. |
+| `version-semver` | ERROR | The `version` field must be valid semantic versioning (e.g. `1.0.0`). |
+| `description-length` | WARNING | Descriptions longer than 512 characters may degrade routing accuracy. |
+| `evals-present` | WARNING | Neither the `evals/` directory nor `evals.json` is present. |
+| `active-missing` | WARNING | The `metadata.active` field is not set. The skill will default to active, but being explicit is preferred. |
 
 A build with any ERROR-level violation will fail. WARN-level violations are reported but do not break the build.

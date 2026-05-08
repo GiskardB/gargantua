@@ -167,7 +167,9 @@ public String targetSkill() {
 
 ### Pass custom data from the client via HTTP headers
 
-Any header starting with `X-Context-` is automatically available in `EnricherContext.attributes()`:
+> 🚧 **Planned — not yet wired.** Auto-binding any `X-Context-*` header into `EnricherContext.attributes()` is on the roadmap. Today the controllers do not extract these headers; `EnricherContext` is built with an empty attributes map. To pass extra context per request, add it to the request body and read it in your enricher.
+
+Once implemented, the binding will be:
 
 ```
 HTTP header:  X-Context-Language: it
@@ -216,41 +218,12 @@ public class CustomMemoryConfig {
 
 ## Agent-as-Tool (Multi-Agent Delegation)
 
-One agent can delegate sub-tasks to another agent by wrapping it as a tool. The sub-agent runs in an isolated session and returns its response as a tool result.
+> 🚧 **Planned — not yet wired.** A first-class `AgentAsToolPort` for in-process multi-agent delegation is on the roadmap. Today, two paths cover the same use case:
+>
+> 1. **A2A (cross-process or cross-host).** Wrap the call to another agent as an `@AgentTool` method using `HttpA2AClient` — see the [A2A section](#a2a-protocol--call-other-agents) below. This is the recommended path even for co-located agents.
+> 2. **`@AgentsFlow` (in-process, sequential)**. Chain skills with the DSL — see [Agent DSL](agent-dsl.md). This handles the most common "agent A then agent B" pattern.
 
-### Example: delegate financial analysis to a specialized agent
-
-```java
-import ai.gargantua.core.orchestrator.AgentAsToolPort;
-import ai.gargantua.core.orchestrator.AgentToolRequest;
-import ai.gargantua.core.orchestrator.AgentToolResponse;
-import ai.gargantua.core.tool.AgentTool;
-import org.springframework.stereotype.Component;
-
-import java.util.Map;
-
-@Component
-public class DelegationTools {
-
-    private final AgentAsToolPort pfmAgent;
-
-    public DelegationTools(AgentAsToolPort pfmAgent) {
-        this.pfmAgent = pfmAgent;
-    }
-
-    @AgentTool(description = """
-        Delegates a financial analysis task to the PFM Agent.
-        Use when the user asks for spending analysis or anomaly detection.
-        """)
-    public AgentToolResponse analyzeFinances(String task, String userId) {
-        return pfmAgent.invoke(
-            new AgentToolRequest(task, userId, null, Map.of())
-        );
-    }
-}
-```
-
-The sub-agent uses its own skill routing, memory, and guardrails — completely independent from the parent agent. Tool calling uses a real multi-turn loop: the LLM can invoke a tool, receive the result, then decide to call another tool or generate a final answer. This loop continues until the LLM produces a text response, enabling complex multi-step reasoning chains.
+When the dedicated `AgentAsToolPort` ships, it will let one orchestrator engine delegate to another agent's full pipeline (its own routing, memory, guardrails, audit) within a single JVM, returning the response as a tool result.
 
 ---
 
@@ -551,20 +524,29 @@ The card advertises `protocolVersion: "1.0"` and lists all active skills.
 
 ### Calling remote A2A agents
 
-Use `HttpA2AClient` to invoke other A2A-compatible agents:
+Use `HttpA2AClient` to invoke other A2A-compatible agents. The client is auto-configured as a Spring bean — inject it; do not new it up:
 
 ```java
-import ai.gargantua.core.a2a.HttpA2AClient;
+import ai.gargantua.autoconfigure.HttpA2AClient;
+import ai.gargantua.core.a2a.A2ATask;
 
 @Component
 public class MultiAgentTools {
 
-    private final HttpA2AClient researchAgent =
-        new HttpA2AClient("https://research-agent.example.com");
+    private final HttpA2AClient a2aClient;
+
+    public MultiAgentTools(HttpA2AClient a2aClient) {
+        this.a2aClient = a2aClient;
+    }
 
     @AgentTool(description = "Delegates research to a specialized agent")
     public String research(String query) {
-        return researchAgent.sendTask(query).output();
+        A2ATask task = a2aClient.sendTask(
+            "https://research-agent.example.com",
+            query,
+            null   // optional skillHint
+        );
+        return task.artifacts().toString();
     }
 }
 ```
@@ -598,17 +580,20 @@ agent:
 ### Querying the audit trail
 
 ```bash
-# By user
-curl "http://localhost:8080/api/admin/audit?userId=user-42&count=20"
+# By user (userId is required; limit defaults to 50)
+curl "http://localhost:8080/api/admin/audit?userId=user-42&limit=20"
 
 # By tenant
-curl "http://localhost:8080/api/admin/audit?tenantId=acme&count=50"
+curl "http://localhost:8080/api/admin/audit/tenant?tenantId=acme&limit=50"
 
-# By session
-curl "http://localhost:8080/api/admin/audit?sessionId=sess_abc123"
+# By session (path variable)
+curl "http://localhost:8080/api/admin/audit/session/sess_abc123"
 
-# By event ID
-curl "http://localhost:8080/api/admin/audit?eventId=evt_xyz789"
+# By event ID (path variable)
+curl "http://localhost:8080/api/admin/audit/evt_xyz789"
+
+# Count audit events in a time range
+curl "http://localhost:8080/api/admin/audit/count"
 ```
 
 ---
@@ -624,7 +609,7 @@ All messages are stored in MongoDB and available via REST API.
 | Full-text search | `GET /api/agent/chat/history/{userId}/search?q=keyword` | Search across all messages |
 | Export | `GET /api/agent/chat/export/{userId}/{sessionId}?format=md` | Download as JSON, TXT, or Markdown |
 | Delete session | `DELETE /api/agent/chat/history/{userId}/{sessionId}` | Remove one session |
-| GDPR delete all | `DELETE /api/agent/chat/history/{userId}` | Remove all data for a user |
+| GDPR delete all | `DELETE /api/agent/chat/history/{userId}` | Removes all chat history for a user from MongoDB. **Note:** working memory in Redis and the audit trail are not touched by this endpoint — for a full GDPR erasure, also clear the user's Redis keys and decide on an audit-trail retention policy. |
 
 ---
 
@@ -667,13 +652,14 @@ metadata:
 
 1. The LLM is instructed to respond with JSON matching the schema
 2. `SchemaValidatorGuardrail` validates the response
-3. If validation fails, the framework **automatically retries** with a corrective prompt (up to 2 retries by default)
-4. After max retries, a `SchemaValidationException` is returned to the client
+3. If validation fails, the response is blocked and a `SchemaValidationException` is surfaced to the client.
+
+> 🚧 **Planned — not yet wired.** Step 3 will become "automatically retry with a corrective prompt up to N times." The `agent.output.validation-retries` property is already bound (default `2`) and reserved for that path; the orchestrator does not yet consume it.
 
 ```yaml
 agent:
   output:
-    validation-retries: 2   # Number of retry attempts on schema mismatch
+    validation-retries: 2   # 🚧 planned — bound but not yet read by the orchestrator
 ```
 
 ---

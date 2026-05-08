@@ -14,7 +14,7 @@ All chat endpoints accept the following headers. Headers marked required will pr
 | `X-User-Id` | Yes | Identifies the user. Propagated from your API gateway or set by the client. |
 | `X-Session-Id` | Yes (for chat) | Identifies the conversation session. Generate a UUID or call `POST /api/agent/session/new`. |
 | `X-Dry-Run` | No | Set to `true` for dry-run mode (no persistence, no real tool calls). |
-| `X-Context-*` | No | Custom context attributes passed to ContextEnrichers. E.g. `X-Context-Language: it`. |
+| `X-Context-*` | No | 🚧 **Planned — not yet wired.** Will pass arbitrary context attributes into `EnricherContext.attributes()` (e.g. `X-Context-Language: it` → `language=it`). Today the controllers do not extract these headers. |
 | `X-Tenant-Id` | No | Tenant identifier for multi-tenancy. Enables automatic data isolation by tenantId prefix on all storage keys. |
 | `X-User-Roles` | No | Comma-separated list of user roles (e.g. `financial-advisor,viewer`). Used by RbacGuardrail to enforce `allowed-roles` on skills and `@RequiresRole` on tools. |
 | `X-Force-Skill` | No | Force a specific skill, bypassing routing. E.g. `X-Force-Skill: weather-skill`. |
@@ -56,7 +56,7 @@ curl -X POST http://localhost:8080/api/agent/chat \
 }
 ```
 
-Response fields: `text` (the answer), `sessionId`, `skillUsed` (which skill handled it), `routingMethod` (`SEMANTIC` | `KEYWORD` | `FORCED`), `toolsCalled` (list of tool names), `totalTokens` (prompt + completion), `estimatedCostUsd`, `durationMs` (end-to-end latency).
+Response fields: `text` (the answer), `sessionId`, `skillUsed` (which skill handled it), `routingMethod` (`SEMANTIC` | `LLM` | `FORCED`), `toolsCalled` (list of tool names), `totalTokens` (prompt + completion), `estimatedCostUsd`, `durationMs` (end-to-end latency).
 
 ---
 
@@ -83,10 +83,10 @@ The response is a stream of SSE frames. Each frame has an `event` type and a JSO
 | `token` | Real-time token delivery. Concatenate values to build the full answer. |
 | `tool_call` | Agent dispatched a tool invocation. Show a "calling tool..." indicator. |
 | `tool_result` | Tool execution completed. Agent may continue generating tokens. |
-| `approval_required` | HITL pause. Stream pauses until `POST /api/agent/approval/{requestId}` resolves it. |
-| `guardrail_warn` | A guardrail modified the output (e.g., PII redacted) but allowed the request. |
 | `done` | Final metadata. Always the last event before the stream closes. |
 | `error` | Guardrail block, schema failure, or server error. Stream closes after this. |
+| `approval_required` | 🚧 **Planned — not yet emitted.** HITL approval today is exposed via `POST /api/agent/approval/{requestId}` from the orchestrator response, not as an SSE event. |
+| `guardrail_warn` | 🚧 **Planned — not yet emitted.** Today guardrails either pass silently or surface as `error` on BLOCK. |
 
 **Example stream** (abbreviated):
 ```
@@ -103,20 +103,18 @@ event: token
 data: {"token": "The current weather in Rome is 22 C and sunny.", "index": 1}
 
 event: done
-data: {"sessionId": "sess_abc123", "skillUsed": "weather-skill", "routingMethod": "SEMANTIC", "totalTokens": 87, "estimatedCostUsd": 0.0013, "durationMs": 1240}
+data: {"sessionId": "sess_abc123", "skillUsed": "weather-skill", "totalTokens": 87, "durationMs": 1240, "toolsCalled": ["getWeather"]}
 ```
 
-An `approval_required` event looks like:
-```
-event: approval_required
-data: {"requestId": "apr_7f3a9c", "toolName": "sendEmail", "message": "Approve sending email to user@example.com?"}
-```
+> The `done` payload currently includes `sessionId`, `skillUsed`, `totalTokens`, `durationMs`, and `toolsCalled`. `routingMethod` and `estimatedCostUsd` are surfaced on the synchronous `/api/agent/chat` response but are 🚧 **planned** for the SSE `done` payload as well.
 
 An `error` event looks like:
 ```
 event: error
-data: {"code": "GUARDRAIL_BLOCKED", "message": "Potential prompt injection detected"}
+data: {"error": "Potential prompt injection detected"}
 ```
+
+> A structured `code` field on `error` events (e.g. `GUARDRAIL_BLOCKED`, `RATE_LIMIT_EXCEEDED`) — matching the `ProblemDetail` URIs on the synchronous endpoint — is 🚧 **planned**.
 
 ---
 
@@ -331,13 +329,17 @@ All cost endpoints default to the last 30 days when `from`/`to` are omitted. Dat
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/admin/audit` | Query audit trail. Supports query params: `userId`, `tenantId`, `sessionId`, `eventId`, `count` (default 50). |
+| GET | `/api/admin/audit?userId=...&limit=50` | Query audit events for a user. `userId` is **required**; `limit` defaults to 50. |
+| GET | `/api/admin/audit/tenant?tenantId=...&limit=50` | Query audit events for a tenant. |
+| GET | `/api/admin/audit/session/{sessionId}` | Query audit events for a session (path variable). |
+| GET | `/api/admin/audit/{eventId}` | Fetch a single audit event by ID (path variable). |
+| GET | `/api/admin/audit/count` | Count audit events in a time range. |
 
 Each `AuditEvent` is an immutable record capturing: input, routing decision, guardrails applied, tools called, output, token usage, estimated cost, and duration.
 
 **Example:**
 ```bash
-curl "http://localhost:8080/api/admin/audit?userId=user-42&count=10"
+curl "http://localhost:8080/api/admin/audit?userId=user-42&limit=10"
 ```
 
 **Config keys:**
@@ -382,7 +384,7 @@ Standard fields: `type` (stable URI for programmatic matching), `title` (human-r
 | `guardrail-blocked` | 403 | A guardrail blocked the request (e.g., prompt injection, toxic content). |
 | `skill-not-found` | 404 | The requested skill (via `X-Force-Skill` or routing) does not exist. |
 | `approval-expired` | 410 | A HITL approval request was resolved after its timeout window. |
-| `schema-validation-failed` | 400 | The request body or a tool argument failed JSON Schema validation. |
+| `schema-validation` | 400 | The request body or a tool argument failed JSON Schema validation. |
 | `token-budget-exceeded` | 413 | The request would exceed the configured per-request token budget. |
 | `rate-limit-exceeded` | 429 | The user or client has exceeded the configured rate limit. Includes a `Retry-After` header. |
 

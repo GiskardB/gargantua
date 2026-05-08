@@ -17,7 +17,7 @@ Built on Java 21, Spring Boot 4.0.4, and LangChain4j.
 mvn archetype:generate \
   -DarchetypeGroupId=com.github.giskardb.gargantua \
   -DarchetypeArtifactId=agent-archetype \
-  -DarchetypeVersion=v1.0.0 \
+  -DarchetypeVersion=v1.1.2 \
   -DarchetypeRepository=https://jitpack.io \
   -DgroupId=com.mycompany -DartifactId=my-agent \
   -Dversion=1.0.0 -DagentName=MyAgent -DinteractiveMode=false
@@ -106,8 +106,8 @@ Every feature has dedicated documentation — click the link to dive deeper.
 |---------|-------------|------|
 | **Cost Tracking** | Per-request token usage and cost, broken down by skill, user, provider. Admin dashboards. | [Extending](docs/extending.md) |
 | **Observability** | OpenTelemetry spans + Micrometer metrics with GenAI semantic conventions. | [Deployment](docs/deployment.md) |
-| **GraalVM Native** | < 100ms startup, ~50MB image. Multi-stage Dockerfile included. | [Deployment](docs/deployment.md) |
-| **Kubernetes** | Kustomize overlays (dev/staging/prod), Helm chart, KEDA autoscaling on SSE connections. | [Deployment](docs/deployment.md) |
+| **GraalVM Native** | < 100ms startup, ~50MB image. `native` profile in the archetype-generated project. | [Deployment](docs/deployment.md) |
+| **Kubernetes** | Kustomize overlays (dev/staging/prod), Helm chart, KEDA autoscaling on HTTP request rate. | [Deployment](docs/deployment.md) |
 
 ---
 
@@ -230,7 +230,7 @@ The "60 seconds" quickstart uses **embedded mode** (everything in-memory, no Doc
 mvn archetype:generate \
   -DarchetypeGroupId=com.github.giskardb.gargantua \
   -DarchetypeArtifactId=agent-archetype \
-  -DarchetypeVersion=v1.0.0 \
+  -DarchetypeVersion=v1.1.2 \
   -DarchetypeRepository=https://jitpack.io \
   -DgroupId=com.mycompany \
   -DartifactId=my-agent \
@@ -280,7 +280,7 @@ Gargantua uses **three LLM roles** — each can be a different provider and mode
 | Role | Purpose | Default | Cost |
 |------|---------|---------|------|
 | **Primary** | Agent conversations — answers the user | OpenAI `gpt-4o` | Per-token API cost |
-| **Fallback** | Auto-failover when primary fails | Anthropic `claude-sonnet` | Per-token (only on failure) |
+| **Fallback** | Auto-failover when primary fails | Anthropic `claude-sonnet-4-20250514` | Per-token (only on failure) |
 | **Routing** | Internal: skill routing, session summaries | Ollama `phi4-mini` (local) | **Free** (if local) |
 
 By default the routing model runs locally via Ollama — but this is just a suggestion. All three roles accept **any OpenAI-compatible endpoint**. You can configure routing to use OpenAI, Azure OpenAI, or any OpenAI-compatible gateway exactly like primary and fallback — just set `LLM_ROUTING_PROVIDER`, `LLM_ROUTING_MODEL`, `LLM_ROUTING_API_KEY`, and `LLM_ROUTING_ENDPOINT`.
@@ -329,7 +329,7 @@ mvn spring-boot:run
 # Option A — curl
 curl -X POST http://localhost:8080/api/agent/chat \
   -H "Content-Type: application/json" \
-  -H "X-User-Id: user1" -H "X-Session-Id: sess1" \
+  -H "X-User-Id: user1" -H "X-Session-Id: sess1" -H "X-Tenant-Id: acme" \
   -d '{"message": "Hello, what can you do?"}'
 
 
@@ -435,7 +435,7 @@ Gargantua is published via **[JitPack](https://jitpack.io)** — no authenticati
 </pluginRepositories>
 ```
 
-> JitPack uses the groupId `com.github.giskardb.gargantua` and versions match Git tags (e.g. `v1.0.0`).
+> JitPack uses the groupId `com.github.giskardb.gargantua` and versions match Git tags (e.g. `v1.1.2`).
 >
 > If you used the Maven archetype, the repository is **already configured** in the generated `pom.xml`.
 
@@ -462,14 +462,14 @@ Add to `pom.xml`:
     </repository>
 </repositories>
 ```
-With GitHub Packages, use groupId `ai.gargantua` and version `1.0.0` (no `v` prefix).
+With GitHub Packages, use groupId `ai.gargantua` and the version that matches the tag without the `v` prefix (e.g. `1.1.2` for tag `v1.1.2`).
 </details>
 
 ### Typical dependency setup (JitPack)
 
 ```xml
 <properties>
-    <gargantua.version>v1.0.0</gargantua.version>
+    <gargantua.version>v1.1.2</gargantua.version>
 </properties>
 
 <repositories>
@@ -661,4 +661,4 @@ All storage uses in-memory ConcurrentHashMaps. Data is lost on restart.
 
 ## License
 
-Apache 2.0
+MIT — see [LICENSE](LICENSE).

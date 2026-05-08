@@ -23,7 +23,7 @@
 
   <properties>
     <java.version>21</java.version>
-    <gargantua.version>v1.0.0</gargantua.version>
+    <gargantua.version>v1.1.2</gargantua.version>
   </properties>
 
   <!-- ═══════════════════════════════════════════════════════════════════

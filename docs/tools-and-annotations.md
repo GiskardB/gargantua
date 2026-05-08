@@ -34,6 +34,8 @@ The `description` is the single most important factor in whether the LLM calls t
 
 ## @ToolRetry -- Automatic Retry with Exponential Backoff
 
+> 🚧 **Planned — not yet wired.** The annotation is declared (`ai.gargantua.core.tool.ToolRetry`) and you can put it on a method, but no aspect/interceptor in `agent-engine` reads it today. The retry policy described below is the intended runtime behavior. The metrics in this section are likewise not yet registered.
+
 Wraps the tool invocation in a retry policy backed by [Resilience4j Retry](https://resilience4j.readme.io/docs/retry). Use this for tools that call external services prone to transient failures.
 
 ```java
@@ -55,8 +57,8 @@ Wraps the tool invocation in a retry policy backed by [Resilience4j Retry](https
 | `waitDurationMs` | long | 500 | Wait time before the first retry, in milliseconds. |
 | `backoffMultiplier` | double | 2.0 | Multiplier applied to the wait duration after each failed attempt. |
 | `maxWaitDurationMs` | long | 5000 | Upper bound on the wait duration regardless of backoff. |
-| `retryOn` | Class[] | `{ Exception.class }` | Exception types that trigger a retry. |
-| `abortOn` | Class[] | `{}` | Exception types that abort immediately without retrying. Takes precedence over `retryOn`. |
+| `retryOn` | Class[] | `{ IOException.class }` | Exception types that trigger a retry. |
+| `abortOn` | Class[] | `{ IllegalArgumentException.class }` | Exception types that abort immediately without retrying. Takes precedence over `retryOn`. |
 
 ### Retry Sequence Example
 
@@ -93,7 +95,7 @@ Pauses agent execution and requests human approval before the tool runs. This is
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `message` | String | -- (required) | Human-readable description shown in the approval prompt. |
+| `message` | String | `""` | Human-readable description shown in the approval prompt. |
 | `showParameters` | String[] | `{}` | Parameter names whose values are included in the approval prompt so the reviewer can see what the tool will do. |
 | `dangerous` | boolean | `false` | If `true`, the approval UI renders a warning indicator. Does not change behavior, only presentation. |
 
@@ -101,7 +103,8 @@ Pauses agent execution and requests human approval before the tool runs. This is
 
 When the agent attempts to call a tool annotated with `@RequiresApproval`, the following sequence occurs:
 
-1. The agent runtime emits an `approval_required` SSE event containing a unique `requestId`, the `message`, and the values of any `showParameters`.
+1. The agent runtime suspends and persists an approval request keyed by a unique `requestId` (via `ApprovalStore` — Redis in standard mode, in-memory in embedded mode).
+   > 🚧 **Planned — not yet wired.** Surfacing the pause as an `approval_required` SSE event on the chat stream is on the roadmap. Today the `requestId` is exposed only via the orchestrator response — clients poll or fetch it programmatically.
 2. The agent **pauses** execution. No further tool calls or LLM requests are made.
 3. The client (web UI, CLI, or external system) presents the approval prompt to a human reviewer.
 4. The reviewer calls the approval endpoint:
@@ -121,9 +124,10 @@ When the agent attempts to call a tool annotated with `@RequiresApproval`, the f
 ```yaml
 agent:
   hitl:
-    enabled: true                # Master switch for human-in-the-loop (default: true)
-    default-ttl-minutes: 5       # How long an approval request stays open
-    auto-deny-on-expiry: true    # Automatically deny if TTL expires without a decision
+    enabled: false                 # Master switch for human-in-the-loop (default: false — requires Redis)
+    default-ttl-minutes: 5         # How long an approval request stays open
+    auto-deny-on-expiry: true      # Automatically deny if TTL expires without a decision
+    require-reason-on-deny: false  # If true, denials must include a non-blank `reason`
 ```
 
 When `auto-deny-on-expiry` is `true` and the TTL elapses, the agent receives the same denial notification as an explicit deny. When `false`, the agent remains paused indefinitely until a decision arrives or the session times out.
@@ -131,6 +135,8 @@ When `auto-deny-on-expiry` is `true` and the TTL elapses, the agent receives the
 ---
 
 ## @RequiresRole — Role-Based Access Control on tools
+
+> 🚧 **Planned — not yet wired.** The annotation is declared at `ai.gargantua.core.security.RequiresRole`, but `ToolRegistry` does not yet enforce the role check before invoking the tool. Today the only RBAC gate that runs is the **skill-level** `allowed-roles` check in `RbacGuardrail`. Per-tool gating described below is roadmap.
 
 Restricts a tool method to callers that have at least one of the listed roles in their `SecurityContext`. When the caller doesn't satisfy the role check, the framework refuses the tool call before execution and surfaces a denial back to the LLM (so it can either pick a different tool or apologise).
 
@@ -168,6 +174,8 @@ curl -X POST http://localhost:8080/api/agent/chat \
 
 ## @CacheableToolResult -- Tool Output Caching
 
+> 🚧 **Planned — not yet wired.** The annotation and `CacheScope` enum are declared, and Redis-backed admin endpoints (`/api/admin/tool-cache/*`) are in place, but no interceptor reads `keyParams`/`scope`/`ttlSeconds` to populate or look up the cache. The metrics below are not yet registered. Roadmap.
+
 Caches tool return values in Redis to avoid redundant external calls. Particularly useful for tools that query slow or rate-limited APIs with predictable outputs.
 
 ```java
@@ -183,7 +191,7 @@ Caches tool return values in Redis to avoid redundant external calls. Particular
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `ttlSeconds` | int | 300 | Time-to-live for the cached result, in seconds. |
-| `keyParams` | String[] | all params | Parameter names to include in the cache key. If omitted, all parameters are used. Specify a subset when some parameters do not affect the result (e.g. a `verbose` flag). |
+| `keyParams` | String[] | `{}` (means: all params) | Parameter names to include in the cache key. If omitted, all parameters are used. Specify a subset when some parameters do not affect the result (e.g. a `verbose` flag). |
 | `scope` | CacheScope | `GLOBAL` | Determines cache isolation. |
 
 ### Cache Scopes
@@ -228,14 +236,14 @@ This means:
 
 ## Complete Example
 
-The following class demonstrates all four annotations working together on a single tool.
+The following class demonstrates all four annotations working together on a single tool. `@AgentTool` and `@RequiresApproval` are fully wired today; `@ToolRetry` and `@CacheableToolResult` are still in development (see the planned banners on each section above) — the example showcases the intended API surface.
 
 ```java
-import ai.gargantua.annotation.AgentTool;
-import ai.gargantua.annotation.ToolRetry;
-import ai.gargantua.annotation.RequiresApproval;
-import ai.gargantua.annotation.CacheableToolResult;
-import ai.gargantua.annotation.CacheScope;
+import ai.gargantua.core.tool.AgentTool;
+import ai.gargantua.core.tool.ToolRetry;
+import ai.gargantua.core.tool.RequiresApproval;
+import ai.gargantua.core.tool.CacheableToolResult;
+import ai.gargantua.core.tool.CacheScope;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;

@@ -19,7 +19,7 @@ Instead of writing a separate SKILL.md file, annotate a Java class:
 public class CoderAgent {
 
     /** The system prompt — what the LLM sees when this skill is activated. */
-    static final String PROMPT = """
+    public static final String PROMPT = """
         ## Role
         You are a senior software engineer.
 
@@ -47,8 +47,8 @@ public class CoderAgent {
 ### How it works
 
 1. At startup, `AgentSkillProcessor` scans all Spring beans annotated with `@AgentSkill`
-2. It auto-detects all `@AgentTool` methods in the class → these become the skill's `allowed-tools`
-3. The system prompt is read from a `static final String PROMPT` field (since Javadoc isn't available at runtime)
+2. It auto-detects all **public** `@AgentTool` methods in the class → these become the skill's `allowed-tools` (private/protected methods are ignored)
+3. The system prompt is read from a `public static final String PROMPT` field (since Javadoc isn't available at runtime)
 4. A `SkillCard` is generated and registered in the `SkillRegistry`
 5. The skill participates in routing, guardrails, memory, and everything else — identical to file-based skills
 
@@ -73,7 +73,7 @@ If both `skills/coder/SKILL.md` and `@AgentSkill(name = "coder")` exist, the **f
 | `maxTokens` | int | `-1` | LLM max tokens override. -1 = use default. |
 | `outputSchema` | String | `""` | Classpath path to JSON Schema for structured output |
 | `preferredModel` | String | `""` | Force a specific LLM model alias |
-| `examples` | String[] | `{}` | Example prompts (shown in Agent Card) |
+| `examples` | String[] | `{}` | 🚧 **Planned — not yet wired.** Attribute is parsed but `AgentSkillProcessor` does not yet propagate it into the published `SkillCard`. |
 
 ### Advanced example — all features
 
@@ -116,22 +116,23 @@ public class NutritionAgent {
 
 ---
 
-## @ConversationStarters — Example Prompts
+## Example prompts
 
-Add example prompts to a skill — they appear in the A2A Agent Card for client discovery:
+🚧 **Planned — not yet wired.** Example prompts will be exposed via the `examples` attribute on `@AgentSkill` (see attributes table above) and surface in the A2A Agent Card for client discovery (Claude Desktop, custom UIs, quick-action buttons). The annotation already accepts the value; what's missing is propagation into the `SkillCard` and the Agent Card response.
 
 ```java
-@ConversationStarters({
-    "Create a workout plan for muscle gain",
-    "What should I eat for breakfast?",
-    "Calculate my BMI"
-})
-@AgentSkill(name = "fitness", description = "...")
+@AgentSkill(
+    name = "fitness",
+    description = "...",
+    examples = {
+        "Create a workout plan for muscle gain",
+        "What should I eat for breakfast?",
+        "Calculate my BMI"
+    }
+)
 @Component
 public class FitnessAgent { ... }
 ```
-
-Clients (Claude Desktop, custom UIs) can show these as suggested prompts or quick-action buttons.
 
 ---
 

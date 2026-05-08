@@ -86,7 +86,9 @@ Episodic memory stores compressed summaries of past sessions. It gives the agent
 
 **How summaries are created:**
 
-When working memory TTL expires, the `SessionSummarizer` is triggered. It receives the full list of messages from the expiring session and produces a `SessionSummary` containing a text summary, extracted key topics, and any unresolved items (open questions or pending tasks). The current `LlmSessionSummarizer` implementation is a placeholder that concatenates messages; the production version will use the routing model (Ollama) to generate true summaries at zero API cost.
+When working memory TTL expires, the `SessionSummarizer` is triggered. It receives the full list of messages from the expiring session and produces a `SessionSummary` containing a text summary, extracted key topics, and any unresolved items (open questions or pending tasks).
+
+> 🚧 **Two pieces are still planned:** (a) the current `LlmSessionSummarizer` is a placeholder that concatenates messages — the production version will use the routing model (Ollama) for true summaries at zero API cost; and (b) the TTL-expiry → summarize trigger (Redis keyspace listener or scheduled job) is not yet wired, so today the summarizer is invoked only when an upstream caller decides to.
 
 **MongoDB collection:** `session_summaries`
 
@@ -103,15 +105,15 @@ When working memory TTL expires, the `SessionSummarizer` is triggered. It receiv
 | `sessionDate` | Instant | When the session started |
 | `expiresAt` | Instant | Optional TTL for the summary itself (null = never expires) |
 
-**Retrieval:** Summaries are sorted by `sessionDate` descending and limited by `maxSummaries`. The composer fetches up to 10 summaries per request, then applies token budget truncation.
+**Retrieval:** Summaries are sorted by `sessionDate` descending. The composer currently fetches up to 10 summaries per request (hardcoded) and then applies token budget truncation.
 
 **Configuration:**
 ```yaml
 agent:
   memory:
     episodic:
-      max-summaries: 5     # max summaries to keep per user
-      ttl-days: 365        # summary retention period
+      max-summaries: 5     # 🚧 planned — bound but not yet read by MemoryComposer (today: hardcoded 10)
+      ttl-days: 365        # 🚧 planned — bound but not yet honored (no Mongo TTL index applied)
 ```
 
 ## Knowledge Memory (MongoDB)
@@ -152,8 +154,8 @@ source: "user"
 agent:
   memory:
     knowledge:
-      max-segments: 10              # max segments per user
-      max-tokens-per-segment: 400   # token budget per segment
+      max-segments: 10              # 🚧 planned — bound but not yet read; adapter currently returns all segments
+      max-tokens-per-segment: 400   # 🚧 planned — bound but not yet enforced
 ```
 
 ## Memory Composer

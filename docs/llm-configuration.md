@@ -20,6 +20,8 @@ Gargantua uses [LangChain4j](https://docs.langchain4j.dev/) for LLM API calls. T
 
 ### Adding a LangChain4j provider (e.g., Google Gemini, Mistral, Cohere)
 
+> 🚧 **Planned — not yet wired.** `LlmProviderFactory.buildModel` resolves a hardcoded set of provider names (`anthropic` plus a default OpenAI-compatible branch) and does not yet consult Spring's `ApplicationContext` for user-defined `ChatModel` beans. The recipe below describes the intended flow once bean lookup ships. Today, the only fully wired providers are the built-in ones (OpenAI-compatible + Anthropic).
+
 LangChain4j supports 20+ providers via dedicated modules. To add one:
 
 **Step 1 — Add the LangChain4j module to your POM:**
@@ -158,14 +160,16 @@ The circuit breaker tracks failures. After repeated failures, it **opens** and r
 
 ### Rate limiting
 
-Each LLM provider is rate-limited via Resilience4j to prevent API quota exhaustion. The default is 60 requests per minute per provider. When a rate limit is exceeded, the request is queued or rejected depending on configuration.
+Each LLM provider is rate-limited via Resilience4j to prevent API quota exhaustion. The current limit is **60 requests per minute per provider**, hardcoded.
+
+> 🚧 **Planned — not yet wired.** Externalising the limit via configuration is on the roadmap. The YAML keys below are reserved; they are not bound today and have no effect.
 
 ```yaml
 agent:
   llm:
     rate-limit:
-      max-requests: 60          # requests per window per provider
-      window-seconds: 60        # sliding window size
+      max-requests: 60          # 🚧 planned — not bound today
+      window-seconds: 60        # 🚧 planned — not bound today
 ```
 
 Rate limiting works in conjunction with the circuit breaker: if the provider returns a `429 Too Many Requests` response, the circuit breaker counts it as a failure, accelerating the switch to fallback.
@@ -173,6 +177,15 @@ Rate limiting works in conjunction with the circuit breaker: if the provider ret
 ---
 
 ## Advanced Setup — Model Catalog + Routing Rules
+
+> 🚧 **Largely planned.** The model catalog and a `RoutingRule` shape are bound on `AgentProperties`, but the rule-evaluation engine is not yet implemented. Specifically:
+>
+> - The catalog under `agent.llm.models.*` and the keys `agent.llm.primary-alias` / `agent.llm.fallback-alias` are read.
+> - `agent.llm.routing-rules` is bound as a free-form `condition: Map<String,Object>`, but no evaluator currently inspects operators like `domain`, `user-tier`, `input-length`, etc.
+> - Skill-level `preferred-model` (in SKILL.md frontmatter) **is honored today**.
+> - The `POST /api/admin/llm/simulate` endpoint exists but currently returns hardcoded values; it does not run real rule evaluation.
+>
+> The design described below is the target end state. Use the simple primary/fallback setup above for production until the evaluator lands.
 
 For organizations with multiple providers, different models for different use cases, or A/B testing needs, Gargantua supports a **model catalog** with **rule-based routing**.
 
@@ -224,11 +237,11 @@ agent:
         temperature: 0.7
         max-tokens: 4000    # Higher token limit for this alias
 
-    # Default model when no routing rule matches
-    primary: gpt-4o
+    # Default model when no routing rule matches (alias from the catalog above)
+    primary-alias: gpt-4o
 
     # Failover model when the selected model fails
-    fallback: claude-sonnet
+    fallback-alias: claude-sonnet
 
     # Local model for internal operations (skill routing, summaries)
     routing-model:
@@ -329,6 +342,8 @@ Rule "long-context" (priority 30)
 
 ## Available Rule Conditions
 
+> 🚧 **Planned — not yet wired.** The condition keys and operators below describe the intended evaluator surface. Today, `RoutingRule.condition` is stored as a free-form `Map<String,Object>` and no production code reads any of these operators. Setting a rule with these keys has no effect until the evaluator lands.
+
 Each condition has an operator and a value. Conditions can be combined with `AND` / `OR`.
 
 | Condition | Operators | Example | What it checks |
@@ -418,38 +433,39 @@ Manage routing rules at runtime without restarting the agent:
 
 ### Simulate endpoint
 
-Test your rule configuration before applying it:
+Test your rule configuration before applying it.
+
+> 🚧 **Mostly planned.** Today the request body is `{"message", "skillName", "userId"}` only — `skillDomain`/`userTier`/`inputLength` are not yet accepted. The response is currently a hardcoded shape (see below) without an `evaluatedRules` trace. Both will change once the rule evaluator ships.
 
 ```bash
 curl -X POST http://localhost:8080/api/admin/llm/simulate \
   -H "Content-Type: application/json" \
   -d '{
-    "userId": "user-123",
+    "message": "What is my portfolio performance?",
     "skillName": "financial-skill",
-    "skillDomain": "financial",
-    "userTier": "premium",
-    "inputLength": 2000
+    "userId": "user-123"
   }'
 ```
 
-Response:
+Response (current placeholder):
 ```json
 {
-  "selectedModel": "gpt-4o-large",
-  "matchedRule": "long-context",
-  "evaluatedRules": [
-    { "name": "high-stakes-domains", "matched": false },
-    { "name": "free-tier-users", "matched": false },
-    { "name": "long-context", "matched": true, "targetModel": "gpt-4o-large" }
-  ]
+  "selectedModel": "gpt-4o",
+  "selectedProvider": "openai",
+  "matchedRule": "domain-specialization",
+  "confidence": 0.95,
+  "skillName": "financial-skill",
+  "inputLengthChars": 36
 }
 ```
+
+Once the evaluator is wired, the response will include a real `evaluatedRules` array detailing which rules matched and which did not.
 
 ---
 
 ## Metrics
 
-Track model usage, costs, and performance across providers:
+> 🚧 **Planned — not yet registered.** The metric names below describe the intended LLM-routing observability surface. They are not currently registered with `MeterRegistry`. Today the Resilience4j Circuit Breaker / Rate Limiter expose their own standard metrics at `/actuator/prometheus`; the gargantua-specific routing/model counters listed here are roadmap.
 
 | Metric | Labels | Description |
 |--------|--------|-------------|
@@ -459,4 +475,4 @@ Track model usage, costs, and performance across providers:
 | `agent.llm.model.latency` | `model`, `skill` | Response latency per model and skill |
 | `agent.llm.model.error_rate` | `model` | Error rate per model (for circuit breaker monitoring) |
 
-These metrics feed into Prometheus/Grafana dashboards. Combined with [Cost Tracking](extending.md#cost-tracking), they give you full visibility into which models are used, how much they cost, and how they perform.
+Once registered, these metrics will feed into Prometheus/Grafana dashboards. Combined with [Cost Tracking](extending.md#cost-tracking), they will give full visibility into which models are used, how much they cost, and how they perform.

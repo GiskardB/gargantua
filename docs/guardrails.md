@@ -6,11 +6,11 @@ Guardrails are filters that protect your agent from bad input and bad output. Th
 
 ## How the pipeline works
 
-Guardrails follow the Chain of Responsibility pattern. Every guardrail is a Spring `@Component` annotated with `@Order`. The framework collects them automatically and runs them in order.
+Guardrails follow the Chain of Responsibility pattern. Every built-in guardrail is registered as a Spring bean with `@Order` (most via `@Component`, a few via auto-config). The framework collects them automatically and runs them in order.
 
 **Input guardrails** run sequentially. If any guardrail returns `BLOCK`, the pipeline short-circuits immediately -- no further guardrails run and the request never reaches the LLM. If a guardrail returns `PASS` or `WARN`, the next guardrail in the chain executes.
 
-**Output guardrails** all run, unconditionally. Each one receives the (possibly modified) response from the previous guardrail, forming a transformation chain. An output guardrail can also return `BLOCK` to suppress the response entirely.
+**Output guardrails** run sequentially as a transformation chain. Each one receives the (possibly modified) response from the previous guardrail. The first guardrail to return `BLOCK` halts the chain and the response (or block reason) is surfaced to the caller — subsequent output guardrails do not run.
 
 ```
                          INPUT PIPELINE
@@ -21,13 +21,13 @@ Guardrails follow the Chain of Responsibility pattern. Every guardrail is a Spri
                                                                                                       |
                                                                                                       v
                          OUTPUT PIPELINE
-                         (all guardrails run, chained)
+                         (chained transformation, halts on first BLOCK)
 
   User <── SchemaValidator <── ScopeValidator <── Disclaimer <── PiiOutput <──────────────────────── LLM
            @Order(40)          @Order(30)          @Order(20)     @Order(10)
 ```
 
-Each input guardrail receives a `GuardrailInputContext` containing the user message, userId, sessionId, activated skill, and a mutable `attributes` map for inter-guardrail communication (e.g., PII maps). Each output guardrail receives a `GuardrailOutputContext` with the current response text and the same attributes from the input phase.
+Each input guardrail receives a `GuardrailInputContext` containing the user message, userId, sessionId, activated skill, and a mutable `attributes` map for inter-guardrail communication (e.g., PII maps). Each output guardrail receives a `GuardrailOutputContext` with the current response text and an `inputAttributes()` map carrying the values the input phase put into context.
 
 ## Built-in Input Guardrails
 
@@ -39,8 +39,7 @@ Each input guardrail receives a `GuardrailInputContext` containing the user mess
 
 **How roles are provided.** The `SecurityContext` is constructed from HTTP headers: `X-User-Id`, `X-Tenant-Id`, and `X-User-Roles` (comma-separated list).
 
-**Config key:**
-- `agent.guardrail.input.rbac-enabled` -- boolean, default `true`
+**Config key:** RBAC is currently always enabled when the bean is registered. The runtime toggle endpoint (`POST /api/admin/guardrails/rbac/toggle`) works to disable it at runtime; a YAML key (`agent.guardrail.input.rbac-enabled`) is on the roadmap.
 
 **Example.** Skill declares `allowed-roles: [financial-advisor, super-admin]` and user has roles `[viewer]`:
 ```
@@ -155,7 +154,7 @@ PASS (pii_detected=true, pii_count=2)
 
 **What it does.** Masks PII (emails, IBANs, phone numbers) found in the LLM's response. Uses the same regex patterns as the input guardrail. Replaces matches with `[EMAIL_REDACTED]`, `[IBAN_REDACTED]`, `[PHONE_REDACTED]`.
 
-Optionally, if the input phase stored a `pii_map` in context attributes, this guardrail can de-anonymize placeholders back to their original values (configurable behavior).
+> 🚧 **Planned — not yet wired.** When the input phase stores a `pii_map` in context attributes, this guardrail will be able to de-anonymize placeholders back to their original values. The hook is in the code but the de-anonymization step is currently a no-op.
 
 **Config key:**
 - `agent.guardrail.output.pii-masking-enabled` -- boolean, default `false`
@@ -282,8 +281,9 @@ The full YAML below shows every guardrail config key with its default value. All
 agent:
   guardrail:
     input:
-      # RbacGuardrail
-      rbac-enabled: true                    # enable/disable role-based access control
+      # RbacGuardrail — always enabled when the bean is registered.
+      # The `rbac-enabled` YAML key is roadmap; toggle at runtime via
+      # POST /api/admin/guardrails/rbac/toggle for now.
 
       # MaxLength guardrail
       max-length-enabled: true              # enable/disable the max-length check
