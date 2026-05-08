@@ -9,14 +9,21 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 
 /**
- * Auto-configuration for the LLM provider factory. {@link LlmRouter} is registered
- * via {@code @Component} scanning; only {@link LlmProviderFactory} needs an explicit
- * factory because it doesn't carry a stereotype annotation (so it can be replaced
- * cleanly with {@code @ConditionalOnMissingBean}).
+ * Auto-configuration for LLM provider and router beans. The {@code @Component}
+ * stereotype on {@link LlmRouter} doesn't help downstream Spring Boot apps
+ * (they scan their own package, not the framework's), so the explicit
+ * {@code @Bean} factories below are the real registration mechanism.
  */
 @AutoConfiguration
 @EnableConfigurationProperties(AgentProperties.class)
 public class LlmProviderAutoConfiguration {
+
+    @Bean
+    @ConditionalOnMissingBean(LlmRouter.class)
+    public LlmRouter llmRouter(AgentProperties properties,
+                               ObjectProvider<MeterRegistry> meterRegistryProvider) {
+        return new LlmRouter(properties, meterRegistryProvider);
+    }
 
     @Bean
     @ConditionalOnMissingBean(LlmProviderFactory.class)
