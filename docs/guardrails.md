@@ -39,7 +39,7 @@ Each input guardrail receives a `GuardrailInputContext` containing the user mess
 
 **How roles are provided.** The `SecurityContext` is constructed from HTTP headers: `X-User-Id`, `X-Tenant-Id`, and `X-User-Roles` (comma-separated list).
 
-**Config key:** RBAC is currently always enabled when the bean is registered. The runtime toggle endpoint (`POST /api/admin/guardrails/rbac/toggle`) works to disable it at runtime; a YAML key (`agent.guardrail.input.rbac-enabled`) is on the roadmap.
+**Config key:** `agent.guardrail.input.rbac-enabled` (default `true`). Setting it to `false` disables the guardrail at startup; the runtime toggle endpoint (`POST /api/admin/guardrails/rbac/toggle`) flips the same flag without a restart.
 
 **Example.** Skill declares `allowed-roles: [financial-advisor, super-admin]` and user has roles `[viewer]`:
 ```
@@ -154,7 +154,7 @@ PASS (pii_detected=true, pii_count=2)
 
 **What it does.** Masks PII (emails, IBANs, phone numbers) found in the LLM's response. Uses the same regex patterns as the input guardrail. Replaces matches with `[EMAIL_REDACTED]`, `[IBAN_REDACTED]`, `[PHONE_REDACTED]`.
 
-> 🚧 **Planned — not yet wired.** When the input phase stores a `pii_map` in context attributes, this guardrail will be able to de-anonymize placeholders back to their original values. The hook is in the code but the de-anonymization step is currently a no-op.
+When the input phase has stashed a `pii_map` (placeholder → original) in context attributes, this guardrail restores the originals before returning the response — longer placeholders are replaced first to avoid partial substitution. When no `pii_map` is present (input masking was off), the guardrail falls back to regex-based redaction of email/IBAN/phone patterns it sees in the LLM output.
 
 **Config key:**
 - `agent.guardrail.output.pii-masking-enabled` -- boolean, default `false`
@@ -281,9 +281,8 @@ The full YAML below shows every guardrail config key with its default value. All
 agent:
   guardrail:
     input:
-      # RbacGuardrail — always enabled when the bean is registered.
-      # The `rbac-enabled` YAML key is roadmap; toggle at runtime via
-      # POST /api/admin/guardrails/rbac/toggle for now.
+      # RbacGuardrail
+      rbac-enabled: true                    # default true; runtime toggle via POST /api/admin/guardrails/rbac/toggle
 
       # MaxLength guardrail
       max-length-enabled: true              # enable/disable the max-length check

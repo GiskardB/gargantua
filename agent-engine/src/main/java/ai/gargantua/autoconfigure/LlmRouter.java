@@ -1,22 +1,29 @@
 package ai.gargantua.autoconfigure;
 
 import ai.gargantua.core.llm.LlmRoutingContext;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.Map;
+import java.util.List;
+import java.util.Optional;
 
 /**
- * Evaluates routing rules from configuration to select which LLM model alias handles a request.
- * Rules are sorted by priority (lowest first) and evaluated against the {@link ai.gargantua.core.llm.LlmRoutingContext}.
- * The first matching rule wins. If no rule matches, the primary model alias is used.
+ * Evaluates routing rules from configuration to select which LLM model alias
+ * handles a request. Rules are sorted by priority (lowest first) and evaluated
+ * against the {@link LlmRoutingContext}; the first matching rule wins. If no
+ * rule matches, the primary model alias is used.
  *
- * <p>Supported condition keys: {@code skill}, {@code domain}, {@code minTokens},
- * {@code userTier}, and any custom key matched against context attributes.</p>
- *
- * @see ai.gargantua.core.llm.LlmRoutingContext
+ * <p>Condition syntax is documented in {@code docs/llm-configuration.md} and
+ * implemented by {@link RoutingRuleEvaluator}, which supports operators
+ * (EQ/IN/NOT_IN/GT/LT/GTE/LTE/CONTAINS/REGEX), special structures
+ * (time-window, day-of-week, random-sampling, input-contains, attribute-match)
+ * and {@code AND}/{@code OR} combinators while remaining backward-compatible
+ * with the simple historical syntax.</p>
  */
 @Component
 public class LlmRouter {
@@ -24,74 +31,107 @@ public class LlmRouter {
     private static final Logger log = LoggerFactory.getLogger(LlmRouter.class);
 
     private final AgentProperties properties;
+    private final RoutingRuleEvaluator evaluator;
+    private final ObjectProvider<MeterRegistry> meterRegistryProvider;
 
-    public LlmRouter(AgentProperties properties) {
+    public LlmRouter(AgentProperties properties, ObjectProvider<MeterRegistry> meterRegistryProvider) {
         this.properties = properties;
+        this.evaluator = new RoutingRuleEvaluator();
+        this.meterRegistryProvider = meterRegistryProvider;
     }
+
+    /** Test-only constructor that disables metrics emission. */
+    public LlmRouter(AgentProperties properties) {
+        this(properties, EmptyObjectProvider.instance());
+    }
+
+    /** Trace entry returned by {@link #evaluateAll(LlmRoutingContext)}. */
+    public record RuleEvaluation(String name, int priority, boolean enabled, boolean matched, String targetModel) {}
+
+    /** Outcome of a routing decision, including which rules were considered. */
+    public record RoutingDecision(String selectedAlias, String matchedRule, List<RuleEvaluation> evaluatedRules) {}
 
     /**
      * Resolve the model alias for the given routing context.
      * Evaluates rules sorted by priority (lowest first). Returns primary alias if no rule matches.
      */
     public String resolve(LlmRoutingContext ctx) {
-        var rules = properties.getLlm().getRoutingRules();
-        if (rules == null || rules.isEmpty()) {
-            return properties.getLlm().getPrimaryAlias();
-        }
-
-        var sorted = rules.stream()
-                .filter(AgentProperties.RoutingRule::isEnabled)
-                .sorted(Comparator.comparingInt(AgentProperties.RoutingRule::getPriority))
-                .toList();
-
-        for (AgentProperties.RoutingRule rule : sorted) {
-            if (matchesRule(rule, ctx)) {
-                log.debug("LLM routing rule matched: '{}' -> model '{}'", rule.getName(), rule.getTargetModel());
-                return rule.getTargetModel();
-            }
-        }
-
-        log.debug("No LLM routing rule matched, using primary: '{}'", properties.getLlm().getPrimaryAlias());
-        return properties.getLlm().getPrimaryAlias();
+        return evaluateAll(ctx).selectedAlias();
     }
 
     /**
-     * Simple condition matching. Supports:
-     * - "skill" -> matches skill name
-     * - "domain" -> matches skill domain
-     * - "minTokens" -> matches when estimated input tokens exceed the value
-     * - "userTier" -> matches user tier
+     * Same as {@link #resolve(LlmRoutingContext)} but also reports per-rule evaluation
+     * outcomes (used by the simulate admin endpoint).
      */
-    boolean matchesRule(AgentProperties.RoutingRule rule, LlmRoutingContext ctx) {
-        var condition = rule.getCondition();
-        if (condition == null || condition.isEmpty()) {
-            return false;
+    public RoutingDecision evaluateAll(LlmRoutingContext ctx) {
+        var rules = properties.getLlm().getRoutingRules();
+        List<RuleEvaluation> trace = new ArrayList<>();
+        if (rules == null || rules.isEmpty()) {
+            String primary = properties.getLlm().getPrimaryAlias();
+            return new RoutingDecision(primary, null, trace);
         }
 
-        for (Map.Entry<String, Object> entry : condition.entrySet()) {
-            String key = entry.getKey();
-            Object expected = entry.getValue();
+        var sorted = rules.stream()
+                .sorted(Comparator.comparingInt(AgentProperties.RoutingRule::getPriority))
+                .toList();
 
-            boolean match = switch (key) {
-                case "skill" -> expected.toString().equals(ctx.skillName());
-                case "domain" -> expected.toString().equals(ctx.skillDomain());
-                case "minTokens" -> {
-                    int threshold = expected instanceof Number n ? n.intValue() : Integer.parseInt(expected.toString());
-                    yield ctx.estimatedInputTokens() >= threshold;
-                }
-                case "userTier" -> expected.toString().equals(ctx.userTier());
-                default -> {
-                    // Check against context attributes
-                    yield ctx.attributes() != null &&
-                          expected.toString().equals(ctx.attributes().get(key));
-                }
-            };
-
-            if (!match) {
-                return false;
+        String matchedRule = null;
+        String selected = null;
+        for (AgentProperties.RoutingRule rule : sorted) {
+            boolean enabled = rule.isEnabled();
+            boolean matched = enabled && evaluator.matches(rule.getCondition(), ctx);
+            trace.add(new RuleEvaluation(rule.getName(), rule.getPriority(), enabled, matched, rule.getTargetModel()));
+            if (selected == null && matched) {
+                matchedRule = rule.getName();
+                selected = rule.getTargetModel();
+                recordRuleMatch(rule.getName(), rule.getTargetModel());
+                log.debug("LLM routing rule matched: '{}' -> model '{}'", rule.getName(), rule.getTargetModel());
+                // Don't break — finish trace so simulate can report later rules too
             }
         }
 
-        return true;
+        if (selected == null) {
+            selected = properties.getLlm().getPrimaryAlias();
+            log.debug("No LLM routing rule matched, using primary: '{}'", selected);
+        }
+        recordModelSelection(selected);
+        return new RoutingDecision(selected, matchedRule, trace);
+    }
+
+    /**
+     * Look up a single routing rule by name (used by admin endpoints).
+     */
+    public Optional<AgentProperties.RoutingRule> findRule(String name) {
+        if (name == null || name.isBlank()) return Optional.empty();
+        return properties.getLlm().getRoutingRules().stream()
+                .filter(r -> name.equals(r.getName()))
+                .findFirst();
+    }
+
+    /**
+     * Backward-compatible wrapper kept for existing tests. Delegates to the
+     * evaluator with the rule's condition map.
+     */
+    boolean matchesRule(AgentProperties.RoutingRule rule, LlmRoutingContext ctx) {
+        return evaluator.matches(rule.getCondition(), ctx);
+    }
+
+    private void recordRuleMatch(String ruleName, String model) {
+        MeterRegistry meters = meterRegistryProvider.getIfAvailable();
+        if (meters != null) {
+            meters.counter("agent.llm.routing.rule.matched",
+                    "rule_name", safe(ruleName), "model", safe(model)).increment();
+        }
+    }
+
+    private void recordModelSelection(String model) {
+        MeterRegistry meters = meterRegistryProvider.getIfAvailable();
+        if (meters != null) {
+            meters.counter("agent.llm.routing.model.selected", "model", safe(model)).increment();
+        }
+    }
+
+    private static String safe(String s) {
+        return s == null ? "" : s;
     }
 }

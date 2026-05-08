@@ -71,12 +71,13 @@ public class AgentCardService {
 
             List<String> tags = new ArrayList<>();
             tags.add(meta.domain());
-            // Enrich tags from allowed tools if available
+            List<String> examples = List.of();
             try {
                 SkillCard card = skillRegistry.load(meta.name());
                 tags.addAll(card.allowedTools());
+                examples = card.examples();
             } catch (Exception ignored) {
-                // Fall back — tools are optional tag enrichment
+                // Fall back — tools and examples are optional enrichment
             }
 
             skills.add(new AgentSkill(
@@ -84,7 +85,8 @@ public class AgentCardService {
                     meta.name(),
                     meta.description(),
                     meta.domain(),
-                    tags
+                    tags,
+                    examples
             ));
         }
         return skills;

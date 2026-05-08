@@ -3,6 +3,7 @@ package ai.gargantua.autoconfigure;
 import ai.gargantua.core.tool.AgentTool;
 import ai.gargantua.core.tool.RequiresApproval;
 import ai.gargantua.core.tool.ToolDefinition;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -10,12 +11,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationContext;
 
 import java.util.Collection;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -53,8 +56,11 @@ class ToolRegistryTest {
     }
 
     @BeforeEach
+    @SuppressWarnings("unchecked")
     void setUp() {
-        toolRegistry = new ToolRegistry(applicationContext);
+        ObjectProvider<ToolResultCache> cacheProvider = mock(ObjectProvider.class);
+        ObjectProvider<MeterRegistry> meterProvider = mock(ObjectProvider.class);
+        toolRegistry = new ToolRegistry(applicationContext, cacheProvider, meterProvider);
     }
 
     @Nested

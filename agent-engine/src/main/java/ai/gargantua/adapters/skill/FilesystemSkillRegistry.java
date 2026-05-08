@@ -78,13 +78,59 @@ public class FilesystemSkillRegistry implements SkillRegistry {
             if (resources.length == 0) {
                 throw new SkillNotFoundException(skillName);
             }
+            String content;
             try (var is = resources[0].getInputStream()) {
-                var content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-                return skillMdParser.parseToCard(content, SkillSource.FILESYSTEM);
+                content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
             }
+            SkillCard card = skillMdParser.parseToCard(content, SkillSource.FILESYSTEM);
+            return appendFolderReferences(card, skillName);
         } catch (IOException e) {
             throw new SkillNotFoundException(skillName);
         }
+    }
+
+    /**
+     * Augments {@link SkillCard#references()} with the contents of every file under
+     * {@code <skillPath>/<skillName>/references/}. Frontmatter-declared references
+     * stay first, then folder files in lexicographic order. The folder is optional —
+     * if it doesn't exist the original card is returned unchanged.
+     */
+    private SkillCard appendFolderReferences(SkillCard card, String skillName) {
+        var pattern = skillPath.endsWith("/")
+                ? "%s%s/references/*".formatted(skillPath, skillName)
+                : "%s/%s/references/*".formatted(skillPath, skillName);
+        List<String> folderRefs = new ArrayList<>();
+        try {
+            var refResources = resourcePatternResolver.getResources(pattern);
+            if (refResources == null || refResources.length == 0) {
+                return card;
+            }
+            // Sort by URI for deterministic ordering across platforms
+            java.util.Arrays.sort(refResources, java.util.Comparator.comparing(r -> {
+                try { return r.getURI().toString(); } catch (IOException e) { return r.getFilename() != null ? r.getFilename() : ""; }
+            }));
+            for (var resource : refResources) {
+                if (!resource.isReadable()) continue;
+                try (var is = resource.getInputStream()) {
+                    folderRefs.add(new String(is.readAllBytes(), StandardCharsets.UTF_8));
+                } catch (IOException e) {
+                    log.warn("Failed to read reference file: {}", resource.getDescription(), e);
+                }
+            }
+        } catch (IOException e) {
+            // No references/ folder is fine — log only at debug
+            log.debug("No references/ folder for skill '{}' (or scan failed: {})", skillName, e.getMessage());
+        }
+        if (folderRefs.isEmpty()) {
+            return card;
+        }
+        List<String> merged = new ArrayList<>(card.references() != null ? card.references() : List.of());
+        merged.addAll(folderRefs);
+        return new SkillCard(
+                card.meta(), card.systemPrompt(), card.allowedTools(), card.outputSchema(),
+                List.copyOf(merged), card.maxTokens(), card.temperature(), card.preferredModel(),
+                card.ragConfig(), card.enabledMemoryLayers(), card.examples()
+        );
     }
 
     @Override

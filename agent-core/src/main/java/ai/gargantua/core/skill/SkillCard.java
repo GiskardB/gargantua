@@ -25,6 +25,8 @@ import java.util.Set;
  * @param ragConfig             RAG configuration if skill declares knowledge-base (null = no RAG)
  * @param enabledMemoryLayers   memory layers fetched by the composer for this skill;
  *                              {@code null} (default) means fetch all layers
+ * @param examples              example prompts surfaced via the A2A Agent Card for discovery;
+ *                              may be empty
  *
  * @see SkillMeta
  * @see SkillRegistry
@@ -39,12 +41,17 @@ public record SkillCard(
         Double temperature,
         String preferredModel,
         RagConfig ragConfig,
-        Set<MemoryLayer> enabledMemoryLayers
+        Set<MemoryLayer> enabledMemoryLayers,
+        List<String> examples
 ) {
+    public SkillCard {
+        examples = examples == null ? List.of() : List.copyOf(examples);
+    }
+
     /**
      * Convenience constructor that defaults {@code enabledMemoryLayers} to {@code null}
-     * (i.e. fetch all memory layers). Preserves the historical 9-arg API for callers
-     * that don't care about per-skill memory restrictions.
+     * (i.e. fetch all memory layers) and {@code examples} to an empty list.
+     * Preserves the historical 9-arg API.
      */
     public SkillCard(
             SkillMeta meta,
@@ -58,6 +65,27 @@ public record SkillCard(
             RagConfig ragConfig
     ) {
         this(meta, systemPrompt, allowedTools, outputSchema, references,
-                maxTokens, temperature, preferredModel, ragConfig, null);
+                maxTokens, temperature, preferredModel, ragConfig, null, List.of());
+    }
+
+    /**
+     * Convenience constructor that defaults {@code examples} to an empty list.
+     * Preserves the historical 10-arg API used by the SKILL.md parser before
+     * examples wiring was added.
+     */
+    public SkillCard(
+            SkillMeta meta,
+            String systemPrompt,
+            List<String> allowedTools,
+            String outputSchema,
+            List<String> references,
+            Integer maxTokens,
+            Double temperature,
+            String preferredModel,
+            RagConfig ragConfig,
+            Set<MemoryLayer> enabledMemoryLayers
+    ) {
+        this(meta, systemPrompt, allowedTools, outputSchema, references,
+                maxTokens, temperature, preferredModel, ragConfig, enabledMemoryLayers, List.of());
     }
 }

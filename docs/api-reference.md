@@ -14,7 +14,7 @@ All chat endpoints accept the following headers. Headers marked required will pr
 | `X-User-Id` | Yes | Identifies the user. Propagated from your API gateway or set by the client. |
 | `X-Session-Id` | Yes (for chat) | Identifies the conversation session. Generate a UUID or call `POST /api/agent/session/new`. |
 | `X-Dry-Run` | No | Set to `true` for dry-run mode (no persistence, no real tool calls). |
-| `X-Context-*` | No | 🚧 **Planned — not yet wired.** Will pass arbitrary context attributes into `EnricherContext.attributes()` (e.g. `X-Context-Language: it` → `language=it`). Today the controllers do not extract these headers. |
+| `X-Context-*` | No | Arbitrary per-request context. Headers prefixed `X-Context-` are extracted by both `ChatController` and `ChatStreamController`, the prefix is stripped, the remainder is lowercased and the pair is forwarded into `EnricherContext.attributes()` and the input-guardrail attribute map. Example: `X-Context-Language: it` → `attributes.get("language") == "it"`. |
 | `X-Tenant-Id` | No | Tenant identifier for multi-tenancy. Enables automatic data isolation by tenantId prefix on all storage keys. |
 | `X-User-Roles` | No | Comma-separated list of user roles (e.g. `financial-advisor,viewer`). Used by RbacGuardrail to enforce `allowed-roles` on skills and `@RequiresRole` on tools. |
 | `X-Force-Skill` | No | Force a specific skill, bypassing routing. E.g. `X-Force-Skill: weather-skill`. |
@@ -85,8 +85,8 @@ The response is a stream of SSE frames. Each frame has an `event` type and a JSO
 | `tool_result` | Tool execution completed. Agent may continue generating tokens. |
 | `done` | Final metadata. Always the last event before the stream closes. |
 | `error` | Guardrail block, schema failure, or server error. Stream closes after this. |
-| `approval_required` | 🚧 **Planned — not yet emitted.** HITL approval today is exposed via `POST /api/agent/approval/{requestId}` from the orchestrator response, not as an SSE event. |
-| `guardrail_warn` | 🚧 **Planned — not yet emitted.** Today guardrails either pass silently or surface as `error` on BLOCK. |
+| `approval_required` | Emitted before a tool annotated with `@RequiresApproval` would run. Carries `requestId`, `tool`, `arguments`, `message`, `dangerous`, `ttlMinutes`. The pending request is also persisted via `ApprovalStore` (when configured) so a reviewer can resolve it via `POST /api/agent/approval/{requestId}`. The tool result returned to the LLM is `{"status":"awaiting_approval","requestId":"..."}`. |
+| `guardrail_warn` | Emitted for every guardrail that returned `WARN` (or `PASS` with a non-blank reason). Carries `phase` (`input` for now), `guardrail`, `reason`. |
 
 **Example stream** (abbreviated):
 ```
@@ -103,18 +103,29 @@ event: token
 data: {"token": "The current weather in Rome is 22 C and sunny.", "index": 1}
 
 event: done
-data: {"sessionId": "sess_abc123", "skillUsed": "weather-skill", "totalTokens": 87, "durationMs": 1240, "toolsCalled": ["getWeather"]}
+data: {"sessionId": "sess_abc123", "skillUsed": "weather-skill", "routingMethod": "SEMANTIC", "totalTokens": 87, "estimatedCostUsd": 0.0013, "durationMs": 1240, "toolsCalled": ["getWeather"]}
 ```
 
-> The `done` payload currently includes `sessionId`, `skillUsed`, `totalTokens`, `durationMs`, and `toolsCalled`. `routingMethod` and `estimatedCostUsd` are surfaced on the synchronous `/api/agent/chat` response but are 🚧 **planned** for the SSE `done` payload as well.
+The `done` payload includes: `sessionId`, `skillUsed`, `routingMethod` (`SEMANTIC` | `LLM` | `FORCED`), `totalTokens`, `estimatedCostUsd` (computed by `CostTracker.estimateUsd` from `agent.cost-tracking.pricing`; `0.0` when cost-tracking is disabled), `durationMs`, and `toolsCalled`.
 
-An `error` event looks like:
+An `error` event carries a structured `code` field whose vocabulary mirrors the `type` URIs used by `AgentKitExceptionHandler` on the synchronous endpoint:
+
 ```
 event: error
-data: {"error": "Potential prompt injection detected"}
+data: {"error": "Potential prompt injection detected", "code": "GUARDRAIL_BLOCKED"}
 ```
 
-> A structured `code` field on `error` events (e.g. `GUARDRAIL_BLOCKED`, `RATE_LIMIT_EXCEEDED`) — matching the `ProblemDetail` URIs on the synchronous endpoint — is 🚧 **planned**.
+| Code | Cause |
+|------|-------|
+| `GUARDRAIL_BLOCKED` | Input or output guardrail returned `BLOCK`. |
+| `RATE_LIMIT_EXCEEDED` | Per-user rate-limit guardrail tripped. |
+| `SKILL_NOT_FOUND` | Routed skill name does not exist in any registry. |
+| `TOKEN_BUDGET_EXCEEDED` | Fixed prompt sections already consume more than `agent.memory.composer.max-context-tokens`. |
+| `SCHEMA_VALIDATION` | Output failed JSON-schema validation after all `agent.output.validation-retries` retries. |
+| `APPROVAL_EXPIRED` | A HITL approval window elapsed without a decision. |
+| `DRY_RUN_NOT_ALLOWED` | Dry-run requested but `agent.dry-run.enabled` is `false` for the active profile. |
+| `MAX_TOOL_ITERATIONS` | The streaming tool-calling loop hit its 10-iteration cap. |
+| `INTERNAL_ERROR` | Anything else (logs carry the original stack). |
 
 ---
 

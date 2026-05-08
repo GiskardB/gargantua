@@ -72,7 +72,9 @@ public class AgentSkillProcessor {
                     annotation.maxTokens() > 0 ? annotation.maxTokens() : null,
                     annotation.temperature() >= 0 ? annotation.temperature() : null,
                     annotation.preferredModel().isEmpty() ? null : annotation.preferredModel(),
-                    ragConfig
+                    ragConfig,
+                    null,
+                    List.of(annotation.examples())
             );
 
             discoveredSkills.add(card);

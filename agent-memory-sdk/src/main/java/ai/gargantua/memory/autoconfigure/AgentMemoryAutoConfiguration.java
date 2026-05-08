@@ -53,17 +53,23 @@ public class AgentMemoryAutoConfiguration {
     @Bean
     @ConditionalOnBean(MongoTemplate.class)
     @ConditionalOnMissingBean(EpisodicMemoryPort.class)
-    public EpisodicMemoryPort episodicMemoryPort(MongoTemplate mongoTemplate) {
-        log.info("[AgentMemory] Registering MongoEpisodicMemoryAdapter");
-        return new MongoEpisodicMemoryAdapter(mongoTemplate);
+    public EpisodicMemoryPort episodicMemoryPort(MongoTemplate mongoTemplate,
+                                                 AgentMemoryProperties properties) {
+        int ttlDays = properties.getEpisodic().getTtlDays();
+        log.info("[AgentMemory] Registering MongoEpisodicMemoryAdapter (ttlDays={})", ttlDays);
+        return new MongoEpisodicMemoryAdapter(mongoTemplate, ttlDays);
     }
 
     @Bean
     @ConditionalOnBean(MongoTemplate.class)
     @ConditionalOnMissingBean(KnowledgeMemoryPort.class)
-    public KnowledgeMemoryPort knowledgeMemoryPort(MongoTemplate mongoTemplate) {
-        log.info("[AgentMemory] Registering MongoKnowledgeMemoryAdapter");
-        return new MongoKnowledgeMemoryAdapter(mongoTemplate);
+    public KnowledgeMemoryPort knowledgeMemoryPort(MongoTemplate mongoTemplate,
+                                                   AgentMemoryProperties properties) {
+        int maxSegments = properties.getKnowledge().getMaxSegments();
+        int maxTokensPerSegment = properties.getKnowledge().getMaxTokensPerSegment();
+        log.info("[AgentMemory] Registering MongoKnowledgeMemoryAdapter (maxSegments={}, maxTokensPerSegment={})",
+                maxSegments, maxTokensPerSegment);
+        return new MongoKnowledgeMemoryAdapter(mongoTemplate, maxSegments, maxTokensPerSegment);
     }
 
     @Bean
@@ -72,13 +78,15 @@ public class AgentMemoryAutoConfiguration {
                                          EpisodicMemoryPort episodicMemoryPort,
                                          KnowledgeMemoryPort knowledgeMemoryPort,
                                          AgentMemoryProperties properties) {
-        log.info("[AgentMemory] Registering MemoryComposer (maxContextTokens={})",
-                properties.getComposer().getMaxContextTokens());
+        int maxSummaries = properties.getEpisodic().getMaxSummaries();
+        log.info("[AgentMemory] Registering MemoryComposer (maxContextTokens={}, maxEpisodicSummaries={})",
+                properties.getComposer().getMaxContextTokens(), maxSummaries);
         return new MemoryComposer(
                 workingMemoryPort,
                 episodicMemoryPort,
                 knowledgeMemoryPort,
-                properties.getComposer().getMaxContextTokens()
+                properties.getComposer().getMaxContextTokens(),
+                maxSummaries
         );
     }
 }

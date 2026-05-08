@@ -21,19 +21,26 @@ public class CachedSkillRegistry implements SkillRegistry {
 
     private static final String LIST_META_KEY = "ALL";
 
+    private static final int DEFAULT_MAX_SIZE = 200;
+
     private final SkillRegistry delegate;
     private final Cache<String, List<SkillMeta>> metaCache;
     private final Cache<String, SkillCard> cardCache;
 
     public CachedSkillRegistry(SkillRegistry delegate, Duration ttl) {
+        this(delegate, ttl, DEFAULT_MAX_SIZE);
+    }
+
+    public CachedSkillRegistry(SkillRegistry delegate, Duration ttl, int maxSize) {
         this.delegate = delegate;
+        int cardMaxSize = maxSize > 0 ? maxSize : DEFAULT_MAX_SIZE;
         this.metaCache = Caffeine.newBuilder()
                 .expireAfterWrite(ttl)
                 .maximumSize(1)
                 .build();
         this.cardCache = Caffeine.newBuilder()
                 .expireAfterWrite(ttl)
-                .maximumSize(200)
+                .maximumSize(cardMaxSize)
                 .build();
     }
 

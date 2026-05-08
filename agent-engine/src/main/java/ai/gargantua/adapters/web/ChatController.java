@@ -66,6 +66,8 @@ public class ChatController {
 
         var securityContext = (SecurityContext) httpRequest.getAttribute(SecurityContextFilter.SECURITY_CONTEXT_ATTR);
 
+        Map<String, String> headerAttrs = RequestContextHeaders.extract(httpRequest);
+
         AgentRequest agentRequest = AgentRequest.builder()
                 .message(request.message())
                 .userId(userId)
@@ -73,6 +75,7 @@ public class ChatController {
                 .forceSkill(forceSkill)
                 .dryRunContext(dryRunContext)
                 .securityContext(securityContext)
+                .contextAttributes(new java.util.HashMap<>(headerAttrs))
                 .build();
 
         log.info("[Chat] POST /api/agent/chat — userId={}, sessionId={}, forceSkill={}, dryRun={}",

@@ -1,5 +1,6 @@
 package ai.gargantua.autoconfigure.guardrails;
 
+import ai.gargantua.autoconfigure.AgentProperties;
 import ai.gargantua.core.guardrail.GuardrailInputContext;
 import ai.gargantua.core.guardrail.GuardrailResult;
 import ai.gargantua.core.guardrail.InputGuardrail;
@@ -27,6 +28,16 @@ public class RbacGuardrail implements InputGuardrail {
 
     public static final String SECURITY_CONTEXT_KEY = "gargantua.securityContext";
 
+    private final AgentProperties agentProperties;
+
+    public RbacGuardrail() {
+        this(null);
+    }
+
+    public RbacGuardrail(AgentProperties agentProperties) {
+        this.agentProperties = agentProperties;
+    }
+
     @Override
     public String name() {
         return "rbac";
@@ -34,7 +45,11 @@ public class RbacGuardrail implements InputGuardrail {
 
     @Override
     public boolean isEnabled(Object props) {
-        return true; // always enabled when registered
+        if (props instanceof AgentProperties ap) {
+            return ap.getGuardrail().getInput().isRbacEnabled();
+        }
+        return agentProperties == null
+                || agentProperties.getGuardrail().getInput().isRbacEnabled();
     }
 
     @Override

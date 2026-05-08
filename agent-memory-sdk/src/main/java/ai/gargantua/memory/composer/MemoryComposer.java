@@ -37,19 +37,34 @@ public class MemoryComposer {
 
     private static final Set<MemoryLayer> ALL_LAYERS = EnumSet.allOf(MemoryLayer.class);
 
+    private static final int DEFAULT_MAX_EPISODIC_SUMMARIES = 10;
+
     private final WorkingMemoryPort workingMemory;
     private final EpisodicMemoryPort episodicMemory;
     private final KnowledgeMemoryPort knowledgeMemory;
     private final int maxContextTokens;
+    private final int maxEpisodicSummaries;
 
     public MemoryComposer(WorkingMemoryPort workingMemory,
                           EpisodicMemoryPort episodicMemory,
                           KnowledgeMemoryPort knowledgeMemory,
                           int maxContextTokens) {
+        this(workingMemory, episodicMemory, knowledgeMemory, maxContextTokens,
+                DEFAULT_MAX_EPISODIC_SUMMARIES);
+    }
+
+    public MemoryComposer(WorkingMemoryPort workingMemory,
+                          EpisodicMemoryPort episodicMemory,
+                          KnowledgeMemoryPort knowledgeMemory,
+                          int maxContextTokens,
+                          int maxEpisodicSummaries) {
         this.workingMemory = workingMemory;
         this.episodicMemory = episodicMemory;
         this.knowledgeMemory = knowledgeMemory;
         this.maxContextTokens = maxContextTokens;
+        this.maxEpisodicSummaries = maxEpisodicSummaries > 0
+                ? maxEpisodicSummaries
+                : DEFAULT_MAX_EPISODIC_SUMMARIES;
     }
 
     /**
@@ -82,7 +97,7 @@ public class MemoryComposer {
                 ? CompletableFuture.supplyAsync(() -> workingMemory.getMessages(sessionId))
                 : CompletableFuture.completedFuture(List.of());
         CompletableFuture<List<SessionSummary>> episodicFuture = layers.contains(MemoryLayer.EPISODIC)
-                ? CompletableFuture.supplyAsync(() -> episodicMemory.getRecentSummaries(userId, 10))
+                ? CompletableFuture.supplyAsync(() -> episodicMemory.getRecentSummaries(userId, maxEpisodicSummaries))
                 : CompletableFuture.completedFuture(List.of());
         CompletableFuture<List<KnowledgeSegment>> knowledgeFuture = layers.contains(MemoryLayer.KNOWLEDGE)
                 ? CompletableFuture.supplyAsync(() -> knowledgeMemory.getSegments(userId))

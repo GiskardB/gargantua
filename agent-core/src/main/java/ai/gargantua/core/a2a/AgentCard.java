@@ -32,8 +32,13 @@ public record AgentCard(
         String name,
         String description,
         String domain,                         // Gargantua extension (not in A2A spec)
-        List<String> tags
-    ) {}
+        List<String> tags,
+        List<String> examples                  // example prompts for discovery
+    ) {
+        public AgentSkill(String id, String name, String description, String domain, List<String> tags) {
+            this(id, name, description, domain, tags, List.of());
+        }
+    }
 
     public record AgentProvider(
         String organization,

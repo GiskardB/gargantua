@@ -112,8 +112,8 @@ When working memory TTL expires, the `SessionSummarizer` is triggered. It receiv
 agent:
   memory:
     episodic:
-      max-summaries: 5     # 🚧 planned — bound but not yet read by MemoryComposer (today: hardcoded 10)
-      ttl-days: 365        # 🚧 planned — bound but not yet honored (no Mongo TTL index applied)
+      max-summaries: 5     # max summaries fetched by MemoryComposer per compose() call
+      ttl-days: 365        # honored via a Mongo TTL index on `expiresAt` (defaulted on insert when null)
 ```
 
 ## Knowledge Memory (MongoDB)
@@ -154,8 +154,8 @@ source: "user"
 agent:
   memory:
     knowledge:
-      max-segments: 10              # 🚧 planned — bound but not yet read; adapter currently returns all segments
-      max-tokens-per-segment: 400   # 🚧 planned — bound but not yet enforced
+      max-segments: 10              # cap on the number of segments returned per user
+      max-tokens-per-segment: 400   # content of each segment is truncated to ~maxTokens × 4 chars
 ```
 
 ## Memory Composer

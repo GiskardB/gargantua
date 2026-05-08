@@ -1,25 +1,37 @@
 package ai.gargantua.autoconfigure;
 
+import ai.gargantua.core.security.RequiresRole;
+import ai.gargantua.core.security.SecurityContext;
 import ai.gargantua.core.tool.AgentTool;
+import ai.gargantua.core.tool.CacheableToolResult;
 import ai.gargantua.core.tool.RequiresApproval;
 import ai.gargantua.core.tool.ToolDefinition;
+import ai.gargantua.core.tool.ToolExecutionContext;
+import ai.gargantua.core.tool.ToolRetry;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
+import io.github.resilience4j.core.IntervalFunction;
+import io.github.resilience4j.retry.Retry;
+import io.github.resilience4j.retry.RetryConfig;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 /**
  * Auto-discovers tools at boot by scanning all Spring beans for methods annotated
@@ -28,6 +40,11 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>The orchestrator uses {@link #getFilteredTools(List)} to restrict available tools
  * to those listed in the skill's {@code allowed-tools} frontmatter.</p>
+ *
+ * <p>{@link #executeTool(String, String, ToolExecutionContext)} additionally honours
+ * three method-level annotations: {@link RequiresRole} (RBAC gate),
+ * {@link CacheableToolResult} (Redis read-through cache) and {@link ToolRetry}
+ * (Resilience4j-backed exponential-backoff retry).</p>
  *
  * @see AgentTool
  * @see ToolDefinition
@@ -38,9 +55,12 @@ public class ToolRegistry {
     private static final Logger log = LoggerFactory.getLogger(ToolRegistry.class);
 
     private static final List<String> ALL_TOOLS_KEY = List.of();
+    private static final String ERROR_PREFIX = "{\"error\":";
 
     private final ApplicationContext applicationContext;
     private final ObjectMapper objectMapper;
+    private final ObjectProvider<ToolResultCache> toolResultCacheProvider;
+    private final ObjectProvider<MeterRegistry> meterRegistryProvider;
     private final Map<String, ToolDefinition> tools = new HashMap<>();
     private final Map<String, ToolInvocation> toolInvocations = new HashMap<>();
     private final Map<List<String>, List<ToolSpecification>> specCache = new ConcurrentHashMap<>();
@@ -48,9 +68,13 @@ public class ToolRegistry {
     /** Holds the bean instance and method needed to invoke a tool at runtime. */
     private record ToolInvocation(Object bean, Method method) {}
 
-    public ToolRegistry(ApplicationContext applicationContext) {
+    public ToolRegistry(ApplicationContext applicationContext,
+                        ObjectProvider<ToolResultCache> toolResultCacheProvider,
+                        ObjectProvider<MeterRegistry> meterRegistryProvider) {
         this.applicationContext = applicationContext;
         this.objectMapper = new ObjectMapper();
+        this.toolResultCacheProvider = toolResultCacheProvider;
+        this.meterRegistryProvider = meterRegistryProvider;
     }
 
     @PostConstruct
@@ -86,7 +110,7 @@ public class ToolRegistry {
                         annotation.description(),
                         annotation.parallelizable(),
                         requiresApproval,
-                        false, // cacheable is determined by @CacheableToolResult
+                        method.isAnnotationPresent(CacheableToolResult.class),
                         approvalMessage,
                         dangerous
                 );
@@ -163,44 +187,162 @@ public class ToolRegistry {
     }
 
     /**
-     * Execute a tool by name with JSON arguments.
-     * Parses the JSON arguments, matches them to method parameters, invokes the method,
-     * and returns the result serialized as a JSON string.
-     *
-     * @param toolName      the registered tool name
-     * @param jsonArguments JSON object string with argument key-value pairs
-     * @return the tool result as a JSON string
+     * Backward-compatible entrypoint with no caller context — used when no
+     * security context or session is available. RBAC gating fails closed for
+     * tools that declare {@link RequiresRole}; caching is skipped.
      */
     public String executeTool(String toolName, String jsonArguments) {
+        return executeTool(toolName, jsonArguments, ToolExecutionContext.empty());
+    }
+
+    /**
+     * Execute a tool by name with JSON arguments, honouring the method-level
+     * annotations {@link RequiresRole}, {@link CacheableToolResult}, and
+     * {@link ToolRetry}.
+     */
+    public String executeTool(String toolName, String jsonArguments, ToolExecutionContext context) {
         var invocation = toolInvocations.get(toolName);
         if (invocation == null) {
             return "{\"error\":\"Tool not found: " + toolName + "\"}";
         }
+        ToolExecutionContext ctx = context != null ? context : ToolExecutionContext.empty();
+        var method = invocation.method();
+
+        // 1. RBAC gate via @RequiresRole
+        var requiresRole = method.getAnnotation(RequiresRole.class);
+        if (requiresRole != null && requiresRole.value().length > 0) {
+            String denial = checkRequiresRole(toolName, requiresRole, ctx.securityContext());
+            if (denial != null) return denial;
+        }
+
+        Map<String, String> args;
+        try {
+            args = parseArgs(jsonArguments);
+        } catch (Exception e) {
+            return errorJson("Invalid tool arguments: " + e.getMessage());
+        }
+
+        // 2. Cacheable read-through
+        var cacheable = method.getAnnotation(CacheableToolResult.class);
+        ToolResultCache cache = toolResultCacheProvider.getIfAvailable();
+        MeterRegistry meters = meterRegistryProvider.getIfAvailable();
+        String cacheKey = null;
+        if (cacheable != null && cache != null) {
+            cacheKey = cache.buildKey(toolName, method, args, cacheable, ctx.securityContext(), ctx.sessionId());
+            if (cacheKey != null) {
+                String hit = cache.get(cacheKey);
+                if (hit != null) {
+                    log.debug("[ToolRegistry] Cache hit for {} (key={})", toolName, cacheKey);
+                    if (meters != null) {
+                        meters.counter("agent.tool.cache.hits",
+                                "tool", toolName, "scope", cacheable.scope().name()).increment();
+                    }
+                    return hit;
+                } else if (meters != null) {
+                    meters.counter("agent.tool.cache.misses",
+                            "tool", toolName, "scope", cacheable.scope().name()).increment();
+                }
+            }
+        }
+
+        // 3. Retry-wrapped invocation
+        Supplier<String> call = () -> doInvoke(invocation, args);
+        var retryAnn = method.getAnnotation(ToolRetry.class);
+        String result = retryAnn != null
+                ? executeWithRetry(toolName, retryAnn, call)
+                : call.get();
+
+        // 4. Cache put on success
+        if (cacheKey != null && !isErrorPayload(result)) {
+            cache.put(cacheKey, result, cacheable.ttlSeconds());
+        }
+        return result;
+    }
+
+    private String checkRequiresRole(String toolName, RequiresRole annotation, SecurityContext securityContext) {
+        if (securityContext == null) {
+            log.warn("[ToolRegistry] @RequiresRole on tool '{}' but no security context — denying", toolName);
+            return errorJson("Access denied: no security context for role-restricted tool '" + toolName + "'");
+        }
+        if (securityContext.hasAnyRole(annotation.value())) {
+            return null;
+        }
+        log.warn("[ToolRegistry] User '{}' lacks role(s) {} for tool '{}'",
+                securityContext.userId(), List.of(annotation.value()), toolName);
+        return errorJson("Access denied: user '" + securityContext.userId()
+                + "' lacks required role(s) " + List.of(annotation.value())
+                + " for tool '" + toolName + "'");
+    }
+
+    private String executeWithRetry(String toolName, ToolRetry ann, Supplier<String> call) {
+        RetryConfig config = RetryConfig.custom()
+                .maxAttempts(Math.max(1, ann.maxAttempts()))
+                .intervalFunction(IntervalFunction.ofExponentialBackoff(
+                        Duration.ofMillis(Math.max(1, ann.waitDurationMs())),
+                        Math.max(1.0, ann.backoffMultiplier()),
+                        Duration.ofMillis(Math.max(ann.waitDurationMs(), ann.maxWaitDurationMs()))
+                ))
+                .retryOnException(t -> {
+                    Throwable cause = unwrap(t);
+                    if (matches(cause, ann.abortOn())) return false;
+                    return matches(cause, ann.retryOn());
+                })
+                .build();
+
+        Retry retry = Retry.of("tool-" + toolName, config);
+        MeterRegistry meters = meterRegistryProvider.getIfAvailable();
+        if (meters != null) {
+            retry.getEventPublisher()
+                    .onRetry(e -> meters.counter("agent.tool.retry.attempts", "tool", toolName).increment())
+                    .onError(e -> meters.counter("agent.tool.retry.exhausted", "tool", toolName).increment());
+        }
+        try {
+            return Retry.decorateSupplier(retry, call).get();
+        } catch (RuntimeException e) {
+            log.error("[ToolRegistry] Tool '{}' failed after retries: {}", toolName, e.getMessage());
+            return errorJson("Tool execution failed: " + safeMessage(e));
+        }
+    }
+
+    private boolean matches(Throwable t, Class<? extends Throwable>[] types) {
+        if (t == null || types == null) return false;
+        for (Class<? extends Throwable> type : types) {
+            if (type.isInstance(t)) return true;
+        }
+        return false;
+    }
+
+    private Throwable unwrap(Throwable t) {
+        Throwable current = t;
+        while (current instanceof java.lang.reflect.InvocationTargetException && current.getCause() != null) {
+            current = current.getCause();
+        }
+        return current;
+    }
+
+    private Map<String, String> parseArgs(String jsonArguments) throws Exception {
+        if (jsonArguments == null || jsonArguments.isBlank() || "{}".equals(jsonArguments.trim())) {
+            return Map.of();
+        }
+        return objectMapper.readValue(jsonArguments, new TypeReference<>() {});
+    }
+
+    /** Reflective invocation, surfacing checked exceptions as RuntimeException for retry. */
+    private String doInvoke(ToolInvocation invocation, Map<String, String> args) {
+        var method = invocation.method();
+        var parameters = method.getParameters();
+        var invokeArgs = new Object[parameters.length];
+
+        for (int i = 0; i < parameters.length; i++) {
+            var paramName = parameters[i].getName();
+            var value = args.get(paramName);
+            if (value == null && parameters.length == 1 && args.size() == 1) {
+                value = args.values().iterator().next();
+            }
+            invokeArgs[i] = convertArgument(value, parameters[i].getType());
+        }
 
         try {
-            Map<String, String> args;
-            if (jsonArguments == null || jsonArguments.isBlank() || "{}".equals(jsonArguments.trim())) {
-                args = Map.of();
-            } else {
-                args = objectMapper.readValue(jsonArguments, new TypeReference<>() {});
-            }
-
-            var method = invocation.method();
-            var parameters = method.getParameters();
-            var invokeArgs = new Object[parameters.length];
-
-            for (int i = 0; i < parameters.length; i++) {
-                var paramName = parameters[i].getName();
-                var value = args.get(paramName);
-                if (value == null) {
-                    // Try to match by position if only one arg
-                    if (parameters.length == 1 && args.size() == 1) {
-                        value = args.values().iterator().next();
-                    }
-                }
-                invokeArgs[i] = convertArgument(value, parameters[i].getType());
-            }
-
             var result = method.invoke(invocation.bean(), invokeArgs);
             if (result == null) {
                 return "null";
@@ -209,10 +351,25 @@ public class ToolRegistry {
                 return s;
             }
             return objectMapper.writeValueAsString(result);
+        } catch (java.lang.reflect.InvocationTargetException e) {
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            if (cause instanceof RuntimeException re) throw re;
+            throw new RuntimeException(cause);
         } catch (Exception e) {
-            log.error("Failed to execute tool '{}': {}", toolName, e.getMessage(), e);
-            return "{\"error\":\"Tool execution failed: " + e.getMessage().replace("\"", "\\\"") + "\"}";
+            throw new RuntimeException(e);
         }
+    }
+
+    private boolean isErrorPayload(String result) {
+        return result != null && result.startsWith(ERROR_PREFIX);
+    }
+
+    private String errorJson(String message) {
+        return "{\"error\":\"" + message.replace("\"", "\\\"") + "\"}";
+    }
+
+    private String safeMessage(Throwable t) {
+        return t.getMessage() != null ? t.getMessage() : t.getClass().getSimpleName();
     }
 
     private Object convertArgument(String value, Class<?> type) {
@@ -222,7 +379,6 @@ public class ToolRegistry {
         if (type == long.class || type == Long.class) return Long.parseLong(value);
         if (type == double.class || type == Double.class) return Double.parseDouble(value);
         if (type == boolean.class || type == Boolean.class) return Boolean.parseBoolean(value);
-        // Fallback: try Jackson deserialization
         try {
             return objectMapper.readValue(value, type);
         } catch (Exception e) {

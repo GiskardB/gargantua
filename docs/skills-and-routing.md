@@ -68,7 +68,7 @@ skills/
 
 - **`references:` (top-level frontmatter list)**: each path listed is appended to the system prompt when the skill is activated. Use it for domain knowledge, style guides, or API documentation that the LLM should always have in context.
 
-  > 🚧 **Planned — not yet wired.** Auto-scanning of a `references/` folder (i.e. "every file under `references/`") is on the roadmap. Today only the explicit list in frontmatter is honored.
+- **`references/` folder (optional)**: in addition to the frontmatter list, `FilesystemSkillRegistry` reads every readable file under `<skill>/references/` (sorted by URI for deterministic ordering) and appends each file's contents to the skill's reference list — frontmatter entries first, folder files after. Drop docs in there and they're picked up at the next skill load with no SKILL.md edit.
 
 - **assets/**: Static resources referenced by frontmatter fields (e.g. `output-schema`).
 - **evals/**: Optional golden input/output pairs consumed by external evaluation tooling (such as [Gavel](https://github.com/giskardb/gavel)). The skill linter warns if this directory is missing.
@@ -103,10 +103,13 @@ A decorator that wraps any other registry with a [Caffeine](https://github.com/b
 ```yaml
 agent:
   skill:
-    cache-ttl-minutes: 60     # Time-to-live for cached entries
+    cache-ttl-minutes: 60       # legacy TTL knob (used when `cache.ttl-seconds` is unset)
+    cache:
+      ttl-seconds: 0            # 0 = fall back to `cache-ttl-minutes` × 60
+      max-size: 200             # Caffeine `maximumSize` for the per-card cache
 ```
 
-The cache size is currently fixed at 200 entries (Caffeine `maximumSize`). Per-cache size configuration is not exposed yet.
+`cache.ttl-seconds` takes precedence when greater than zero, so older configurations using `cache-ttl-minutes` keep working unchanged.
 
 ### HotReloadSkillRegistry
 
@@ -162,13 +165,13 @@ agent:
     threshold: 0.6            # Minimum cosine similarity for semantic match
 ```
 
-> 🚧 **`strategy` is currently informational.** The framework default is `semantic`, but the orchestrator always runs the hybrid path (`SemanticRoutingService` does semantic matching with an LLM fallback). Pure-semantic and pure-LLM modes are roadmap; today every `strategy` value behaves like `hybrid`.
+`SemanticRoutingService.route()` branches on `strategy` (default `hybrid`). Unknown values fall back to `hybrid` with a warning log.
 
-| Strategy | Behavior (intended) |
-|----------|---------------------|
-| `semantic` | Embedding similarity only. Falls back to `fallback-skill` if no skill meets the threshold. |
-| `llm` | LLM-based routing only. Every request incurs the LLM call. |
-| `hybrid` | Tries semantic first; if below threshold, falls back to LLM routing. Recommended default. |
+| Strategy | Behavior |
+|----------|----------|
+| `semantic` | Embedding similarity only. If no skill meets the threshold, returns the configured `fallback-skill` (no LLM call). |
+| `llm` | Skips embeddings entirely; every request goes through `RoutingService.routeWithLlm`. |
+| `hybrid` | Default. Tries semantic first; if below threshold, falls back to LLM routing. |
 
 ### Force a Specific Skill
 

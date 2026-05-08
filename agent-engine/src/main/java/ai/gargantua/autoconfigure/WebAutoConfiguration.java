@@ -9,6 +9,7 @@ import ai.gargantua.adapters.web.ChatExportController;
 import ai.gargantua.adapters.web.ChatHistoryController;
 import ai.gargantua.adapters.web.ChatStreamController;
 import ai.gargantua.adapters.web.CostAdminController;
+// CostTracker is in the same package — no import needed
 import ai.gargantua.adapters.web.GuardrailAdminController;
 import ai.gargantua.adapters.web.LlmRoutingAdminController;
 import ai.gargantua.adapters.web.OpenApiConfig;
@@ -89,11 +90,13 @@ public class WebAutoConfiguration {
             List<ContextEnricher> contextEnrichers,
             @Nullable SkillRegistry skillRegistry,
             @Nullable MemoryComposer memoryComposer,
-            @Nullable WorkingMemoryPort workingMemoryPort) {
+            @Nullable WorkingMemoryPort workingMemoryPort,
+            @Nullable CostTracker costTracker,
+            @Nullable ApprovalStore approvalStore) {
         return new ChatStreamController(orchestratorEngine, llmProviderFactory,
                 guardrailPipeline, semanticRoutingService, tokenBudgetManager,
                 promptBuilder, toolRegistry, properties, contextEnrichers,
-                skillRegistry, memoryComposer, workingMemoryPort);
+                skillRegistry, memoryComposer, workingMemoryPort, costTracker, approvalStore);
     }
 
     @Bean
@@ -118,8 +121,10 @@ public class WebAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean(LlmRoutingAdminController.class)
-    public LlmRoutingAdminController llmRoutingAdminController() {
-        return new LlmRoutingAdminController();
+    public LlmRoutingAdminController llmRoutingAdminController(AgentProperties properties,
+                                                               LlmRouter llmRouter,
+                                                               LlmProviderFactory llmProviderFactory) {
+        return new LlmRoutingAdminController(properties, llmRouter, llmProviderFactory);
     }
 
     // ── A2A ─────────────────────────────────────────────────────

@@ -122,6 +122,7 @@ public class AgentProperties {
         private String path = "skills";
         private boolean hotReload = false;
         private int cacheTtlMinutes = 10;
+        private Cache cache = new Cache();
 
         public String getPath() { return path; }
         public void setPath(String path) { this.path = path; }
@@ -131,6 +132,25 @@ public class AgentProperties {
 
         public int getCacheTtlMinutes() { return cacheTtlMinutes; }
         public void setCacheTtlMinutes(int cacheTtlMinutes) { this.cacheTtlMinutes = cacheTtlMinutes; }
+
+        public Cache getCache() { return cache; }
+        public void setCache(Cache cache) { this.cache = cache; }
+
+        /**
+         * Fine-grained controls for the skill registry cache.
+         * When {@code ttlSeconds} is {@code 0}, the legacy {@code cacheTtlMinutes}
+         * is used instead, preserving older configurations.
+         */
+        public static class Cache {
+            private int ttlSeconds = 0;
+            private int maxSize = 200;
+
+            public int getTtlSeconds() { return ttlSeconds; }
+            public void setTtlSeconds(int ttlSeconds) { this.ttlSeconds = ttlSeconds; }
+
+            public int getMaxSize() { return maxSize; }
+            public void setMaxSize(int maxSize) { this.maxSize = maxSize; }
+        }
     }
 
     public static class Llm {
@@ -141,6 +161,25 @@ public class AgentProperties {
         private String primaryAlias = "default";
         private String fallbackAlias = "";
         private List<RoutingRule> routingRules = new ArrayList<>();
+        private RateLimit rateLimit = new RateLimit();
+
+        public RateLimit getRateLimit() { return rateLimit; }
+        public void setRateLimit(RateLimit rateLimit) { this.rateLimit = rateLimit; }
+
+        /**
+         * Per-alias Resilience4j rate limit applied around every LLM call.
+         * Default: 60 requests / 60 seconds, matching the historical hardcoded value.
+         */
+        public static class RateLimit {
+            private int maxRequests = 60;
+            private int windowSeconds = 60;
+
+            public int getMaxRequests() { return maxRequests; }
+            public void setMaxRequests(int maxRequests) { this.maxRequests = maxRequests; }
+
+            public int getWindowSeconds() { return windowSeconds; }
+            public void setWindowSeconds(int windowSeconds) { this.windowSeconds = windowSeconds; }
+        }
 
         public Primary getPrimary() { return primary; }
         public void setPrimary(Primary primary) { this.primary = primary; }
@@ -228,7 +267,7 @@ public class AgentProperties {
     }
 
     public static class Routing {
-        private String strategy = "semantic";
+        private String strategy = "hybrid";
         private String fallbackSkill = "default";
         private Semantic semantic = new Semantic();
 
@@ -332,6 +371,10 @@ public class AgentProperties {
             private boolean rateLimitEnabled = false;
             private int rateLimitMaxRequests = 60;
             private int rateLimitWindowSeconds = 60;
+            private boolean rbacEnabled = true;
+
+            public boolean isRbacEnabled() { return rbacEnabled; }
+            public void setRbacEnabled(boolean rbacEnabled) { this.rbacEnabled = rbacEnabled; }
 
             public boolean isMaxLengthEnabled() { return maxLengthEnabled; }
             public void setMaxLengthEnabled(boolean maxLengthEnabled) { this.maxLengthEnabled = maxLengthEnabled; }

@@ -55,23 +55,37 @@ public class PiiOutputGuardrail implements OutputGuardrail {
             return new GuardrailOutputResult(GuardrailVerdict.PASS, response, null, name());
         }
 
+        Map<String, String> piiMap = null;
+        if (ctx.inputAttributes() != null) {
+            Object raw = ctx.inputAttributes().get("pii_map");
+            if (raw instanceof Map<?, ?> m && !m.isEmpty()) {
+                piiMap = (Map<String, String>) m;
+            }
+        }
+
+        if (piiMap != null) {
+            // Input phase already masked PII and stashed {placeholder → original}.
+            // Restore the originals so the user sees their own data back, replacing
+            // longer placeholders first to avoid partial substitution.
+            String restored = response;
+            var entries = new java.util.ArrayList<>(piiMap.entrySet());
+            entries.sort((a, b) -> Integer.compare(b.getKey().length(), a.getKey().length()));
+            for (Map.Entry<String, String> entry : entries) {
+                String placeholder = entry.getKey();
+                String original = entry.getValue();
+                if (placeholder == null || placeholder.isEmpty() || original == null) continue;
+                if (restored.contains(placeholder)) {
+                    restored = restored.replace(placeholder, original);
+                }
+            }
+            return new GuardrailOutputResult(GuardrailVerdict.PASS, restored, null, name());
+        }
+
+        // No input pii_map — apply regex masking on the LLM output as a safety net.
         String masked = response;
         masked = maskPattern(masked, EMAIL_PATTERN, "[EMAIL_REDACTED]");
         masked = maskPattern(masked, IBAN_PATTERN, "[IBAN_REDACTED]");
         masked = maskPattern(masked, PHONE_PATTERN, "[PHONE_REDACTED]");
-
-        // Optionally de-anonymize if pii_map is available from input attributes
-        if (ctx.inputAttributes() != null) {
-            Object piiMapObj = ctx.inputAttributes().get("pii_map");
-            if (piiMapObj instanceof Map<?, ?> rawMap) {
-                Map<String, String> piiMap = (Map<String, String>) rawMap;
-                for (Map.Entry<String, String> entry : piiMap.entrySet()) {
-                    // If the output contains the placeholder, we can de-anonymize
-                    // (typically this would be configurable)
-                }
-            }
-        }
-
         return new GuardrailOutputResult(GuardrailVerdict.PASS, masked, null, name());
     }
 

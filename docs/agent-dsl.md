@@ -73,7 +73,7 @@ If both `skills/coder/SKILL.md` and `@AgentSkill(name = "coder")` exist, the **f
 | `maxTokens` | int | `-1` | LLM max tokens override. -1 = use default. |
 | `outputSchema` | String | `""` | Classpath path to JSON Schema for structured output |
 | `preferredModel` | String | `""` | Force a specific LLM model alias |
-| `examples` | String[] | `{}` | 🚧 **Planned — not yet wired.** Attribute is parsed but `AgentSkillProcessor` does not yet propagate it into the published `SkillCard`. |
+| `examples` | String[] | `{}` | Example prompts surfaced via the A2A Agent Card for discovery. Propagated by `AgentSkillProcessor` into `SkillCard.examples()` and exposed by `AgentCardService` on `/.well-known/agent.json`. |
 
 ### Advanced example — all features
 
@@ -118,7 +118,7 @@ public class NutritionAgent {
 
 ## Example prompts
 
-🚧 **Planned — not yet wired.** Example prompts will be exposed via the `examples` attribute on `@AgentSkill` (see attributes table above) and surface in the A2A Agent Card for client discovery (Claude Desktop, custom UIs, quick-action buttons). The annotation already accepts the value; what's missing is propagation into the `SkillCard` and the Agent Card response.
+Use the `examples` attribute on `@AgentSkill` to declare prompt suggestions. They are propagated into `SkillCard.examples()` and surfaced in the A2A Agent Card response (`/.well-known/agent.json`) so client UIs (Claude Desktop, custom UIs, quick-action buttons) can render them as discovery hints.
 
 ```java
 @AgentSkill(

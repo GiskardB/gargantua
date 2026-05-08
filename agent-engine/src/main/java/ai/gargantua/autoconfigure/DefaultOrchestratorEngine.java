@@ -22,6 +22,7 @@ import ai.gargantua.core.skill.SkillCard;
 import ai.gargantua.core.skill.SkillMeta;
 import ai.gargantua.core.skill.SkillRegistry;
 import ai.gargantua.core.tool.ToolDefinition;
+import ai.gargantua.core.tool.ToolExecutionContext;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
@@ -99,6 +100,9 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
     @Nullable
     private final MongoTemplate mongoTemplate;
 
+    @Nullable
+    private final CostTracker costTracker;
+
     public DefaultOrchestratorEngine(GuardrailPipeline guardrailPipeline,
                                      SemanticRoutingService semanticRoutingService,
                                      TokenBudgetManager tokenBudgetManager,
@@ -112,6 +116,26 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
                                      @Nullable MemoryComposer memoryComposer,
                                      @Nullable WorkingMemoryPort workingMemoryPort,
                                      @Nullable MongoTemplate mongoTemplate) {
+        this(guardrailPipeline, semanticRoutingService, tokenBudgetManager,
+                llmProviderFactory, promptBuilder, toolRegistry, properties,
+                skillRegistry, contextEnrichers, auditService, memoryComposer,
+                workingMemoryPort, mongoTemplate, null);
+    }
+
+    public DefaultOrchestratorEngine(GuardrailPipeline guardrailPipeline,
+                                     SemanticRoutingService semanticRoutingService,
+                                     TokenBudgetManager tokenBudgetManager,
+                                     LlmProviderFactory llmProviderFactory,
+                                     PromptBuilder promptBuilder,
+                                     ToolRegistry toolRegistry,
+                                     AgentProperties properties,
+                                     @Nullable SkillRegistry skillRegistry,
+                                     List<ContextEnricher> contextEnrichers,
+                                     @Nullable AuditService auditService,
+                                     @Nullable MemoryComposer memoryComposer,
+                                     @Nullable WorkingMemoryPort workingMemoryPort,
+                                     @Nullable MongoTemplate mongoTemplate,
+                                     @Nullable CostTracker costTracker) {
         this.guardrailPipeline = guardrailPipeline;
         this.semanticRoutingService = semanticRoutingService;
         this.tokenBudgetManager = tokenBudgetManager;
@@ -125,6 +149,7 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
         this.memoryComposer = memoryComposer;
         this.workingMemoryPort = workingMemoryPort;
         this.mongoTemplate = mongoTemplate;
+        this.costTracker = costTracker;
     }
 
     @Override
@@ -253,14 +278,18 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
                 memory.knowledgeSegments().size(), memory.estimatedTokens());
 
         // 7. Build prompt — run context enrichers first
-        var enricherAttributes = new HashMap<String, String>();
+        // Seed with request-level attributes (X-Context-* headers, attributes set by callers)
+        // so enrichers can read them through ctx.attributes() — see docs/extending.md.
+        Map<String, String> requestAttrs = request.contextAttributes() != null
+                ? request.contextAttributes() : Map.of();
+        var enricherAttributes = new HashMap<>(requestAttrs);
         var enricherCtxForEnrichers = new EnricherContext(
                 request.userId(),
                 effectiveSessionId,
                 skillCard.meta().name(),
                 skillCard.meta().domain(),
                 request.message(),
-                Map.of()
+                requestAttrs
         );
         contextEnrichers.stream()
                 .sorted(Comparator.comparingInt(ContextEnricher::order))
@@ -331,18 +360,19 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
         var messages = llmProviderFactory.buildMessages(
                 allocation.systemPrompt(), request.message(), memory.workingMessages());
 
-        var rawResponse = executeLlmWithTools(model, messages, toolSpecs, toolsCalled);
+        var toolContext = ToolExecutionContext.of(securityContext, effectiveSessionId);
+        var rawResponse = executeLlmWithTools(model, messages, toolSpecs, toolsCalled, toolContext);
         log.info("[Pipeline] Step 9 — LLM call complete, tools called: {}", toolsCalled);
 
-        // 10. Output guardrails
-        var outputCtx = new GuardrailOutputContext(
-                rawResponse,
-                request.userId(),
-                request.sessionId(),
-                skillCard.meta(),
-                inputAttributes
-        );
-        var processedResponse = guardrailPipeline.processOutput(outputCtx);
+        // Expose the skill's output schema to SchemaValidatorGuardrail via the input attributes.
+        if (skillCard.outputSchema() != null && !skillCard.outputSchema().isBlank()) {
+            inputAttributes.putIfAbsent("output_schema", skillCard.outputSchema());
+        }
+
+        // 10. Output guardrails — with schema-validation auto-retry.
+        var processedResponse = runOutputGuardrailsWithSchemaRetry(
+                rawResponse, request, effectiveSessionId, skillCard, inputAttributes,
+                model, messages, toolSpecs, toolsCalled, toolContext);
         log.debug("[Pipeline] Step 10 — Output guardrails applied (response {} chars)", processedResponse.length());
 
         // 11. Persist memory (skip in dry-run)
@@ -384,6 +414,13 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
         int inputTokens = tokenBudgetManager.estimate(request.message());
         int outputTokens = tokenBudgetManager.estimate(processedResponse);
 
+        var modelConfig = llmProviderFactory.getModelConfig(alias);
+        String provider = modelConfig != null ? modelConfig.getProvider() : "";
+        String modelName = modelConfig != null ? modelConfig.getModel() : "";
+        double estimatedCostUsd = costTracker != null
+                ? costTracker.estimateUsd(provider, modelName, inputTokens, outputTokens)
+                : 0.0;
+
         var response = new AgentResponse(
                 processedResponse,
                 effectiveSessionId,
@@ -394,7 +431,7 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
                 inputTokens,
                 outputTokens,
                 inputTokens + outputTokens,
-                0.0,
+                estimatedCostUsd,
                 durationMs,
                 isDryRun
         );
@@ -417,13 +454,64 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
     }
 
     /**
+     * Run the output-guardrail chain. When the {@code schema-validator} guardrail
+     * raises a {@code BLOCK}, append a corrective-prompt user message and re-invoke
+     * the LLM up to {@code agent.output.validation-retries} times.
+     */
+    private String runOutputGuardrailsWithSchemaRetry(
+            String initialResponse,
+            AgentRequest request,
+            String effectiveSessionId,
+            SkillCard skillCard,
+            Map<String, Object> inputAttributes,
+            ChatModel model,
+            List<dev.langchain4j.data.message.ChatMessage> messages,
+            List<ToolSpecification> toolSpecs,
+            List<String> toolsCalled,
+            ToolExecutionContext toolContext) {
+
+        int maxRetries = Math.max(0, properties.getOutput().getValidationRetries());
+        String currentResponse = initialResponse;
+
+        for (int attempt = 0; attempt <= maxRetries; attempt++) {
+            var outputCtx = new GuardrailOutputContext(
+                    currentResponse,
+                    request.userId(),
+                    effectiveSessionId,
+                    skillCard.meta(),
+                    inputAttributes
+            );
+            var detailed = guardrailPipeline.processOutputDetailed(outputCtx);
+            if (!detailed.blocked() || !"schema-validator".equals(detailed.blockedBy())) {
+                return detailed.processedText();
+            }
+            if (attempt == maxRetries) {
+                log.warn("[Pipeline] Schema validation failed after {} retries, returning blocked response",
+                        maxRetries);
+                return detailed.processedText();
+            }
+            log.info("[Pipeline] Schema validation failed (attempt {}/{}), asking LLM to correct: {}",
+                    attempt + 1, maxRetries + 1, detailed.blockedReason());
+            messages.add(dev.langchain4j.data.message.AiMessage.from(currentResponse));
+            messages.add(dev.langchain4j.data.message.UserMessage.from(
+                    "Your previous response failed JSON-schema validation: "
+                            + detailed.blockedReason()
+                            + ". Re-emit a valid response that conforms to the schema; "
+                            + "do not include any prose outside the JSON."));
+            currentResponse = executeLlmWithTools(model, messages, toolSpecs, toolsCalled, toolContext);
+        }
+        return currentResponse;
+    }
+
+    /**
      * Execute the LLM with a tool calling loop. The LLM may request tool executions;
      * each tool result is fed back until the LLM produces a final text response.
      */
     private String executeLlmWithTools(ChatModel model,
                                         List<dev.langchain4j.data.message.ChatMessage> messages,
                                         List<ToolSpecification> toolSpecs,
-                                        List<String> toolsCalled) {
+                                        List<String> toolsCalled,
+                                        ToolExecutionContext toolContext) {
         int maxIterations = 10;
 
         for (int i = 0; i < maxIterations; i++) {
@@ -448,7 +536,7 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
                 toolsCalled.add(toolName);
                 log.info("[Pipeline] Tool call: {} with args: {}", toolName, toolRequest.arguments());
 
-                String result = toolRegistry.executeTool(toolName, toolRequest.arguments());
+                String result = toolRegistry.executeTool(toolName, toolRequest.arguments(), toolContext);
                 log.debug("[Pipeline] Tool result for {}: {}", toolName,
                         result != null && result.length() > 200 ? result.substring(0, 200) + "..." : result);
 

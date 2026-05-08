@@ -167,9 +167,7 @@ public String targetSkill() {
 
 ### Pass custom data from the client via HTTP headers
 
-> 🚧 **Planned — not yet wired.** Auto-binding any `X-Context-*` header into `EnricherContext.attributes()` is on the roadmap. Today the controllers do not extract these headers; `EnricherContext` is built with an empty attributes map. To pass extra context per request, add it to the request body and read it in your enricher.
-
-Once implemented, the binding will be:
+Headers prefixed `X-Context-` are extracted by both the synchronous and streaming chat controllers, the prefix is stripped, the remainder is lowercased and the pairs are forwarded into `EnricherContext.attributes()` (and the input-guardrail attribute map) before any enricher runs. The same map is also seeded onto `AgentRequest.contextAttributes()` so it shows up in `LlmRoutingContext.attributes` for `attribute-match` routing rules.
 
 ```
 HTTP header:  X-Context-Language: it
@@ -652,14 +650,12 @@ metadata:
 
 1. The LLM is instructed to respond with JSON matching the schema
 2. `SchemaValidatorGuardrail` validates the response
-3. If validation fails, the response is blocked and a `SchemaValidationException` is surfaced to the client.
-
-> 🚧 **Planned — not yet wired.** Step 3 will become "automatically retry with a corrective prompt up to N times." The `agent.output.validation-retries` property is already bound (default `2`) and reserved for that path; the orchestrator does not yet consume it.
+3. On failure, `DefaultOrchestratorEngine` appends a corrective user message (`"Your previous response failed JSON-schema validation: <reason>. Re-emit a valid response..."`) and re-invokes the LLM. The retry loop runs up to `agent.output.validation-retries` times; if the final attempt still fails, a `SchemaValidationException` is surfaced to the client.
 
 ```yaml
 agent:
   output:
-    validation-retries: 2   # 🚧 planned — bound but not yet read by the orchestrator
+    validation-retries: 2   # number of corrective-prompt retries (default 2)
 ```
 
 ---

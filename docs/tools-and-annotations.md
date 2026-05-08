@@ -34,9 +34,7 @@ The `description` is the single most important factor in whether the LLM calls t
 
 ## @ToolRetry -- Automatic Retry with Exponential Backoff
 
-> 🚧 **Planned — not yet wired.** The annotation is declared (`ai.gargantua.core.tool.ToolRetry`) and you can put it on a method, but no aspect/interceptor in `agent-engine` reads it today. The retry policy described below is the intended runtime behavior. The metrics in this section are likewise not yet registered.
-
-Wraps the tool invocation in a retry policy backed by [Resilience4j Retry](https://resilience4j.readme.io/docs/retry). Use this for tools that call external services prone to transient failures.
+Wraps the tool invocation in a retry policy backed by [Resilience4j Retry](https://resilience4j.readme.io/docs/retry). Honored by `ToolRegistry.executeTool` whenever the tool method carries `@ToolRetry`. Use it for tools that call external services prone to transient failures.
 
 ```java
 @ToolRetry(
@@ -104,7 +102,7 @@ Pauses agent execution and requests human approval before the tool runs. This is
 When the agent attempts to call a tool annotated with `@RequiresApproval`, the following sequence occurs:
 
 1. The agent runtime suspends and persists an approval request keyed by a unique `requestId` (via `ApprovalStore` — Redis in standard mode, in-memory in embedded mode).
-   > 🚧 **Planned — not yet wired.** Surfacing the pause as an `approval_required` SSE event on the chat stream is on the roadmap. Today the `requestId` is exposed only via the orchestrator response — clients poll or fetch it programmatically.
+   > On the streaming endpoint (`/api/agent/chat/stream`), `ChatStreamController` emits an `approval_required` SSE event before the tool would run, with `requestId`, `tool`, `arguments`, `message`, `dangerous`, `ttlMinutes`. The pending request is also persisted via `ApprovalStore` (when configured) so a reviewer can resolve it via `POST /api/agent/approval/{requestId}`. The synthetic tool result fed back to the LLM is `{"status":"awaiting_approval","requestId":"..."}`.
 2. The agent **pauses** execution. No further tool calls or LLM requests are made.
 3. The client (web UI, CLI, or external system) presents the approval prompt to a human reviewer.
 4. The reviewer calls the approval endpoint:
@@ -136,9 +134,7 @@ When `auto-deny-on-expiry` is `true` and the TTL elapses, the agent receives the
 
 ## @RequiresRole — Role-Based Access Control on tools
 
-> 🚧 **Planned — not yet wired.** The annotation is declared at `ai.gargantua.core.security.RequiresRole`, but `ToolRegistry` does not yet enforce the role check before invoking the tool. Today the only RBAC gate that runs is the **skill-level** `allowed-roles` check in `RbacGuardrail`. Per-tool gating described below is roadmap.
-
-Restricts a tool method to callers that have at least one of the listed roles in their `SecurityContext`. When the caller doesn't satisfy the role check, the framework refuses the tool call before execution and surfaces a denial back to the LLM (so it can either pick a different tool or apologise).
+Restricts a tool method to callers that have at least one of the listed roles in their `SecurityContext`. `ToolRegistry.executeTool` checks the annotation before any cache lookup or invocation; on denial it returns a `{"error":"Access denied: ..."}` payload that the LLM sees as the tool result, so it can either pick a different tool or apologise. The skill-level `allowed-roles` check in `RbacGuardrail` runs in addition, earlier in the pipeline — `@RequiresRole` complements it for finer per-tool gating.
 
 ```java
 import ai.gargantua.core.security.RequiresRole;
@@ -174,9 +170,7 @@ curl -X POST http://localhost:8080/api/agent/chat \
 
 ## @CacheableToolResult -- Tool Output Caching
 
-> 🚧 **Planned — not yet wired.** The annotation and `CacheScope` enum are declared, and Redis-backed admin endpoints (`/api/admin/tool-cache/*`) are in place, but no interceptor reads `keyParams`/`scope`/`ttlSeconds` to populate or look up the cache. The metrics below are not yet registered. Roadmap.
-
-Caches tool return values in Redis to avoid redundant external calls. Particularly useful for tools that query slow or rate-limited APIs with predictable outputs.
+Caches tool return values in Redis (prefix `tool-cache:`) to avoid redundant external calls. Activated when `ToolResultCache` is registered (auto-configured if a `StringRedisTemplate` bean is present). Particularly useful for tools that query slow or rate-limited APIs with predictable outputs.
 
 ```java
 @CacheableToolResult(

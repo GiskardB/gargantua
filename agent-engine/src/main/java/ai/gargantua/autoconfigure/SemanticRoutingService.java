@@ -53,15 +53,25 @@ public class SemanticRoutingService {
     }
 
     /**
-     * Route a user message to the best matching skill using cosine similarity
-     * of ONNX embeddings, falling back to LLM routing if below threshold.
+     * Route a user message to the best matching skill, branching on
+     * {@code agent.routing.strategy}: {@code semantic} (embeddings only),
+     * {@code llm} (LLM-only), or {@code hybrid} (default — embeddings with
+     * LLM fallback when below threshold).
      */
     public RoutingResult route(String userMessage, List<SkillMeta> skills) {
         if (skills == null || skills.isEmpty()) {
             return RoutingResult.semantic(properties.getRouting().getFallbackSkill(), 0.0);
         }
 
-        // Ensure index is up to date
+        String strategy = normalizeStrategy(properties.getRouting().getStrategy());
+
+        if ("llm".equals(strategy)) {
+            log.debug("Routing strategy=llm — skipping embeddings");
+            String llmResult = routingService.routeWithLlm(userMessage, skills);
+            return RoutingResult.llm(llmResult);
+        }
+
+        // Ensure index is up to date for semantic and hybrid strategies
         if (skillEmbeddings.isEmpty()) {
             index(skills);
         }
@@ -92,13 +102,35 @@ public class SemanticRoutingService {
             return RoutingResult.semantic(bestSkill, bestScore);
         }
 
-        // Fall back to LLM routing
+        if ("semantic".equals(strategy)) {
+            // Strict semantic strategy — no LLM fallback. Return the configured fallback skill.
+            String fallback = properties.getRouting().getFallbackSkill();
+            if (log.isDebugEnabled()) {
+                log.debug("Semantic strategy: score below threshold ({} < {}), returning fallback skill '{}'",
+                        bestScore >= 0 ? "%.4f".formatted(bestScore) : "none", threshold, fallback);
+            }
+            return RoutingResult.semantic(fallback, Math.max(0.0, bestScore));
+        }
+
+        // hybrid (default) — fall back to LLM routing
         if (log.isDebugEnabled()) {
-            log.debug("Semantic score below threshold ({} < {}), falling back to LLM routing",
+            log.debug("Hybrid strategy: score below threshold ({} < {}), falling back to LLM routing",
                     bestScore >= 0 ? "%.4f".formatted(bestScore) : "none", threshold);
         }
         String llmResult = routingService.routeWithLlm(userMessage, skills);
         return RoutingResult.llm(llmResult);
+    }
+
+    private String normalizeStrategy(String raw) {
+        if (raw == null || raw.isBlank()) return "hybrid";
+        String s = raw.trim().toLowerCase(java.util.Locale.ROOT);
+        return switch (s) {
+            case "semantic", "llm", "hybrid" -> s;
+            default -> {
+                log.warn("Unknown routing strategy '{}' — falling back to 'hybrid'", raw);
+                yield "hybrid";
+            }
+        };
     }
 
     /**

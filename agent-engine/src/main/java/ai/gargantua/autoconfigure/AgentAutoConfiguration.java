@@ -6,6 +6,8 @@ import ai.gargantua.core.orchestrator.OrchestratorEngine;
 import ai.gargantua.core.orchestrator.TokenBudgetManager;
 import ai.gargantua.core.skill.SkillRegistry;
 import ai.gargantua.memory.composer.MemoryComposer;
+import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -41,12 +43,13 @@ public class AgentAutoConfiguration {
             @Nullable AuditService auditService,
             @Nullable MemoryComposer memoryComposer,
             @Nullable WorkingMemoryPort workingMemoryPort,
-            @Nullable MongoTemplate mongoTemplate) {
+            @Nullable MongoTemplate mongoTemplate,
+            @Nullable CostTracker costTracker) {
         return new DefaultOrchestratorEngine(
                 guardrailPipeline, semanticRoutingService, tokenBudgetManager,
                 llmProviderFactory, promptBuilder, toolRegistry, properties,
                 skillRegistry, contextEnrichers, auditService,
-                memoryComposer, workingMemoryPort, mongoTemplate);
+                memoryComposer, workingMemoryPort, mongoTemplate, costTracker);
     }
 
     @Bean
@@ -57,7 +60,9 @@ public class AgentAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean(ToolRegistry.class)
-    public ToolRegistry toolRegistry(ApplicationContext applicationContext) {
-        return new ToolRegistry(applicationContext);
+    public ToolRegistry toolRegistry(ApplicationContext applicationContext,
+                                     ObjectProvider<ToolResultCache> toolResultCacheProvider,
+                                     ObjectProvider<MeterRegistry> meterRegistryProvider) {
+        return new ToolRegistry(applicationContext, toolResultCacheProvider, meterRegistryProvider);
     }
 }

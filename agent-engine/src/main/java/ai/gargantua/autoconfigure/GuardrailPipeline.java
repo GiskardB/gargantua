@@ -72,6 +72,15 @@ public class GuardrailPipeline {
      * Iterate output guardrails, chaining transformations on the response text.
      */
     public String processOutput(GuardrailOutputContext ctx) {
+        return processOutputDetailed(ctx).processedText();
+    }
+
+    /**
+     * Same as {@link #processOutput(GuardrailOutputContext)} but also reports
+     * the guardrail name and reason if a {@code BLOCK} was raised, so the caller
+     * can react (e.g. trigger a corrective-prompt retry on schema validation).
+     */
+    public OutputProcessingResult processOutputDetailed(GuardrailOutputContext ctx) {
         var current = ctx;
 
         for (var guardrail : outputGuardrails) {
@@ -88,10 +97,26 @@ public class GuardrailPipeline {
 
             if (result.verdict() == GuardrailVerdict.BLOCK) {
                 log.warn("Output blocked by guardrail '{}': {}", guardrail.name(), result.reason());
-                return result.processedResponse() != null ? result.processedResponse() : current.rawResponse();
+                String text = result.processedResponse() != null
+                        ? result.processedResponse() : current.rawResponse();
+                return new OutputProcessingResult(text, guardrail.name(), result.reason());
             }
         }
 
-        return current.rawResponse();
+        return new OutputProcessingResult(current.rawResponse(), null, null);
+    }
+
+    /**
+     * Detailed outcome of {@link #processOutputDetailed(GuardrailOutputContext)}.
+     *
+     * @param processedText  text after the chain of transformations (or the last
+     *                       seen response when a guardrail blocked)
+     * @param blockedBy      name of the first guardrail that returned {@code BLOCK},
+     *                       or {@code null} when none did
+     * @param blockedReason  human-readable reason emitted by the blocking guardrail,
+     *                       or {@code null}
+     */
+    public record OutputProcessingResult(String processedText, String blockedBy, String blockedReason) {
+        public boolean blocked() { return blockedBy != null; }
     }
 }

@@ -1,5 +1,6 @@
 package ai.gargantua.adapters.web;
 
+import ai.gargantua.autoconfigure.CostTracker;
 import ai.gargantua.autoconfigure.DefaultOrchestratorEngine;
 import ai.gargantua.autoconfigure.GuardrailPipeline;
 import ai.gargantua.autoconfigure.LlmProviderFactory;
@@ -8,9 +9,19 @@ import ai.gargantua.autoconfigure.SemanticRoutingService;
 import ai.gargantua.autoconfigure.SecurityContextFilter;
 import ai.gargantua.autoconfigure.ToolRegistry;
 import ai.gargantua.autoconfigure.AgentProperties;
+import ai.gargantua.core.exception.GuardrailBlockedException;
+import ai.gargantua.core.exception.RateLimitExceededException;
+import ai.gargantua.core.exception.SchemaValidationException;
+import ai.gargantua.core.exception.TokenBudgetExceededException;
+import ai.gargantua.core.exception.ApprovalExpiredException;
+import ai.gargantua.core.exception.DryRunNotAllowedException;
 import ai.gargantua.core.exception.SkillNotFoundException;
 import ai.gargantua.core.guardrail.GuardrailInputContext;
 import ai.gargantua.core.guardrail.GuardrailOutputContext;
+import ai.gargantua.core.guardrail.GuardrailResult;
+import ai.gargantua.core.guardrail.GuardrailVerdict;
+import ai.gargantua.core.hitl.ApprovalRequest;
+import ai.gargantua.core.hitl.ApprovalStore;
 import ai.gargantua.core.llm.LlmRoutingContext;
 import ai.gargantua.core.memory.ChatMessage;
 import ai.gargantua.core.memory.ComposedMemory;
@@ -27,6 +38,7 @@ import ai.gargantua.core.skill.SkillCard;
 import ai.gargantua.core.skill.SkillMeta;
 import ai.gargantua.core.skill.SkillRegistry;
 import ai.gargantua.core.tool.ToolDefinition;
+import ai.gargantua.core.tool.ToolExecutionContext;
 import ai.gargantua.memory.composer.MemoryComposer;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
@@ -90,6 +102,12 @@ public class ChatStreamController {
     @Nullable
     private final WorkingMemoryPort workingMemoryPort;
 
+    @Nullable
+    private final CostTracker costTracker;
+
+    @Nullable
+    private final ApprovalStore approvalStore;
+
     public ChatStreamController(OrchestratorEngine orchestratorEngine,
                                 LlmProviderFactory llmProviderFactory,
                                 GuardrailPipeline guardrailPipeline,
@@ -101,7 +119,9 @@ public class ChatStreamController {
                                 List<ContextEnricher> contextEnrichers,
                                 @Nullable SkillRegistry skillRegistry,
                                 @Nullable MemoryComposer memoryComposer,
-                                @Nullable WorkingMemoryPort workingMemoryPort) {
+                                @Nullable WorkingMemoryPort workingMemoryPort,
+                                @Nullable CostTracker costTracker,
+                                @Nullable ApprovalStore approvalStore) {
         this.orchestratorEngine = orchestratorEngine;
         this.llmProviderFactory = llmProviderFactory;
         this.guardrailPipeline = guardrailPipeline;
@@ -114,6 +134,8 @@ public class ChatStreamController {
         this.skillRegistry = skillRegistry;
         this.memoryComposer = memoryComposer;
         this.workingMemoryPort = workingMemoryPort;
+        this.costTracker = costTracker;
+        this.approvalStore = approvalStore;
     }
 
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -137,6 +159,7 @@ public class ChatStreamController {
             HttpServletRequest httpRequest) {
 
         var securityContext = (SecurityContext) httpRequest.getAttribute(SecurityContextFilter.SECURITY_CONTEXT_ATTR);
+        Map<String, String> headerAttrs = RequestContextHeaders.extract(httpRequest);
 
         Sinks.Many<ServerSentEvent<String>> sink = Sinks.many().unicast().onBackpressureBuffer();
 
@@ -150,15 +173,14 @@ public class ChatStreamController {
                 if (securityContext != null) {
                     inputAttributes.put("gargantua.securityContext", securityContext);
                 }
+                inputAttributes.putAll(headerAttrs);
                 var inputCtx = new GuardrailInputContext(
                         request.message(), userId, sessionId, null, inputAttributes);
                 var inputResult = guardrailPipeline.checkInput(inputCtx);
+                emitGuardrailWarnings(sink, inputResult.results(), "input");
                 if (inputResult.blocked()) {
-                    sink.tryEmitNext(ServerSentEvent.<String>builder()
-                            .event("error")
-                            .data("{\"error\":\"Blocked by guardrail: %s\"}".formatted(
-                                    escapeJson(inputResult.reason())))
-                            .build());
+                    emitError(sink, "GUARDRAIL_BLOCKED",
+                            "Blocked by guardrail: " + inputResult.reason());
                     sink.tryEmitComplete();
                     return Flux.empty();
                 }
@@ -202,11 +224,11 @@ public class ChatStreamController {
                     memory = new ComposedMemory(List.of(), List.of(), List.of(), 0);
                 }
 
-                // Build prompt with enrichers
-                var enricherAttributes = new HashMap<String, String>();
+                // Build prompt with enrichers — seed with X-Context-* attrs so enrichers can read them
+                var enricherAttributes = new HashMap<String, String>(headerAttrs);
                 var enricherCtx = new EnricherContext(
                         userId, effectiveSessionId, skillCard.meta().name(),
-                        skillCard.meta().domain(), request.message(), Map.of());
+                        skillCard.meta().domain(), request.message(), headerAttrs);
                 contextEnrichers.stream()
                         .sorted(Comparator.comparingInt(ContextEnricher::order))
                         .filter(e -> e.targetSkill() == null || e.targetSkill().equals(skillCard.meta().name()))
@@ -254,17 +276,15 @@ public class ChatStreamController {
                 StreamingChatModel streamingModel = llmProviderFactory.getStreamingModel(alias);
 
                 // --- Real streaming with tool calling loop ---
+                var toolContext = ToolExecutionContext.of(securityContext, effectiveSessionId);
                 streamWithToolLoop(sink, streamingModel, messages, toolSpecs, skillCard,
                         routingResult, effectiveSessionId, userId, request.message(),
-                        memory, startTime, dryRun);
+                        memory, startTime, dryRun, toolContext, alias);
 
             } catch (Exception e) {
                 log.error("Error during streaming chat setup", e);
-                sink.tryEmitNext(ServerSentEvent.<String>builder()
-                        .event("error")
-                        .data("{\"error\":\"%s\"}".formatted(escapeJson(
-                                e.getMessage() != null ? e.getMessage() : "Unknown error")))
-                        .build());
+                emitError(sink, errorCodeFor(e),
+                        e.getMessage() != null ? e.getMessage() : "Unknown error");
                 sink.tryEmitComplete();
             }
             return Flux.empty();
@@ -288,10 +308,12 @@ public class ChatStreamController {
                                      String userMessage,
                                      ComposedMemory memory,
                                      long startTime,
-                                     boolean dryRun) {
+                                     boolean dryRun,
+                                     ToolExecutionContext toolContext,
+                                     String modelAlias) {
         streamSingleTurn(sink, streamingModel, messages, toolSpecs, skillCard,
                 routingResult, effectiveSessionId, userId, userMessage, memory,
-                startTime, dryRun, 0, new ArrayList<>(), new StringBuilder());
+                startTime, dryRun, 0, new ArrayList<>(), new StringBuilder(), toolContext, modelAlias);
     }
 
     private void streamSingleTurn(Sinks.Many<ServerSentEvent<String>> sink,
@@ -308,12 +330,11 @@ public class ChatStreamController {
                                    boolean dryRun,
                                    int iteration,
                                    List<String> toolsCalled,
-                                   StringBuilder fullResponse) {
+                                   StringBuilder fullResponse,
+                                   ToolExecutionContext toolContext,
+                                   String modelAlias) {
         if (iteration >= 10) {
-            sink.tryEmitNext(ServerSentEvent.<String>builder()
-                    .event("error")
-                    .data("{\"error\":\"Max tool iterations reached\"}")
-                    .build());
+            emitError(sink, "MAX_TOOL_ITERATIONS", "Max tool iterations reached");
             sink.tryEmitComplete();
             return;
         }
@@ -353,7 +374,19 @@ public class ChatStreamController {
                                         escapeJson(toolName), toolRequest.arguments()))
                                 .build());
 
-                        String result = toolRegistry.executeTool(toolName, toolRequest.arguments());
+                        ToolDefinition def = toolRegistry.getFilteredTools(null).stream()
+                                .filter(t -> toolName.equals(t.name()))
+                                .findFirst().orElse(null);
+
+                        String result;
+                        if (def != null && def.requiresApproval()) {
+                            String approvalRequestId = emitApprovalRequired(sink, def, toolName,
+                                    toolRequest.arguments(), userId, effectiveSessionId);
+                            result = "{\"status\":\"awaiting_approval\",\"requestId\":\""
+                                    + escapeJson(approvalRequestId) + "\"}";
+                        } else {
+                            result = toolRegistry.executeTool(toolName, toolRequest.arguments(), toolContext);
+                        }
 
                         sink.tryEmitNext(ServerSentEvent.<String>builder()
                                 .event("tool_result")
@@ -368,7 +401,8 @@ public class ChatStreamController {
                     // Continue the loop: call LLM again with tool results
                     streamSingleTurn(sink, streamingModel, messages, toolSpecs, skillCard,
                             routingResult, effectiveSessionId, userId, userMessage, memory,
-                            startTime, dryRun, iteration + 1, toolsCalled, fullResponse);
+                            startTime, dryRun, iteration + 1, toolsCalled, fullResponse,
+                            toolContext, modelAlias);
                 } else {
                     // Final response — complete the stream
                     String finalText = fullResponse.toString();
@@ -398,15 +432,29 @@ public class ChatStreamController {
                     int inputTokens = tokenBudgetManager.estimate(userMessage);
                     int outputTokens = tokenBudgetManager.estimate(finalText);
 
+                    var modelConfig = llmProviderFactory.getModelConfig(modelAlias);
+                    String provider = modelConfig != null ? modelConfig.getProvider() : "";
+                    String modelName = modelConfig != null ? modelConfig.getModel() : "";
+                    double estimatedCostUsd = costTracker != null
+                            ? costTracker.estimateUsd(provider, modelName, inputTokens, outputTokens)
+                            : 0.0;
+
+                    String toolsJson = toolsCalled.stream()
+                            .map(t -> "\"" + escapeJson(t) + "\"")
+                            .reduce((a, b) -> a + "," + b).orElse("");
                     sink.tryEmitNext(ServerSentEvent.<String>builder()
                             .event("done")
-                            .data("{\"sessionId\":\"%s\",\"skillUsed\":\"%s\",\"totalTokens\":%d,\"durationMs\":%d,\"toolsCalled\":[%s]}"
+                            .data(("{\"sessionId\":\"%s\",\"skillUsed\":\"%s\","
+                                    + "\"routingMethod\":\"%s\",\"totalTokens\":%d,"
+                                    + "\"estimatedCostUsd\":%s,\"durationMs\":%d,"
+                                    + "\"toolsCalled\":[%s]}")
                                     .formatted(escapeJson(effectiveSessionId),
                                             escapeJson(routingResult.skillName()),
-                                            inputTokens + outputTokens, durationMs,
-                                            toolsCalled.stream()
-                                                    .map(t -> "\"" + escapeJson(t) + "\"")
-                                                    .reduce((a, b) -> a + "," + b).orElse("")))
+                                            routingResult.method() != null ? routingResult.method().name() : "",
+                                            inputTokens + outputTokens,
+                                            formatCost(estimatedCostUsd),
+                                            durationMs,
+                                            toolsJson))
                             .build());
 
                     sink.tryEmitComplete();
@@ -416,14 +464,104 @@ public class ChatStreamController {
             @Override
             public void onError(Throwable error) {
                 log.error("Streaming LLM error", error);
-                sink.tryEmitNext(ServerSentEvent.<String>builder()
-                        .event("error")
-                        .data("{\"error\":\"%s\"}".formatted(escapeJson(
-                                error.getMessage() != null ? error.getMessage() : "Unknown streaming error")))
-                        .build());
+                emitError(sink, errorCodeFor(error),
+                        error.getMessage() != null ? error.getMessage() : "Unknown streaming error");
                 sink.tryEmitComplete();
             }
         });
+    }
+
+    /**
+     * Emits an {@code approval_required} SSE event for a tool annotated with
+     * {@link ai.gargantua.core.tool.RequiresApproval}. When an
+     * {@link ApprovalStore} bean is available the pending request is also
+     * persisted so a reviewer can resolve it via {@code POST /api/agent/approval/{id}}.
+     * Returns the generated {@code requestId}.
+     */
+    private String emitApprovalRequired(Sinks.Many<ServerSentEvent<String>> sink,
+                                        ToolDefinition def, String toolName,
+                                        String arguments, String userId, String sessionId) {
+        String requestId = java.util.UUID.randomUUID().toString();
+        int ttl = properties.getHitl().getDefaultTtlMinutes();
+        if (approvalStore != null) {
+            try {
+                approvalStore.savePending(requestId, new ApprovalRequest(
+                        requestId, sessionId, userId, toolName,
+                        Map.of("arguments", arguments != null ? arguments : ""),
+                        def.approvalMessage(), def.dangerous(),
+                        java.time.Instant.now().plusSeconds(ttl * 60L)
+                ), java.time.Duration.ofMinutes(ttl));
+            } catch (Exception e) {
+                log.warn("Failed to persist pending approval for {}: {}", toolName, e.getMessage());
+            }
+        }
+        sink.tryEmitNext(ServerSentEvent.<String>builder()
+                .event("approval_required")
+                .data(("{\"requestId\":\"%s\",\"tool\":\"%s\",\"arguments\":%s,"
+                        + "\"message\":\"%s\",\"dangerous\":%s,\"ttlMinutes\":%d}")
+                        .formatted(escapeJson(requestId),
+                                escapeJson(toolName),
+                                arguments != null && !arguments.isBlank() ? arguments : "{}",
+                                escapeJson(def.approvalMessage() != null ? def.approvalMessage() : ""),
+                                def.dangerous(),
+                                ttl))
+                .build());
+        return requestId;
+    }
+
+    /**
+     * Emits a {@code guardrail_warn} SSE event for every guardrail result whose
+     * verdict is {@link GuardrailVerdict#WARN} (or has a non-blank reason while
+     * passing — covers guardrails that mention soft caveats).
+     */
+    private void emitGuardrailWarnings(Sinks.Many<ServerSentEvent<String>> sink,
+                                       List<GuardrailResult> results, String phase) {
+        if (results == null) return;
+        for (GuardrailResult r : results) {
+            boolean isWarn = r.verdict() == GuardrailVerdict.WARN
+                    || (r.verdict() == GuardrailVerdict.PASS && r.reason() != null && !r.reason().isBlank());
+            if (!isWarn) continue;
+            sink.tryEmitNext(ServerSentEvent.<String>builder()
+                    .event("guardrail_warn")
+                    .data("{\"phase\":\"%s\",\"guardrail\":\"%s\",\"reason\":\"%s\"}".formatted(
+                            escapeJson(phase),
+                            escapeJson(r.guardrailName()),
+                            escapeJson(r.reason() != null ? r.reason() : "")))
+                    .build());
+        }
+    }
+
+    private void emitError(Sinks.Many<ServerSentEvent<String>> sink, String code, String message) {
+        sink.tryEmitNext(ServerSentEvent.<String>builder()
+                .event("error")
+                .data("{\"error\":\"%s\",\"code\":\"%s\"}".formatted(
+                        escapeJson(message != null ? message : ""),
+                        escapeJson(code != null ? code : "INTERNAL_ERROR")))
+                .build());
+    }
+
+    /**
+     * Maps a thrown exception to the structured {@code code} field surfaced on
+     * SSE error events. The values mirror the {@code type} URIs used by
+     * {@link AgentKitExceptionHandler}, so REST and SSE clients see the same
+     * vocabulary for the same failure modes.
+     */
+    static String errorCodeFor(Throwable error) {
+        if (error == null) return "INTERNAL_ERROR";
+        if (error instanceof GuardrailBlockedException) return "GUARDRAIL_BLOCKED";
+        if (error instanceof RateLimitExceededException) return "RATE_LIMIT_EXCEEDED";
+        if (error instanceof SkillNotFoundException) return "SKILL_NOT_FOUND";
+        if (error instanceof TokenBudgetExceededException) return "TOKEN_BUDGET_EXCEEDED";
+        if (error instanceof SchemaValidationException) return "SCHEMA_VALIDATION";
+        if (error instanceof ApprovalExpiredException) return "APPROVAL_EXPIRED";
+        if (error instanceof DryRunNotAllowedException) return "DRY_RUN_NOT_ALLOWED";
+        return "INTERNAL_ERROR";
+    }
+
+    private static String formatCost(double cost) {
+        // Always emit a JSON-safe number — handles NaN/Infinity by collapsing to 0.
+        if (Double.isNaN(cost) || Double.isInfinite(cost)) return "0.0";
+        return Double.toString(cost);
     }
 
     private static String escapeJson(String value) {

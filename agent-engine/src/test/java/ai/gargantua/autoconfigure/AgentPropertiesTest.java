@@ -114,9 +114,9 @@ class AgentPropertiesTest {
     class RoutingDefaults {
 
         @Test
-        @DisplayName("default strategy is semantic")
+        @DisplayName("default strategy is hybrid")
         void defaultStrategy() {
-            assertThat(new AgentProperties().getRouting().getStrategy()).isEqualTo("semantic");
+            assertThat(new AgentProperties().getRouting().getStrategy()).isEqualTo("hybrid");
         }
 
         @Test

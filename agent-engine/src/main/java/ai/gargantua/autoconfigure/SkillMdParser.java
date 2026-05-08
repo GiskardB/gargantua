@@ -74,6 +74,7 @@ public class SkillMdParser {
         var preferredModel = getString(metadata, "preferred-model", null);
 
         var references = getStringList(frontmatter, "references");
+        var examples = getStringList(frontmatter, "examples");
 
         // RAG configuration from metadata
         var knowledgeBase = getString(metadata, "knowledge-base", null);
@@ -107,7 +108,8 @@ public class SkillMdParser {
                 temperature,
                 preferredModel,
                 ragConfig,
-                memoryLayers
+                memoryLayers,
+                examples
         );
     }
 

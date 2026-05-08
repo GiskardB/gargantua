@@ -16,8 +16,12 @@ import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.ratelimiter.RateLimiter;
 import io.github.resilience4j.ratelimiter.RateLimiterConfig;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.ApplicationContext;
 import org.springframework.lang.Nullable;
 
 import java.time.Duration;
@@ -37,6 +41,9 @@ public class LlmProviderFactory {
 
     private final AgentProperties properties;
     private final LlmRouter llmRouter;
+    @Nullable
+    private final ApplicationContext applicationContext;
+    private final ObjectProvider<MeterRegistry> meterRegistryProvider;
     private final ConcurrentHashMap<String, ChatModel> modelCache = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, StreamingChatModel> streamingModelCache = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, RateLimiter> rateLimiters = new ConcurrentHashMap<>();
@@ -49,8 +56,16 @@ public class LlmProviderFactory {
                     .build());
 
     public LlmProviderFactory(AgentProperties properties, LlmRouter llmRouter) {
+        this(properties, llmRouter, null, EmptyObjectProvider.instance());
+    }
+
+    public LlmProviderFactory(AgentProperties properties, LlmRouter llmRouter,
+                              @Nullable ApplicationContext applicationContext,
+                              ObjectProvider<MeterRegistry> meterRegistryProvider) {
         this.properties = properties;
         this.llmRouter = llmRouter;
+        this.applicationContext = applicationContext;
+        this.meterRegistryProvider = meterRegistryProvider;
     }
 
     /**
@@ -132,16 +147,31 @@ public class LlmProviderFactory {
      * Get the rate limiter for a given provider alias.
      */
     private RateLimiter getRateLimiter(String alias) {
-        return rateLimiters.computeIfAbsent(alias, a -> RateLimiter.of(a,
-                RateLimiterConfig.custom()
-                        .limitForPeriod(60)
-                        .limitRefreshPeriod(Duration.ofMinutes(1))
-                        .timeoutDuration(Duration.ofSeconds(10))
-                        .build()));
+        return rateLimiters.computeIfAbsent(alias, a -> {
+            var rateLimit = properties.getLlm().getRateLimit();
+            int maxRequests = rateLimit.getMaxRequests() > 0 ? rateLimit.getMaxRequests() : 60;
+            int windowSeconds = rateLimit.getWindowSeconds() > 0 ? rateLimit.getWindowSeconds() : 60;
+            return RateLimiter.of(a,
+                    RateLimiterConfig.custom()
+                            .limitForPeriod(maxRequests)
+                            .limitRefreshPeriod(Duration.ofSeconds(windowSeconds))
+                            .timeoutDuration(Duration.ofSeconds(10))
+                            .build());
+        });
     }
 
     private ChatModel buildModel(String alias) {
         var config = getModelConfig(alias);
+
+        // 1. Spring bean lookup — let users register a ChatModel @Bean named after the alias
+        //    (or after the provider). Wins over the built-in switch so adapters for Gemini,
+        //    Mistral, Cohere etc. can be plugged in without touching this factory.
+        ChatModel custom = lookupChatModelBean(alias, config.getProvider());
+        if (custom != null) {
+            log.info("Using user-provided ChatModel bean for alias={}, provider={}",
+                    alias, config.getProvider());
+            return custom;
+        }
 
         String apiKey = config.getApiKey();
         if (apiKey == null || apiKey.isBlank()) {
@@ -179,6 +209,13 @@ public class LlmProviderFactory {
 
     private StreamingChatModel buildStreamingModel(String alias) {
         var config = getModelConfig(alias);
+
+        StreamingChatModel custom = lookupStreamingChatModelBean(alias, config.getProvider());
+        if (custom != null) {
+            log.info("Using user-provided StreamingChatModel bean for alias={}, provider={}",
+                    alias, config.getProvider());
+            return custom;
+        }
 
         String apiKey = config.getApiKey();
         if (apiKey == null || apiKey.isBlank()) {
@@ -284,22 +321,115 @@ public class LlmProviderFactory {
 
         var messages = buildMessages(systemPrompt, userMessage, conversationHistory);
 
+        String skillName = ctx != null && ctx.skillName() != null ? ctx.skillName() : "unknown";
+        long startNanos = System.nanoTime();
         try {
-            return RateLimiter.decorateSupplier(getRateLimiter(alias), () ->
+            String result = RateLimiter.decorateSupplier(getRateLimiter(alias), () ->
                     primaryCircuitBreaker.executeSupplier(() -> {
                         var resp = model.chat(messages);
                         return resp.aiMessage().text();
                     })
             ).get();
+            recordLatency(alias, skillName, startNanos);
+            return result;
         } catch (Exception e) {
+            recordError(alias);
             log.warn("Primary LLM failed (alias={}), trying fallback: {}", alias, e.getMessage());
             var fallback = getFallbackModel();
             if (fallback != null) {
-                var resp = fallback.chat(messages);
-                return resp.aiMessage().text();
+                recordFallbackUsed(alias);
+                long fallbackStart = System.nanoTime();
+                try {
+                    var resp = fallback.chat(messages);
+                    recordLatency("fallback", skillName, fallbackStart);
+                    return resp.aiMessage().text();
+                } catch (Exception fe) {
+                    recordError("fallback");
+                    throw fe instanceof RuntimeException re ? re : new RuntimeException(fe);
+                }
             }
             throw e instanceof RuntimeException re ? re : new RuntimeException(e);
         }
+    }
+
+    /**
+     * Returns the user-registered {@link ChatModel} bean for {@code alias}, or for
+     * {@code provider} as a fallback name. {@code null} when no such bean exists or the
+     * application context wasn't injected (e.g. unit-test constructor).
+     */
+    @Nullable
+    private ChatModel lookupChatModelBean(String alias, String provider) {
+        if (applicationContext == null) return null;
+        if (alias != null && !alias.isBlank() && applicationContext.containsBean(alias)) {
+            try {
+                Object bean = applicationContext.getBean(alias);
+                if (bean instanceof ChatModel cm) return cm;
+            } catch (Exception ignored) {
+                // bean exists with that name but is a different type — fall through to provider lookup
+            }
+        }
+        if (provider != null && !provider.isBlank()
+                && !"openai".equals(provider) && !"anthropic".equals(provider)
+                && applicationContext.containsBean(provider)) {
+            try {
+                Object bean = applicationContext.getBean(provider);
+                if (bean instanceof ChatModel cm) return cm;
+            } catch (Exception ignored) {
+                // not the type we want
+            }
+        }
+        return null;
+    }
+
+    private void recordLatency(String alias, String skillName, long startNanos) {
+        MeterRegistry meters = meterRegistryProvider.getIfAvailable();
+        if (meters != null) {
+            Timer.builder("agent.llm.model.latency")
+                    .tag("model", alias != null ? alias : "")
+                    .tag("skill", skillName != null ? skillName : "")
+                    .register(meters)
+                    .record(Duration.ofNanos(System.nanoTime() - startNanos));
+        }
+    }
+
+    private void recordError(String alias) {
+        MeterRegistry meters = meterRegistryProvider.getIfAvailable();
+        if (meters != null) {
+            meters.counter("agent.llm.model.error_rate", "model", alias != null ? alias : "").increment();
+        }
+    }
+
+    private void recordFallbackUsed(String originalAlias) {
+        MeterRegistry meters = meterRegistryProvider.getIfAvailable();
+        if (meters != null) {
+            meters.counter("agent.llm.routing.fallback.used",
+                    "original_model", originalAlias != null ? originalAlias : "").increment();
+        }
+    }
+
+    @Nullable
+    private StreamingChatModel lookupStreamingChatModelBean(String alias, String provider) {
+        if (applicationContext == null) return null;
+        if (alias != null && !alias.isBlank()) {
+            String streamingBeanName = alias + "Streaming";
+            if (applicationContext.containsBean(streamingBeanName)) {
+                try {
+                    Object bean = applicationContext.getBean(streamingBeanName);
+                    if (bean instanceof StreamingChatModel scm) return scm;
+                } catch (Exception ignored) {}
+            }
+        }
+        if (provider != null && !provider.isBlank()
+                && !"openai".equals(provider) && !"anthropic".equals(provider)) {
+            String streamingBeanName = provider + "Streaming";
+            if (applicationContext.containsBean(streamingBeanName)) {
+                try {
+                    Object bean = applicationContext.getBean(streamingBeanName);
+                    if (bean instanceof StreamingChatModel scm) return scm;
+                } catch (Exception ignored) {}
+            }
+        }
+        return null;
     }
 
     /**

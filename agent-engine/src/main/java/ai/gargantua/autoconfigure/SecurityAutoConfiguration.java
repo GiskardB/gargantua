@@ -29,7 +29,7 @@ public class SecurityAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean(RbacGuardrail.class)
-    public RbacGuardrail rbacGuardrail() {
-        return new RbacGuardrail();
+    public RbacGuardrail rbacGuardrail(AgentProperties agentProperties) {
+        return new RbacGuardrail(agentProperties);
     }
 }

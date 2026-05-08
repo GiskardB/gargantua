@@ -71,9 +71,10 @@ public class SkillRegistryAutoConfiguration {
         var composite = new CompositeSkillRegistry(
                 List.of(filesystemSkillRegistry, classpathSkillsJarRegistry));
 
-        var ttl = Duration.ofMinutes(properties.getSkill().getCacheTtlMinutes());
-        log.info("SkillRegistry: Composite → Cached (TTL={}min)", properties.getSkill().getCacheTtlMinutes());
-        return new CachedSkillRegistry(composite, ttl);
+        var ttl = resolveCacheTtl(properties);
+        var maxSize = properties.getSkill().getCache().getMaxSize();
+        log.info("SkillRegistry: Composite → Cached (TTL={}, maxSize={})", ttl, maxSize);
+        return new CachedSkillRegistry(composite, ttl, maxSize);
     }
 
     @Bean
@@ -88,15 +89,24 @@ public class SkillRegistryAutoConfiguration {
         var composite = new CompositeSkillRegistry(
                 List.of(filesystemSkillRegistry, classpathSkillsJarRegistry));
 
-        var ttl = Duration.ofMinutes(properties.getSkill().getCacheTtlMinutes());
-        var cached = new CachedSkillRegistry(composite, ttl);
+        var ttl = resolveCacheTtl(properties);
+        var maxSize = properties.getSkill().getCache().getMaxSize();
+        var cached = new CachedSkillRegistry(composite, ttl, maxSize);
 
         var skillPath = properties.getSkill().getPath();
         var watchPath = skillPath.startsWith("classpath:")
                 ? Path.of("src/main/resources/" + skillPath.replace("classpath:", ""))
                 : Path.of(skillPath);
 
-        log.info("SkillRegistry: Composite → Cached → HotReload (watch={})", watchPath);
+        log.info("SkillRegistry: Composite → Cached → HotReload (watch={}, TTL={}, maxSize={})",
+                watchPath, ttl, maxSize);
         return new HotReloadSkillRegistry(cached, watchPath, eventPublisher);
+    }
+
+    private Duration resolveCacheTtl(AgentProperties properties) {
+        int ttlSeconds = properties.getSkill().getCache().getTtlSeconds();
+        return ttlSeconds > 0
+                ? Duration.ofSeconds(ttlSeconds)
+                : Duration.ofMinutes(properties.getSkill().getCacheTtlMinutes());
     }
 }
