@@ -1,5 +1,13 @@
 # Gargantua -- AI Agent Framework
 
+[![License](https://img.shields.io/github/license/GiskardB/gargantua?style=flat-square&color=blue)](LICENSE)
+[![Latest version](https://img.shields.io/github/v/tag/GiskardB/gargantua?style=flat-square&label=version&color=brightgreen)](https://github.com/GiskardB/gargantua/tags)
+[![JitPack](https://jitpack.io/v/GiskardB/gargantua.svg?style=flat-square)](https://jitpack.io/#GiskardB/gargantua)
+[![CI](https://img.shields.io/github/actions/workflow/status/GiskardB/gargantua/ci.yml?style=flat-square&label=CI)](https://github.com/GiskardB/gargantua/actions/workflows/ci.yml)
+[![Java](https://img.shields.io/badge/Java-21-007396?style=flat-square&logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/21/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.0.4-6DB33F?style=flat-square&logo=spring&logoColor=white)](https://spring.io/projects/spring-boot)
+[![LangChain4j](https://img.shields.io/badge/LangChain4j-1.12-ff6b35?style=flat-square)](https://docs.langchain4j.dev/)
+
 **AI agents as a service, in Java.** Write a skill file and a tool class — Gargantua gives you a deployable REST API with streaming, persistent memory, guardrails, and multi-agent orchestration.
 
 Define what your agent can do in a `SKILL.md` file (or a Java `@AgentSkill` annotation), implement actions as `@AgentTool` methods, and chain them into multi-step `@AgentsFlow` pipelines. The framework handles everything else: skill routing, 3-layer memory, input/output guardrails, human-in-the-loop approvals, cost tracking, A2A interoperability, and Kubernetes deployment.
@@ -17,7 +25,7 @@ Built on Java 21, Spring Boot 4.0.4, and LangChain4j.
 mvn archetype:generate \
   -DarchetypeGroupId=com.github.giskardb.gargantua \
   -DarchetypeArtifactId=agent-archetype \
-  -DarchetypeVersion=v1.1.2 \
+  -DarchetypeVersion=v1.2.2 \
   -DarchetypeRepository=https://jitpack.io \
   -DgroupId=com.mycompany -DartifactId=my-agent \
   -Dversion=1.0.0 -DagentName=MyAgent -DinteractiveMode=false
@@ -230,7 +238,7 @@ The "60 seconds" quickstart uses **embedded mode** (everything in-memory, no Doc
 mvn archetype:generate \
   -DarchetypeGroupId=com.github.giskardb.gargantua \
   -DarchetypeArtifactId=agent-archetype \
-  -DarchetypeVersion=v1.1.2 \
+  -DarchetypeVersion=v1.2.2 \
   -DarchetypeRepository=https://jitpack.io \
   -DgroupId=com.mycompany \
   -DartifactId=my-agent \
@@ -416,9 +424,11 @@ Gargantua is distributed as a set of Maven libraries. You don't clone this repo 
 | `agent-skill-linter-maven-plugin` | `ai.gargantua` | Build-time SKILL.md validation. |
 | `agent-archetype` | `ai.gargantua` | Maven archetype to scaffold new agent projects. |
 
-### Repository setup — JitPack (recommended)
+### Repository setup — JitPack
 
-Gargantua is published via **[JitPack](https://jitpack.io)** — no authentication, no `settings.xml`, just add the repository:
+Gargantua is published via **JitPack** — no authentication, no `settings.xml`, just add the repository.
+
+> 📦 **Browse the published artifacts and build logs at [jitpack.io/#GiskardB/gargantua](https://jitpack.io/#GiskardB/gargantua)** — every Git tag becomes a downloadable Maven version.
 
 ```xml
 <repositories>
@@ -435,41 +445,15 @@ Gargantua is published via **[JitPack](https://jitpack.io)** — no authenticati
 </pluginRepositories>
 ```
 
-> JitPack uses the groupId `com.github.giskardb.gargantua` and versions match Git tags (e.g. `v1.1.2`).
+> JitPack uses the groupId `com.github.giskardb.gargantua` and versions match Git tags (e.g. `v1.2.2`).
 >
 > If you used the Maven archetype, the repository is **already configured** in the generated `pom.xml`.
-
-<details>
-<summary>Alternative: GitHub Packages (requires authentication)</summary>
-
-Add to `~/.m2/settings.xml`:
-```xml
-<servers>
-    <server>
-        <id>github-gargantua</id>
-        <username>YOUR_GITHUB_USERNAME</username>
-        <password>YOUR_GITHUB_TOKEN</password><!-- read:packages scope -->
-    </server>
-</servers>
-```
-
-Add to `pom.xml`:
-```xml
-<repositories>
-    <repository>
-        <id>github-gargantua</id>
-        <url>https://maven.pkg.github.com/giskardb/gargantua</url>
-    </repository>
-</repositories>
-```
-With GitHub Packages, use groupId `ai.gargantua` and the version that matches the tag without the `v` prefix (e.g. `1.1.2` for tag `v1.1.2`).
-</details>
 
 ### Typical dependency setup (JitPack)
 
 ```xml
 <properties>
-    <gargantua.version>v1.1.2</gargantua.version>
+    <gargantua.version>v1.2.2</gargantua.version>
 </properties>
 
 <repositories>
