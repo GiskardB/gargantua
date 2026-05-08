@@ -104,6 +104,25 @@ class SkillMdParserTest {
     }
 
     @Test
+    void parseToCard_acceptsAllowedToolsAsYamlList() {
+        String content = """
+                ---
+                name: weather
+                description: Weather lookup
+                allowed-tools:
+                  - get-current-weather
+                  - get-forecast
+                ---
+                Body.
+                """;
+
+        SkillCard card = parser.parseToCard(content, SkillSource.FILESYSTEM);
+        assertEquals(2, card.allowedTools().size());
+        assertTrue(card.allowedTools().contains("get-current-weather"));
+        assertTrue(card.allowedTools().contains("get-forecast"));
+    }
+
+    @Test
     void parseToMeta_inactiveSkill() {
         String content = """
                 ---

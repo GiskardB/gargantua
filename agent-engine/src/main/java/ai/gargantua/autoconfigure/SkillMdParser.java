@@ -62,10 +62,7 @@ public class SkillMdParser {
         var description = getString(frontmatter, "description", "");
         var version = getString(frontmatter, "version", "1.0.0");
 
-        var allowedToolsStr = getString(frontmatter, "allowed-tools", "");
-        var allowedTools = allowedToolsStr.isBlank()
-                ? Collections.<String>emptyList()
-                : Arrays.asList(allowedToolsStr.split("\\s+"));
+        var allowedTools = parseAllowedTools(frontmatter.get("allowed-tools"));
 
         var metadata = getMap(frontmatter, "metadata");
         var active = getBoolean(metadata, "active", true);
@@ -236,6 +233,17 @@ public class SkillMdParser {
     }
 
     @SuppressWarnings("unchecked")
+    // Accepts a YAML list `[a, b]` or a whitespace-separated string `"a b"` for backward compatibility.
+    private List<String> parseAllowedTools(Object raw) {
+        if (raw instanceof List<?> list) {
+            return list.stream().map(Object::toString).toList();
+        }
+        if (raw instanceof String s && !s.isBlank()) {
+            return Arrays.asList(s.split("\\s+"));
+        }
+        return Collections.emptyList();
+    }
+
     private List<String> getStringList(Map<String, Object> map, String key) {
         if (map == null) return Collections.emptyList();
         Object val = map.get(key);
