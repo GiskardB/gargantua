@@ -1,7 +1,7 @@
 replicaCount: 2
 
 image:
-  repository: ghcr.ai/gargantua/gargantua-parent
+  repository: ghcr.io/giskardb/gargantua-parent
   tag: latest
   pullPolicy: IfNotPresent
 

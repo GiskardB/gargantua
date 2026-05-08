@@ -9,3 +9,9 @@ data:
   SERVER_PORT: "8080"
   MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus
   MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"
+  # LLM provider configuration — override per environment via overlays
+  LLM_PRIMARY_PROVIDER: openai
+  LLM_PRIMARY_MODEL: gpt-4o
+  LLM_PRIMARY_ENDPOINT: https://api.openai.com/v1
+  LLM_FALLBACK_PROVIDER: anthropic
+  LLM_FALLBACK_MODEL: claude-sonnet-4-20250514
