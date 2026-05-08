@@ -21,12 +21,30 @@ Built on Java 21, Spring Boot 4.0.4, and LangChain4j.
 > Requires: Java 21+, Maven, an OpenAI-compatible API key. No Docker needed.
 
 ```bash
+# 0. (one-time) Tell Maven where to find JitPack — the maven-archetype-plugin
+#    ignores -DarchetypeRepository, so the repository must live in settings.xml.
+#    Append this profile to ~/.m2/settings.xml (create the file if missing):
+#
+# <settings>
+#   <profiles>
+#     <profile>
+#       <id>jitpack</id>
+#       <repositories>
+#         <repository><id>jitpack.io</id><url>https://jitpack.io</url></repository>
+#       </repositories>
+#       <pluginRepositories>
+#         <pluginRepository><id>jitpack.io</id><url>https://jitpack.io</url></pluginRepository>
+#       </pluginRepositories>
+#     </profile>
+#   </profiles>
+#   <activeProfiles><activeProfile>jitpack</activeProfile></activeProfiles>
+# </settings>
+
 # 1. Generate a new agent project
 mvn archetype:generate \
   -DarchetypeGroupId=com.github.giskardb.gargantua \
   -DarchetypeArtifactId=agent-archetype \
   -DarchetypeVersion=v1.2.2 \
-  -DarchetypeRepository=https://jitpack.io \
   -DgroupId=com.mycompany -DartifactId=my-agent \
   -Dversion=1.0.0 -DagentName=MyAgent -DinteractiveMode=false
 
@@ -234,12 +252,17 @@ The "60 seconds" quickstart uses **embedded mode** (everything in-memory, no Doc
 
 ### 1. Generate the project
 
+> **First-time setup:** declare JitPack in `~/.m2/settings.xml` once — see the
+> snippet in [Try it in 60 seconds](#try-it-in-60-seconds). The
+> `maven-archetype-plugin` doesn't honour `-DarchetypeRepository` reliably, so
+> the repository has to be visible at the Maven-settings level for the
+> `archetype:generate` lookup to find the JitPack-published archetype.
+
 ```bash
 mvn archetype:generate \
   -DarchetypeGroupId=com.github.giskardb.gargantua \
   -DarchetypeArtifactId=agent-archetype \
   -DarchetypeVersion=v1.2.2 \
-  -DarchetypeRepository=https://jitpack.io \
   -DgroupId=com.mycompany \
   -DartifactId=my-agent \
   -Dversion=1.0.0 \
