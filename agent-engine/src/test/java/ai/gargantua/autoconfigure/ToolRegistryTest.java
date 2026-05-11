@@ -1,6 +1,8 @@
 package ai.gargantua.autoconfigure;
 
 import ai.gargantua.core.tool.AgentTool;
+import ai.gargantua.core.tool.CacheScope;
+import ai.gargantua.core.tool.CacheableToolResult;
 import ai.gargantua.core.tool.RequiresApproval;
 import ai.gargantua.core.tool.ToolDefinition;
 import ai.gargantua.core.tool.ToolRetry;
@@ -395,6 +397,93 @@ class ToolRegistryTest {
             assertThat(bean.invocations.get()).isEqualTo(3);
             assertThat(meters.counter("agent.tool.retry.exhausted", "tool", "alwaysFail").count())
                     .isEqualTo(1.0);
+        }
+    }
+
+    /**
+     * End-to-end coverage for {@link CacheableToolResult} backed by the
+     * in-memory {@link ToolResultCache} (1.2.5). Verifies the read-through
+     * behaviour, hit/miss counters, and that distinct argument tuples land
+     * in distinct cache slots.
+     */
+    @Nested
+    @DisplayName("executeTool — @CacheableToolResult (1.2.5)")
+    class CacheableToolResults {
+
+        static class CounterToolBean {
+            final AtomicInteger invocations = new AtomicInteger();
+
+            @AgentTool(description = "Returns the call count for the given key — purely to make the cache observable")
+            @CacheableToolResult(ttlSeconds = 60, keyParams = {"key"}, scope = CacheScope.GLOBAL)
+            public String count(String key) {
+                return "k=" + key + ";n=" + invocations.incrementAndGet();
+            }
+        }
+
+        private CounterToolBean bean;
+        private SimpleMeterRegistry meters;
+        private ToolResultCache cache;
+
+        @BeforeEach
+        @SuppressWarnings("unchecked")
+        void wireRealCacheAndMeters() {
+            meters = new SimpleMeterRegistry();
+            cache  = new ToolResultCache();
+
+            ObjectProvider<ToolResultCache> cacheProvider = mock(ObjectProvider.class);
+            ObjectProvider<MeterRegistry>   meterProvider = mock(ObjectProvider.class);
+            when(cacheProvider.getIfAvailable()).thenReturn(cache);
+            when(meterProvider.getIfAvailable()).thenReturn(meters);
+
+            toolRegistry = new ToolRegistry(applicationContext, cacheProvider, meterProvider);
+
+            bean = new CounterToolBean();
+            when(applicationContext.getBeanDefinitionNames())
+                    .thenReturn(new String[]{"counterToolBean"});
+            when(applicationContext.getBean("counterToolBean")).thenReturn(bean);
+            toolRegistry.scan();
+        }
+
+        @Test
+        @DisplayName("second call with the same args returns the cached value — tool body runs once")
+        void secondCallHitsCache() {
+            String first  = toolRegistry.executeTool("count", "{\"key\":\"alpha\"}");
+            String second = toolRegistry.executeTool("count", "{\"key\":\"alpha\"}");
+
+            // doInvoke returns String values verbatim (no JSON quoting).
+            assertThat(first).isEqualTo("k=alpha;n=1");
+            assertThat(second).isEqualTo(first);
+            assertThat(bean.invocations.get())
+                    .as("tool body should have executed exactly once across two invocations")
+                    .isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("distinct keyParams values land in distinct cache slots")
+        void distinctArgsAreDistinctCacheEntries() {
+            toolRegistry.executeTool("count", "{\"key\":\"alpha\"}");
+            toolRegistry.executeTool("count", "{\"key\":\"beta\"}");
+            toolRegistry.executeTool("count", "{\"key\":\"alpha\"}"); // should hit
+            toolRegistry.executeTool("count", "{\"key\":\"beta\"}");  // should hit
+
+            assertThat(bean.invocations.get())
+                    .as("alpha and beta each execute once, the repeats hit the cache")
+                    .isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("Micrometer cache hit/miss counters increment per scope")
+        void hitMissMetersIncrement() {
+            toolRegistry.executeTool("count", "{\"key\":\"alpha\"}"); // miss
+            toolRegistry.executeTool("count", "{\"key\":\"alpha\"}"); // hit
+            toolRegistry.executeTool("count", "{\"key\":\"alpha\"}"); // hit
+
+            assertThat(meters.counter("agent.tool.cache.misses",
+                    "tool", "count", "scope", "GLOBAL").count())
+                    .isEqualTo(1.0);
+            assertThat(meters.counter("agent.tool.cache.hits",
+                    "tool", "count", "scope", "GLOBAL").count())
+                    .isEqualTo(2.0);
         }
     }
 }

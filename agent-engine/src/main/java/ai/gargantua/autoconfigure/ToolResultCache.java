@@ -6,6 +6,7 @@ import ai.gargantua.core.tool.CacheableToolResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.lang.Nullable;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
@@ -18,11 +19,28 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
 
 /**
- * Redis-backed cache for tool results, driven by {@link CacheableToolResult}.
- * Cache keys live under the {@code tool-cache:} prefix so the existing
- * {@code /api/admin/tool-cache/*} endpoints can list and clear them.
+ * Cache for tool results, driven by {@link CacheableToolResult}. The class has
+ * two interchangeable backends:
+ *
+ * <ul>
+ *   <li><b>Redis</b> — constructed via {@link #ToolResultCache(StringRedisTemplate)}.
+ *       Survives restarts and is shared across replicas. Wired automatically
+ *       by {@link ToolCacheAutoConfiguration} when a {@code StringRedisTemplate}
+ *       bean is present.</li>
+ *   <li><b>In-memory</b> — constructed via {@link #ToolResultCache()}. A
+ *       process-local {@link ConcurrentHashMap} with per-entry TTL.
+ *       Wired in embedded mode by {@code EmbeddedProfileAutoConfiguration}
+ *       so {@code @CacheableToolResult} also works without Redis. Data is
+ *       lost when the process restarts and is NOT shared across replicas.</li>
+ * </ul>
+ *
+ * <p>Cache keys live under the {@code tool-cache:} prefix so the existing
+ * {@code /api/admin/tool-cache/*} endpoints can list and clear them.</p>
  *
  * <p>Key layout: {@code tool-cache:<scope>:<tool>:[<userOrSession>:]<argsHash>}.
  * The hash is SHA-256 over the JSON-serialised, sorted subset of arguments
@@ -34,10 +52,27 @@ public class ToolResultCache {
     private static final Logger log = LoggerFactory.getLogger(ToolResultCache.class);
     private static final String KEY_PREFIX = "tool-cache:";
 
-    private final StringRedisTemplate redis;
+    private final @Nullable StringRedisTemplate redis;
+    private final @Nullable ConcurrentMap<String, Entry> inMemory;
 
+    /** Redis-backed constructor (production default when Redis is available). */
     public ToolResultCache(StringRedisTemplate redis) {
         this.redis = redis;
+        this.inMemory = null;
+    }
+
+    /**
+     * In-memory constructor — process-local cache with per-entry TTL.
+     * Used in embedded mode and tests. Data does not survive restart.
+     */
+    public ToolResultCache() {
+        this.redis = null;
+        this.inMemory = new ConcurrentHashMap<>();
+    }
+
+    /** Backing entry for the in-memory backend. */
+    private record Entry(String value, long expiresAtNanos) {
+        boolean isExpired() { return System.nanoTime() > expiresAtNanos; }
     }
 
     /**
@@ -69,21 +104,37 @@ public class ToolResultCache {
     }
 
     public String get(String key) {
-        try {
-            return redis.opsForValue().get(key);
-        } catch (Exception e) {
-            log.warn("[ToolCache] Redis GET failed for key={}: {}", key, e.getMessage());
+        if (redis != null) {
+            try {
+                return redis.opsForValue().get(key);
+            } catch (Exception e) {
+                log.warn("[ToolCache] Redis GET failed for key={}: {}", key, e.getMessage());
+                return null;
+            }
+        }
+        Entry e = inMemory.get(key);
+        if (e == null) {
             return null;
         }
+        if (e.isExpired()) {
+            inMemory.remove(key, e);
+            return null;
+        }
+        return e.value();
     }
 
     public void put(String key, String value, int ttlSeconds) {
-        try {
-            int ttl = ttlSeconds > 0 ? ttlSeconds : 300;
-            redis.opsForValue().set(key, value, Duration.ofSeconds(ttl));
-        } catch (Exception e) {
-            log.warn("[ToolCache] Redis SET failed for key={}: {}", key, e.getMessage());
+        int ttl = ttlSeconds > 0 ? ttlSeconds : 300;
+        if (redis != null) {
+            try {
+                redis.opsForValue().set(key, value, Duration.ofSeconds(ttl));
+            } catch (Exception e) {
+                log.warn("[ToolCache] Redis SET failed for key={}: {}", key, e.getMessage());
+            }
+            return;
         }
+        long expiresAt = System.nanoTime() + TimeUnit.SECONDS.toNanos(ttl);
+        inMemory.put(key, new Entry(value, expiresAt));
     }
 
     private String hashArgs(Method method, Map<String, String> args, String[] keyParams) {

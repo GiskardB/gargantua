@@ -89,4 +89,11 @@ public class EmbeddedProfileAutoConfiguration {
         log.info("Using in-memory audit store (data will be lost on restart)");
         return new InMemoryAuditStore();
     }
+
+    @Bean
+    @ConditionalOnMissingBean(ToolResultCache.class)
+    public ToolResultCache inMemoryToolResultCache() {
+        log.info("Using in-memory tool-result cache (data will be lost on restart)");
+        return new ToolResultCache();
+    }
 }
