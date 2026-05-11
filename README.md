@@ -44,7 +44,7 @@ Built on Java 21, Spring Boot 4.0.4, and LangChain4j.
 mvn archetype:generate \
   -DarchetypeGroupId=com.github.giskardb.gargantua \
   -DarchetypeArtifactId=agent-archetype \
-  -DarchetypeVersion=v1.2.6 \
+  -DarchetypeVersion=v1.2.7 \
   -DgroupId=com.mycompany -DartifactId=my-agent \
   -Dversion=1.0.0 -DagentName=MyAgent -DinteractiveMode=false
 
@@ -262,7 +262,7 @@ The "60 seconds" quickstart uses **embedded mode** (everything in-memory, no Doc
 mvn archetype:generate \
   -DarchetypeGroupId=com.github.giskardb.gargantua \
   -DarchetypeArtifactId=agent-archetype \
-  -DarchetypeVersion=v1.2.6 \
+  -DarchetypeVersion=v1.2.7 \
   -DgroupId=com.mycompany \
   -DartifactId=my-agent \
   -Dversion=1.0.0 \
@@ -468,7 +468,7 @@ Gargantua is published via **JitPack** — no authentication, no `settings.xml`,
 </pluginRepositories>
 ```
 
-> JitPack uses the groupId `com.github.giskardb.gargantua` and versions match Git tags (e.g. `v1.2.6`).
+> JitPack uses the groupId `com.github.giskardb.gargantua` and versions match Git tags (e.g. `v1.2.7`).
 >
 > If you used the Maven archetype, the repository is **already configured** in the generated `pom.xml`.
 
@@ -476,7 +476,7 @@ Gargantua is published via **JitPack** — no authentication, no `settings.xml`,
 
 ```xml
 <properties>
-    <gargantua.version>v1.2.6</gargantua.version>
+    <gargantua.version>v1.2.7</gargantua.version>
 </properties>
 
 <repositories>

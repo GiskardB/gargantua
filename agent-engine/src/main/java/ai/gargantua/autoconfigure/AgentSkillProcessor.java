@@ -7,7 +7,6 @@ import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationContext;
-import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Method;
 import java.util.*;
@@ -18,8 +17,13 @@ import java.util.*;
  * field on the annotated class (since Javadoc is not available at runtime).
  *
  * <p>If a SKILL.md file exists with the same name, it takes priority.</p>
+ *
+ * <p>Registered as a {@code @Bean} by {@code SkillRegistryAutoConfiguration}
+ * (1.2.7+) — the older {@code @Component} stereotype required user apps to
+ * extend their component scan, which was easy to forget. The bean is consumed
+ * by {@link ai.gargantua.adapters.skill.AnnotatedSkillRegistry} as the
+ * third source in the registry composite.</p>
  */
-@Component
 public class AgentSkillProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(AgentSkillProcessor.class);
