@@ -3,7 +3,9 @@ package ai.gargantua.autoconfigure;
 import ai.gargantua.core.tool.AgentTool;
 import ai.gargantua.core.tool.RequiresApproval;
 import ai.gargantua.core.tool.ToolDefinition;
+import ai.gargantua.core.tool.ToolRetry;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -14,8 +16,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationContext;
 
+import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -308,6 +312,89 @@ class ToolRegistryTest {
             assertThat(result)
                     .startsWith("{\"error\":")
                     .contains("Tool execution failed", "on purpose");
+        }
+    }
+
+    /**
+     * Regression coverage for the 1.2.4 fix: when a tool method throws a
+     * checked exception, the framework wraps it through a sentinel
+     * {@code CheckedToolException} so the retry predicate still sees the
+     * original type instead of a bare {@code RuntimeException}.
+     */
+    @Nested
+    @DisplayName("executeTool — @ToolRetry on checked exceptions (1.2.4 regression)")
+    class RetryOnCheckedExceptions {
+
+        static class FlakyToolBean {
+            final AtomicInteger invocations = new AtomicInteger();
+            volatile int failuresBeforeSuccess = 2;
+
+            @AgentTool(description = "Throws IOException until the Nth attempt, then succeeds")
+            @ToolRetry(
+                    maxAttempts = 3,
+                    waitDurationMs = 1,
+                    backoffMultiplier = 1.0,
+                    retryOn = {IOException.class}
+            )
+            public String flaky(String input) throws IOException {
+                int n = invocations.incrementAndGet();
+                if (n <= failuresBeforeSuccess) {
+                    throw new IOException("transient failure on attempt " + n);
+                }
+                return "ok:" + input;
+            }
+
+            @AgentTool(description = "Always throws IOException — exhausts the retry budget")
+            @ToolRetry(maxAttempts = 3, waitDurationMs = 1, retryOn = {IOException.class})
+            public String alwaysFail(String reason) throws IOException {
+                invocations.incrementAndGet();
+                throw new IOException("permanent: " + reason);
+            }
+        }
+
+        private FlakyToolBean bean;
+        private SimpleMeterRegistry meters;
+
+        @BeforeEach
+        @SuppressWarnings("unchecked")
+        void wireRealMeterRegistry() {
+            // Replace the parent-class setUp's mocked meter provider with a
+            // real SimpleMeterRegistry so we can assert the retry counters.
+            meters = new SimpleMeterRegistry();
+            ObjectProvider<ToolResultCache> cacheProvider = mock(ObjectProvider.class);
+            ObjectProvider<MeterRegistry>   meterProvider = mock(ObjectProvider.class);
+            when(meterProvider.getIfAvailable()).thenReturn(meters);
+
+            toolRegistry = new ToolRegistry(applicationContext, cacheProvider, meterProvider);
+
+            bean = new FlakyToolBean();
+            when(applicationContext.getBeanDefinitionNames())
+                    .thenReturn(new String[]{"flakyToolBean"});
+            when(applicationContext.getBean("flakyToolBean")).thenReturn(bean);
+            toolRegistry.scan();
+        }
+
+        @Test
+        @DisplayName("retries an IOException-throwing tool until it succeeds")
+        void retriesUntilSuccess() {
+            String result = toolRegistry.executeTool("flaky", "{\"input\":\"hi\"}");
+
+            assertThat(result).isEqualTo("ok:hi");
+            assertThat(bean.invocations.get()).isEqualTo(3);
+            // 2 retries means the onRetry event fires twice.
+            assertThat(meters.counter("agent.tool.retry.attempts", "tool", "flaky").count())
+                    .isEqualTo(2.0);
+        }
+
+        @Test
+        @DisplayName("exhausts maxAttempts when IOException is permanent")
+        void exhaustsRetryBudget() {
+            String result = toolRegistry.executeTool("alwaysFail", "{\"reason\":\"x\"}");
+
+            assertThat(result).startsWith("{\"error\":").contains("Tool execution failed");
+            assertThat(bean.invocations.get()).isEqualTo(3);
+            assertThat(meters.counter("agent.tool.retry.exhausted", "tool", "alwaysFail").count())
+                    .isEqualTo(1.0);
         }
     }
 }

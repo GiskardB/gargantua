@@ -338,12 +338,39 @@ public class ToolRegistry {
         return false;
     }
 
+    /**
+     * Peel framework-internal wrappers so the retry predicate sees the
+     * exception type the tool body actually threw. Two wrappers can appear:
+     *
+     * <ul>
+     *   <li>{@link java.lang.reflect.InvocationTargetException} — from
+     *       {@link java.lang.reflect.Method#invoke}.</li>
+     *   <li>{@link CheckedToolException} — our marker for a checked exception
+     *       lifted out of a reflective invocation (see {@link #doInvoke}).</li>
+     * </ul>
+     *
+     * <p>Only these two are unwrapped; a {@link RuntimeException} that the tool
+     * deliberately constructed with a cause is left alone, since its type IS
+     * the type the predicate should match.</p>
+     */
     private Throwable unwrap(Throwable t) {
         Throwable current = t;
-        while (current instanceof java.lang.reflect.InvocationTargetException && current.getCause() != null) {
+        while ((current instanceof java.lang.reflect.InvocationTargetException
+                || current instanceof CheckedToolException)
+                && current.getCause() != null) {
             current = current.getCause();
         }
         return current;
+    }
+
+    /**
+     * Marker wrapper used by {@link #doInvoke} when a tool method throws a
+     * checked exception. {@link #unwrap} knows to peel this back to the
+     * original throwable so {@code retryOn}/{@code abortOn} predicates see
+     * the type the developer declared, not a generic {@code RuntimeException}.
+     */
+    private static final class CheckedToolException extends RuntimeException {
+        CheckedToolException(Throwable cause) { super(cause); }
     }
 
     private Map<String, String> parseArgs(String jsonArguments) throws Exception {
@@ -380,9 +407,11 @@ public class ToolRegistry {
         } catch (java.lang.reflect.InvocationTargetException e) {
             Throwable cause = e.getCause() != null ? e.getCause() : e;
             if (cause instanceof RuntimeException re) throw re;
-            throw new RuntimeException(cause);
+            // Checked exception: lift through a marker wrapper so unwrap()
+            // can restore the original type for the retry predicate.
+            throw new CheckedToolException(cause);
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new CheckedToolException(e);
         }
     }
 
