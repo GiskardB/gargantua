@@ -243,4 +243,71 @@ class ToolRegistryTest {
             assertThat(tools.iterator().next().name()).isEqualTo("custom-calculator");
         }
     }
+
+    @Nested
+    @DisplayName("executeTool")
+    class ExecuteTool {
+
+        static class ArithmeticToolBean {
+            @AgentTool(description = "Adds two integers and returns their sum")
+            public int add(int a, int b) {
+                return a + b;
+            }
+
+            public record MultiplyResult(int a, int b, long result) {}
+
+            @AgentTool(description = "Multiplies two integers, returns a record")
+            public MultiplyResult multiply(int a, int b) {
+                return new MultiplyResult(a, b, (long) a * b);
+            }
+
+            @AgentTool(description = "Always throws — exercises the exception path")
+            public String boom(String why) {
+                throw new IllegalArgumentException("nope: " + why);
+            }
+        }
+
+        @BeforeEach
+        void scanArithmetic() {
+            when(applicationContext.getBeanDefinitionNames())
+                    .thenReturn(new String[]{"arithmeticToolBean"});
+            when(applicationContext.getBean("arithmeticToolBean"))
+                    .thenReturn(new ArithmeticToolBean());
+            toolRegistry.scan();
+        }
+
+        @Test
+        @DisplayName("primitive return is JSON-encoded as a bare value")
+        void primitiveReturnIsJsonEncoded() {
+            String result = toolRegistry.executeTool("add", "{\"a\":\"2\",\"b\":\"3\"}");
+            assertThat(result).isEqualTo("5");
+        }
+
+        @Test
+        @DisplayName("record return is JSON-encoded as an object with field names")
+        void recordReturnIsJsonEncoded() {
+            String result = toolRegistry.executeTool("multiply", "{\"a\":\"3\",\"b\":\"4\"}");
+            assertThat(result).contains("\"a\":3", "\"b\":4", "\"result\":12");
+        }
+
+        @Test
+        @DisplayName("unknown tool name returns {\"error\":\"Tool not found: …\"}")
+        void unknownToolReturnsErrorJson() {
+            String result = toolRegistry.executeTool("nope", "{}");
+            assertThat(result).startsWith("{\"error\":").contains("Tool not found", "nope");
+        }
+
+        @Test
+        @DisplayName("exception thrown by the tool body is wrapped in errorJson (no @ToolRetry)")
+        void exceptionFromToolBodyIsWrappedInErrorJson() {
+            // No @ToolRetry on `boom`. Before the 1.2.3 fix this used to
+            // propagate the IllegalArgumentException out of executeTool —
+            // now the contract is that any RuntimeException becomes a
+            // structured {"error":"..."} payload the LLM can read.
+            String result = toolRegistry.executeTool("boom", "{\"why\":\"on purpose\"}");
+            assertThat(result)
+                    .startsWith("{\"error\":")
+                    .contains("Tool execution failed", "on purpose");
+        }
+    }
 }

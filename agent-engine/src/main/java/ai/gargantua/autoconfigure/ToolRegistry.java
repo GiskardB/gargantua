@@ -260,12 +260,23 @@ public class ToolRegistry {
             }
         }
 
-        // 3. Retry-wrapped invocation (cached @ToolRetry)
+        // 3. Retry-wrapped invocation (cached @ToolRetry). Whether or not
+        //    @ToolRetry is present, any RuntimeException thrown by the tool
+        //    body is converted to a {"error":"..."} payload so the LLM gets
+        //    a recoverable signal instead of the request blowing up.
         Supplier<String> call = () -> doInvoke(invocation, args);
         ToolRetry retryAnn = invocation.retry();
-        String result = retryAnn != null
-                ? executeWithRetry(toolName, retryAnn, call)
-                : call.get();
+        String result;
+        if (retryAnn != null) {
+            result = executeWithRetry(toolName, retryAnn, call);
+        } else {
+            try {
+                result = call.get();
+            } catch (RuntimeException e) {
+                log.error("[ToolRegistry] Tool '{}' threw: {}", toolName, e.getMessage());
+                result = errorJson("Tool execution failed: " + safeMessage(e));
+            }
+        }
 
         // 4. Cache put on success
         if (cacheKey != null && !isErrorPayload(result)) {
