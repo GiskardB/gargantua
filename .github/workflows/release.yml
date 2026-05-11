@@ -1,5 +1,5 @@
 # ══════════════════════════════════════════════════════════════════════════════
-# Gargantua AI Agent Framework — Release & Publish to GitHub Packages
+# Gargantua AI Agent Framework — Release
 #
 # Triggered by:
 #   1. Push of a version tag (e.g. v1.0.0, v1.2.3)
@@ -8,14 +8,11 @@
 # What it does:
 #   1. Builds all modules
 #   2. Runs all tests
-#   3. Publishes JARs to GitHub Packages Maven registry
-#   4. Creates a GitHub Release with changelog
+#   3. Creates a GitHub Release with changelog
 #
-# Consumer setup (in their pom.xml or settings.xml):
-#   <repository>
-#     <id>github</id>
-#     <url>https://maven.pkg.github.com/giskardb/gargantua</url>
-#   </repository>
+# Distribution: JitPack is the canonical consumer channel. It builds the
+# tag on demand the first time a consumer resolves it — no upload step
+# from this workflow is required. See README.md for consumer setup.
 # ══════════════════════════════════════════════════════════════════════════════
 
 name: Release
@@ -31,14 +28,13 @@ on:
         required: false
         type: string
       dry_run:
-        description: 'Dry run — build and test only, skip publish'
+        description: 'Dry run — build and test only, skip GitHub Release'
         required: false
         type: boolean
         default: false
 
 permissions:
   contents: write    # For creating GitHub Releases
-  packages: write    # For publishing to GitHub Packages
 
 env:
   MAVEN_OPTS: -Xmx1024m
@@ -46,10 +42,10 @@ env:
 jobs:
 
   # ────────────────────────────────────────────────────────────────────────────
-  # Step 1: Build, test, and publish
+  # Step 1: Build, test, and create GitHub Release
   # ────────────────────────────────────────────────────────────────────────────
   release:
-    name: Build, Test & Publish
+    name: Build, Test & Release
     runs-on: ubuntu-latest
 
     steps:
@@ -58,17 +54,12 @@ jobs:
         with:
           fetch-depth: 0  # Full history for changelog generation
 
-      - name: Set up JDK 21 + Maven settings for GitHub Packages
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
           cache: maven
-          # setup-java auto-generates ~/.m2/settings.xml with this server entry,
-          # authenticated via the GITHUB_TOKEN env var set in the deploy step.
-          server-id: github-gargantua
-          server-username: GITHUB_ACTOR
-          server-password: GITHUB_TOKEN
 
       # ── Determine version ──────────────────────────────────────────────────
       - name: Extract version
@@ -105,17 +96,6 @@ jobs:
           mvn test
           --batch-mode --no-transfer-progress
 
-      # ── Publish to GitHub Packages ─────────────────────────────────────────
-      - name: Publish to GitHub Packages
-        if: ${{ !inputs.dry_run }}
-        run: >
-          mvn deploy
-          --batch-mode --no-transfer-progress
-          -DskipTests
-          -DaltDeploymentRepository=github-gargantua::default::https://maven.pkg.github.com/${{ github.repository }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       # ── Generate changelog ─────────────────────────────────────────────────
       - name: Generate changelog
         id: changelog
@@ -132,10 +112,10 @@ jobs:
           echo "" >> changelog.md
           echo "---" >> changelog.md
           echo "" >> changelog.md
-          echo "### Maven Coordinates" >> changelog.md
+          echo "### Maven Coordinates (via JitPack)" >> changelog.md
           echo '```xml' >> changelog.md
           echo '<dependency>' >> changelog.md
-          echo '    <groupId>ai.gargantua</groupId>' >> changelog.md
+          echo '    <groupId>com.github.giskardb.gargantua</groupId>' >> changelog.md
           echo '    <artifactId>agent-engine</artifactId>' >> changelog.md
           echo "    <version>${{ steps.version.outputs.version }}</version>" >> changelog.md
           echo '</dependency>' >> changelog.md
@@ -144,7 +124,7 @@ jobs:
           echo "### Quick Start" >> changelog.md
           echo '```bash' >> changelog.md
           echo 'mvn archetype:generate \' >> changelog.md
-          echo '  -DarchetypeGroupId=ai.gargantua \' >> changelog.md
+          echo '  -DarchetypeGroupId=com.github.giskardb.gargantua \' >> changelog.md
           echo '  -DarchetypeArtifactId=agent-archetype \' >> changelog.md
           echo "  -DarchetypeVersion=${{ steps.version.outputs.version }}" >> changelog.md
           echo '```' >> changelog.md
@@ -171,12 +151,6 @@ jobs:
           echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "**Dry run:** ${{ inputs.dry_run || 'false' }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Published artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "| Artifact | GroupId |" >> $GITHUB_STEP_SUMMARY
-          echo "|----------|---------|" >> $GITHUB_STEP_SUMMARY
-          echo "| agent-core | ai.gargantua |" >> $GITHUB_STEP_SUMMARY
-          echo "| agent-memory-sdk | ai.gargantua |" >> $GITHUB_STEP_SUMMARY
-          echo "| agent-engine | ai.gargantua |" >> $GITHUB_STEP_SUMMARY
-          echo "| agent-mcp-server | ai.gargantua |" >> $GITHUB_STEP_SUMMARY
-          echo "| agent-skill-linter-maven-plugin | ai.gargantua |" >> $GITHUB_STEP_SUMMARY
-          echo "| agent-archetype | ai.gargantua |" >> $GITHUB_STEP_SUMMARY
+          echo "### Distribution" >> $GITHUB_STEP_SUMMARY
+          echo "Consumers resolve via JitPack on first request. See:" >> $GITHUB_STEP_SUMMARY
+          echo "https://jitpack.io/#${{ github.repository }}/${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY

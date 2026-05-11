@@ -26,8 +26,8 @@
     </extensions>
     <plugins>
       <!-- Skip archetype integration test during CI — the generated project
-           depends on Gargantua JARs that aren't published to a remote repo yet.
-           The IT can be run manually after publishing to GitHub Packages. -->
+           depends on Gargantua JARs that resolve through JitPack on first
+           build. The IT can be run manually once a tag has been published. -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-archetype-plugin</artifactId>

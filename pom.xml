@@ -144,21 +144,9 @@
     </dependencies>
   </dependencyManagement>
 
-  <!-- ═══════════════════════════════════════════════════════════════════════
-       Distribution — GitHub Packages Maven Registry
-       Consumers add this repository to their pom.xml or settings.xml:
-         <repository>
-           <id>github</id>
-           <url>https://maven.pkg.github.com/giskardb/gargantua</url>
-         </repository>
-       ═══════════════════════════════════════════════════════════════════════ -->
-  <distributionManagement>
-    <repository>
-      <id>github-gargantua</id>
-      <name>Gargantua GitHub Packages</name>
-      <url>https://maven.pkg.github.com/giskardb/gargantua</url>
-    </repository>
-  </distributionManagement>
+  <!-- Distribution: artifacts are built by JitPack on demand at the
+       consumer end. No upload step is required from this build. See
+       README.md for consumer setup. -->
 
   <build>
     <pluginManagement>
