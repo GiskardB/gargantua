@@ -14,6 +14,9 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -174,5 +177,102 @@ public class ToolResultCache {
     /** Convenience for tests/debug — list of supported scopes. */
     public List<CacheScope> supportedScopes() {
         return List.of(CacheScope.GLOBAL, CacheScope.USER, CacheScope.SESSION);
+    }
+
+    // ── Admin / housekeeping API (1.2.6+) ──────────────────────────
+    //
+    // Both backends MUST honour these so the /api/admin/tool-cache/*
+    // controllers work uniformly whether Redis is wired or not.
+
+    /** Total number of entries currently held (in-memory) or visible (Redis). */
+    public int size() {
+        if (redis != null) {
+            try {
+                Set<String> keys = redis.keys(KEY_PREFIX + "*");
+                return keys == null ? 0 : keys.size();
+            } catch (Exception e) {
+                log.warn("[ToolCache] Redis KEYS failed: {}", e.getMessage());
+                return 0;
+            }
+        }
+        return inMemory.size();
+    }
+
+    /** All cache keys held by this instance (always under the {@code tool-cache:} prefix). */
+    public Collection<String> keys() {
+        if (redis != null) {
+            try {
+                Set<String> keys = redis.keys(KEY_PREFIX + "*");
+                return keys == null ? List.of() : Collections.unmodifiableSet(keys);
+            } catch (Exception e) {
+                log.warn("[ToolCache] Redis KEYS failed: {}", e.getMessage());
+                return List.of();
+            }
+        }
+        return List.copyOf(inMemory.keySet());
+    }
+
+    /** All cache keys for a specific tool name. */
+    public Collection<String> keys(String toolName) {
+        Collection<String> all = keys();
+        List<String> match = new ArrayList<>();
+        for (String key : all) {
+            if (isKeyForTool(key, toolName)) {
+                match.add(key);
+            }
+        }
+        return Collections.unmodifiableList(match);
+    }
+
+    /** Clear every entry. Returns the number of entries removed. */
+    public int clear() {
+        if (redis != null) {
+            try {
+                Set<String> keys = redis.keys(KEY_PREFIX + "*");
+                if (keys == null || keys.isEmpty()) return 0;
+                Long deleted = redis.delete(keys);
+                return deleted == null ? 0 : deleted.intValue();
+            } catch (Exception e) {
+                log.warn("[ToolCache] Redis DEL failed: {}", e.getMessage());
+                return 0;
+            }
+        }
+        int removed = inMemory.size();
+        inMemory.clear();
+        return removed;
+    }
+
+    /** Clear every entry for a specific tool name. Returns the number removed. */
+    public int clear(String toolName) {
+        if (toolName == null || toolName.isBlank()) return 0;
+        if (redis != null) {
+            try {
+                Collection<String> match = keys(toolName);
+                if (match.isEmpty()) return 0;
+                Long deleted = redis.delete(match);
+                return deleted == null ? 0 : deleted.intValue();
+            } catch (Exception e) {
+                log.warn("[ToolCache] Redis DEL by tool failed: {}", e.getMessage());
+                return 0;
+            }
+        }
+        int before = inMemory.size();
+        inMemory.keySet().removeIf(k -> isKeyForTool(k, toolName));
+        return before - inMemory.size();
+    }
+
+    /**
+     * Match the key layout {@code tool-cache:<scope>:<tool>:[<userOrSession>:]<argsHash>}
+     * (and also {@code tool-cache:user:<id>:<tool>:…} / {@code tool-cache:session:<id>:<tool>:…}).
+     * We strip the prefix and then look for {@code :<toolName>:} or the bare
+     * {@code <toolName>:} at any segment boundary.
+     */
+    private static boolean isKeyForTool(String key, String toolName) {
+        if (!key.startsWith(KEY_PREFIX)) return false;
+        String rest = key.substring(KEY_PREFIX.length());
+        for (String segment : rest.split(":")) {
+            if (segment.equals(toolName)) return true;
+        }
+        return false;
     }
 }

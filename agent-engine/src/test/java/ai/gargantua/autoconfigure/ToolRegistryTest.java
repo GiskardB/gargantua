@@ -65,8 +65,11 @@ class ToolRegistryTest {
     @SuppressWarnings("unchecked")
     void setUp() {
         ObjectProvider<ToolResultCache> cacheProvider = mock(ObjectProvider.class);
-        ObjectProvider<MeterRegistry> meterProvider = mock(ObjectProvider.class);
-        toolRegistry = new ToolRegistry(applicationContext, cacheProvider, meterProvider);
+        ObjectProvider<MeterRegistry>   meterProvider = mock(ObjectProvider.class);
+        ObjectProvider<ai.gargantua.core.hitl.ApprovalStore> approvalProvider = mock(ObjectProvider.class);
+        ObjectProvider<AgentProperties> propsProvider = mock(ObjectProvider.class);
+        toolRegistry = new ToolRegistry(applicationContext, cacheProvider, meterProvider,
+                approvalProvider, propsProvider);
     }
 
     @Nested
@@ -367,7 +370,10 @@ class ToolRegistryTest {
             ObjectProvider<MeterRegistry>   meterProvider = mock(ObjectProvider.class);
             when(meterProvider.getIfAvailable()).thenReturn(meters);
 
-            toolRegistry = new ToolRegistry(applicationContext, cacheProvider, meterProvider);
+            ObjectProvider<ai.gargantua.core.hitl.ApprovalStore> approvalProvider = mock(ObjectProvider.class);
+            ObjectProvider<AgentProperties> propsProvider = mock(ObjectProvider.class);
+            toolRegistry = new ToolRegistry(applicationContext, cacheProvider, meterProvider,
+                    approvalProvider, propsProvider);
 
             bean = new FlakyToolBean();
             when(applicationContext.getBeanDefinitionNames())
@@ -435,7 +441,10 @@ class ToolRegistryTest {
             when(cacheProvider.getIfAvailable()).thenReturn(cache);
             when(meterProvider.getIfAvailable()).thenReturn(meters);
 
-            toolRegistry = new ToolRegistry(applicationContext, cacheProvider, meterProvider);
+            ObjectProvider<ai.gargantua.core.hitl.ApprovalStore> approvalProvider = mock(ObjectProvider.class);
+            ObjectProvider<AgentProperties> propsProvider = mock(ObjectProvider.class);
+            toolRegistry = new ToolRegistry(applicationContext, cacheProvider, meterProvider,
+                    approvalProvider, propsProvider);
 
             bean = new CounterToolBean();
             when(applicationContext.getBeanDefinitionNames())
@@ -484,6 +493,115 @@ class ToolRegistryTest {
             assertThat(meters.counter("agent.tool.cache.hits",
                     "tool", "count", "scope", "GLOBAL").count())
                     .isEqualTo(2.0);
+        }
+    }
+
+    /**
+     * End-to-end coverage for the {@code @RequiresApproval} gate that now
+     * lives in {@link ToolRegistry#executeTool} (1.2.6). Verifies that:
+     * <ul>
+     *   <li>The tool body is NOT invoked.</li>
+     *   <li>The returned JSON is the {@code awaiting_approval} shape.</li>
+     *   <li>The {@link ai.gargantua.core.hitl.ApprovalStore} receives a
+     *       pending request whose {@code parameters} map is filtered by
+     *       {@link ai.gargantua.core.tool.RequiresApproval#showParameters}.</li>
+     * </ul>
+     */
+    @Nested
+    @DisplayName("executeTool — @RequiresApproval gate (1.2.6)")
+    class ApprovalGate {
+
+        static class BankToolBean {
+            final AtomicInteger transferCalls = new AtomicInteger();
+
+            @AgentTool(description = "Transfers money")
+            @ai.gargantua.core.tool.RequiresApproval(
+                    message = "Confirm transfer",
+                    showParameters = {"from", "to", "amount"},
+                    dangerous = true)
+            public String transfer(String from, String to, long amount, String note) {
+                transferCalls.incrementAndGet();
+                return "transferred:" + amount;
+            }
+        }
+
+        private BankToolBean bean;
+        private ai.gargantua.core.hitl.ApprovalStore approvalStore;
+        private ai.gargantua.core.hitl.ApprovalRequest captured;
+
+        @BeforeEach
+        @SuppressWarnings("unchecked")
+        void wireRealApprovalStore() {
+            ObjectProvider<ToolResultCache> cacheProvider = mock(ObjectProvider.class);
+            ObjectProvider<MeterRegistry>   meterProvider = mock(ObjectProvider.class);
+            ObjectProvider<ai.gargantua.core.hitl.ApprovalStore> approvalProvider = mock(ObjectProvider.class);
+            ObjectProvider<AgentProperties> propsProvider = mock(ObjectProvider.class);
+
+            captured = null;
+            approvalStore = new ai.gargantua.memory.adapters.inmemory.InMemoryApprovalStore() {
+                @Override
+                public void savePending(String requestId,
+                                        ai.gargantua.core.hitl.ApprovalRequest request,
+                                        java.time.Duration ttl) {
+                    captured = request;
+                    super.savePending(requestId, request, ttl);
+                }
+            };
+            // lenient because toolDefinitionCarriesShowParameters never reaches
+            // the executeTool gate that would consume this stub.
+            org.mockito.Mockito.lenient()
+                    .when(approvalProvider.getIfAvailable())
+                    .thenReturn(approvalStore);
+
+            toolRegistry = new ToolRegistry(applicationContext, cacheProvider, meterProvider,
+                    approvalProvider, propsProvider);
+
+            bean = new BankToolBean();
+            when(applicationContext.getBeanDefinitionNames())
+                    .thenReturn(new String[]{"bankToolBean"});
+            when(applicationContext.getBean("bankToolBean")).thenReturn(bean);
+            toolRegistry.scan();
+        }
+
+        @Test
+        @DisplayName("returns awaiting_approval JSON and does NOT invoke the tool body")
+        void returnsAwaitingJson() {
+            String result = toolRegistry.executeTool("transfer",
+                    "{\"from\":\"alice\",\"to\":\"bob\",\"amount\":\"100\",\"note\":\"rent\"}");
+
+            assertThat(result)
+                    .startsWith("{\"status\":\"awaiting_approval\",\"requestId\":\"")
+                    .endsWith("\"}");
+            assertThat(bean.transferCalls.get())
+                    .as("the tool body must NEVER run when @RequiresApproval gates the call")
+                    .isEqualTo(0);
+        }
+
+        @Test
+        @DisplayName("ApprovalStore.savePending receives a request whose parameters are filtered by showParameters")
+        void persistsRequestWithFilteredParameters() {
+            toolRegistry.executeTool("transfer",
+                    "{\"from\":\"alice\",\"to\":\"bob\",\"amount\":\"100\",\"note\":\"rent\"}");
+
+            assertThat(captured).as("savePending must have been called").isNotNull();
+            assertThat(captured.toolName()).isEqualTo("transfer");
+            assertThat(captured.message()).isEqualTo("Confirm transfer");
+            assertThat(captured.dangerous()).isTrue();
+
+            // showParameters = {"from", "to", "amount"} — "note" must NOT be present.
+            assertThat(captured.parameters())
+                    .containsKeys("from", "to", "amount")
+                    .doesNotContainKey("note");
+        }
+
+        @Test
+        @DisplayName("ToolDefinition exposes the approvalShowParameters array")
+        void toolDefinitionCarriesShowParameters() {
+            ToolDefinition def = toolRegistry.getToolDefinitions().stream()
+                    .filter(d -> d.name().equals("transfer"))
+                    .findFirst().orElseThrow();
+            assertThat(def.approvalShowParameters())
+                    .containsExactly("from", "to", "amount");
         }
     }
 }

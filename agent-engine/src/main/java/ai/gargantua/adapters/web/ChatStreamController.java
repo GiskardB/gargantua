@@ -382,14 +382,14 @@ public class ChatStreamController {
                                 .filter(t -> toolName.equals(t.name()))
                                 .findFirst().orElse(null);
 
-                        String result;
-                        if (def != null && def.requiresApproval()) {
-                            String approvalRequestId = emitApprovalRequired(sink, def, toolName,
-                                    toolRequest.arguments(), userId, effectiveSessionId);
-                            result = "{\"status\":\"awaiting_approval\",\"requestId\":\""
-                                    + escapeJson(approvalRequestId) + "\"}";
-                        } else {
-                            result = toolRegistry.executeTool(toolName, toolRequest.arguments(), toolContext);
+                        // Since 1.2.6 the @RequiresApproval gate lives in
+                        // ToolRegistry.executeTool — the registry persists the
+                        // pending request and returns the awaiting_approval JSON.
+                        // The controller's job is only to surface the SSE event
+                        // when that JSON comes back.
+                        String result = toolRegistry.executeTool(toolName, toolRequest.arguments(), toolContext);
+                        if (def != null && def.requiresApproval() && isAwaitingApproval(result)) {
+                            emitApprovalRequiredEvent(sink, def, toolName, extractRequestId(result));
                         }
 
                         sink.tryEmitNext(ServerSentEvent.<String>builder()
@@ -475,42 +475,86 @@ public class ChatStreamController {
         });
     }
 
+    private static final java.util.regex.Pattern AWAITING_REQUEST_ID =
+            java.util.regex.Pattern.compile("\"requestId\"\\s*:\\s*\"([0-9a-fA-F-]+)\"");
+
+    /** Recognise the JSON the registry returns when a tool is gated by {@code @RequiresApproval}. */
+    private static boolean isAwaitingApproval(String result) {
+        return result != null && result.startsWith("{\"status\":\"awaiting_approval\"");
+    }
+
+    /** Extract the registry-generated requestId from the awaiting_approval JSON, or {@code null}. */
+    private static String extractRequestId(String result) {
+        if (result == null) return null;
+        var m = AWAITING_REQUEST_ID.matcher(result);
+        return m.find() ? m.group(1) : null;
+    }
+
     /**
-     * Emits an {@code approval_required} SSE event for a tool annotated with
-     * {@link ai.gargantua.core.tool.RequiresApproval}. When an
-     * {@link ApprovalStore} bean is available the pending request is also
-     * persisted so a reviewer can resolve it via {@code POST /api/agent/approval/{id}}.
-     * Returns the generated {@code requestId}.
+     * Emit an {@code approval_required} SSE event for a tool that the registry
+     * has already persisted as a pending {@link ApprovalRequest}. The event
+     * surfaces the filtered parameter subset (per
+     * {@link ai.gargantua.core.tool.RequiresApproval#showParameters}), the
+     * human-readable message, the {@code dangerous} flag and the TTL window.
      */
-    private String emitApprovalRequired(Sinks.Many<ServerSentEvent<String>> sink,
-                                        ToolDefinition def, String toolName,
-                                        String arguments, String userId, String sessionId) {
-        String requestId = java.util.UUID.randomUUID().toString();
-        int ttl = properties.getHitl().getDefaultTtlMinutes();
-        if (approvalStore != null) {
-            try {
-                approvalStore.savePending(requestId, new ApprovalRequest(
-                        requestId, sessionId, userId, toolName,
-                        Map.of("arguments", arguments != null ? arguments : ""),
-                        def.approvalMessage(), def.dangerous(),
-                        java.time.Instant.now().plusSeconds(ttl * 60L)
-                ), java.time.Duration.ofMinutes(ttl));
-            } catch (Exception e) {
-                log.warn("Failed to persist pending approval for {}: {}", toolName, e.getMessage());
-            }
+    private void emitApprovalRequiredEvent(Sinks.Many<ServerSentEvent<String>> sink,
+                                           ToolDefinition def, String toolName,
+                                           @org.springframework.lang.Nullable String requestId) {
+        if (requestId == null) {
+            log.warn("[ChatStream] approval_required event skipped: registry returned awaiting JSON "
+                    + "without a parseable requestId for tool {}", toolName);
+            return;
         }
+        int ttl = properties.getHitl().getDefaultTtlMinutes();
+        String parametersJson = renderApprovalParameters(requestId);
         sink.tryEmitNext(ServerSentEvent.<String>builder()
                 .event("approval_required")
-                .data(("{\"requestId\":\"%s\",\"tool\":\"%s\",\"arguments\":%s,"
+                .data(("{\"requestId\":\"%s\",\"tool\":\"%s\",\"parameters\":%s,"
                         + "\"message\":\"%s\",\"dangerous\":%s,\"ttlMinutes\":%d}")
                         .formatted(escapeJson(requestId),
                                 escapeJson(toolName),
-                                arguments != null && !arguments.isBlank() ? arguments : "{}",
+                                parametersJson,
                                 escapeJson(def.approvalMessage() != null ? def.approvalMessage() : ""),
                                 def.dangerous(),
                                 ttl))
                 .build());
-        return requestId;
+    }
+
+    /**
+     * Look up the persisted {@link ApprovalRequest} by id and render its
+     * {@code parameters} map as JSON. Falls back to {@code {}} when the store
+     * is missing or the entry can't be found (e.g. immediate readback race or
+     * an in-memory store that just rotated).
+     */
+    private String renderApprovalParameters(String requestId) {
+        if (approvalStore == null) return "{}";
+        try {
+            return approvalStore.getPending(requestId)
+                    .map(req -> mapToJson(req.parameters()))
+                    .orElse("{}");
+        } catch (Exception e) {
+            return "{}";
+        }
+    }
+
+    private static String mapToJson(Map<String, Object> map) {
+        if (map == null || map.isEmpty()) return "{}";
+        StringBuilder sb = new StringBuilder("{");
+        boolean first = true;
+        for (var e : map.entrySet()) {
+            if (!first) sb.append(',');
+            sb.append('"').append(escapeJson(e.getKey())).append("\":");
+            Object v = e.getValue();
+            if (v == null) {
+                sb.append("null");
+            } else if (v instanceof Number || v instanceof Boolean) {
+                sb.append(v);
+            } else {
+                sb.append('"').append(escapeJson(String.valueOf(v))).append('"');
+            }
+            first = false;
+        }
+        return sb.append('}').toString();
     }
 
     /**

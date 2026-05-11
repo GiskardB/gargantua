@@ -68,7 +68,10 @@ public class AgentAutoConfiguration {
     @ConditionalOnMissingBean(ToolRegistry.class)
     public ToolRegistry toolRegistry(ApplicationContext applicationContext,
                                      ObjectProvider<ToolResultCache> toolResultCacheProvider,
-                                     ObjectProvider<MeterRegistry> meterRegistryProvider) {
-        return new ToolRegistry(applicationContext, toolResultCacheProvider, meterRegistryProvider);
+                                     ObjectProvider<MeterRegistry> meterRegistryProvider,
+                                     ObjectProvider<ai.gargantua.core.hitl.ApprovalStore> approvalStoreProvider,
+                                     ObjectProvider<AgentProperties> agentPropertiesProvider) {
+        return new ToolRegistry(applicationContext, toolResultCacheProvider, meterRegistryProvider,
+                approvalStoreProvider, agentPropertiesProvider);
     }
 }

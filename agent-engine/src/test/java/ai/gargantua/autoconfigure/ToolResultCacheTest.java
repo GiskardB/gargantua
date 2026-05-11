@@ -82,6 +82,87 @@ class ToolResultCacheTest {
     }
 
     @Nested
+    @DisplayName("admin / housekeeping API (1.2.6)")
+    class AdminApi {
+
+        @Test
+        @DisplayName("size() reflects the number of held entries")
+        void sizeIsAccurate() {
+            ToolResultCache cache = new ToolResultCache();
+            assertThat(cache.size()).isEqualTo(0);
+            cache.put("tool-cache:global:add:hash-a", "1", 60);
+            cache.put("tool-cache:global:add:hash-b", "2", 60);
+            assertThat(cache.size()).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("keys() returns every cached key")
+        void keysReturnsEverything() {
+            ToolResultCache cache = new ToolResultCache();
+            cache.put("tool-cache:global:add:hash-a", "1", 60);
+            cache.put("tool-cache:global:mul:hash-b", "4", 60);
+            assertThat(cache.keys())
+                    .containsExactlyInAnyOrder(
+                            "tool-cache:global:add:hash-a",
+                            "tool-cache:global:mul:hash-b");
+        }
+
+        @Test
+        @DisplayName("keys(toolName) filters by the tool segment in the key layout")
+        void keysFiltersByTool() {
+            ToolResultCache cache = new ToolResultCache();
+            cache.put("tool-cache:global:add:hash-a", "1", 60);
+            cache.put("tool-cache:global:add:hash-b", "2", 60);
+            cache.put("tool-cache:user:alice:add:hash-c", "3", 60);
+            cache.put("tool-cache:global:mul:hash-d", "4", 60);
+
+            assertThat(cache.keys("add"))
+                    .containsExactlyInAnyOrder(
+                            "tool-cache:global:add:hash-a",
+                            "tool-cache:global:add:hash-b",
+                            "tool-cache:user:alice:add:hash-c");
+            assertThat(cache.keys("mul"))
+                    .containsExactly("tool-cache:global:mul:hash-d");
+            assertThat(cache.keys("missing")).isEmpty();
+        }
+
+        @Test
+        @DisplayName("clear() empties the cache and returns the prior size")
+        void clearAllReturnsCount() {
+            ToolResultCache cache = new ToolResultCache();
+            cache.put("tool-cache:global:add:hash-a", "1", 60);
+            cache.put("tool-cache:global:add:hash-b", "2", 60);
+
+            assertThat(cache.clear()).isEqualTo(2);
+            assertThat(cache.size()).isEqualTo(0);
+            assertThat(cache.get("tool-cache:global:add:hash-a")).isNull();
+        }
+
+        @Test
+        @DisplayName("clear(toolName) removes only that tool's entries and returns the count")
+        void clearByToolRemovesOnlyMatching() {
+            ToolResultCache cache = new ToolResultCache();
+            cache.put("tool-cache:global:add:hash-a", "1", 60);
+            cache.put("tool-cache:global:mul:hash-b", "4", 60);
+            cache.put("tool-cache:user:alice:add:hash-c", "9", 60);
+
+            assertThat(cache.clear("add")).isEqualTo(2);
+            assertThat(cache.size()).isEqualTo(1);
+            assertThat(cache.get("tool-cache:global:mul:hash-b")).isEqualTo("4");
+        }
+
+        @Test
+        @DisplayName("clear(null) and clear(\"\") are no-ops")
+        void clearWithBlankToolNameIsNoop() {
+            ToolResultCache cache = new ToolResultCache();
+            cache.put("tool-cache:global:add:hash-a", "1", 60);
+            assertThat(cache.clear(null)).isEqualTo(0);
+            assertThat(cache.clear("")).isEqualTo(0);
+            assertThat(cache.size()).isEqualTo(1);
+        }
+    }
+
+    @Nested
     @DisplayName("buildKey")
     class BuildKey {
 

@@ -1,5 +1,7 @@
 package ai.gargantua.autoconfigure;
 
+import ai.gargantua.core.hitl.ApprovalRequest;
+import ai.gargantua.core.hitl.ApprovalStore;
 import ai.gargantua.core.security.RequiresRole;
 import ai.gargantua.core.security.SecurityContext;
 import ai.gargantua.core.tool.AgentTool;
@@ -26,10 +28,14 @@ import org.springframework.stereotype.Component;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
@@ -57,34 +63,45 @@ public class ToolRegistry {
     private static final List<String> ALL_TOOLS_KEY = List.of();
     private static final String ERROR_PREFIX = "{\"error\":";
 
+    /** Default HITL TTL when no {@link AgentProperties} bean is available. */
+    private static final int DEFAULT_HITL_TTL_MINUTES = 5;
+
     private final ApplicationContext applicationContext;
     private final ObjectMapper objectMapper;
     private final ObjectProvider<ToolResultCache> toolResultCacheProvider;
     private final ObjectProvider<MeterRegistry> meterRegistryProvider;
+    private final ObjectProvider<ApprovalStore> approvalStoreProvider;
+    private final ObjectProvider<AgentProperties> agentPropertiesProvider;
     private final Map<String, ToolDefinition> tools = new HashMap<>();
     private final Map<String, ToolInvocation> toolInvocations = new HashMap<>();
     private final Map<List<String>, List<ToolSpecification>> specCache = new ConcurrentHashMap<>();
 
     /**
-     * Holds the bean + method plus the three method-level annotations evaluated on
-     * every invocation. Caching them at scan time turns three reflective lookups
-     * per tool call ({@link RequiresRole}, {@link CacheableToolResult},
-     * {@link ToolRetry}) into pure field reads on the hot path.
+     * Holds the bean + method plus the four method-level annotations evaluated on
+     * every invocation. Caching them at scan time turns four reflective lookups
+     * per tool call ({@link RequiresRole}, {@link RequiresApproval},
+     * {@link CacheableToolResult}, {@link ToolRetry}) into pure field reads on
+     * the hot path.
      */
     private record ToolInvocation(
             Object bean,
             Method method,
             @org.springframework.lang.Nullable RequiresRole requiresRole,
+            @org.springframework.lang.Nullable RequiresApproval requiresApproval,
             @org.springframework.lang.Nullable CacheableToolResult cacheable,
             @org.springframework.lang.Nullable ToolRetry retry) {}
 
     public ToolRegistry(ApplicationContext applicationContext,
                         ObjectProvider<ToolResultCache> toolResultCacheProvider,
-                        ObjectProvider<MeterRegistry> meterRegistryProvider) {
+                        ObjectProvider<MeterRegistry> meterRegistryProvider,
+                        ObjectProvider<ApprovalStore> approvalStoreProvider,
+                        ObjectProvider<AgentProperties> agentPropertiesProvider) {
         this.applicationContext = applicationContext;
         this.objectMapper = new ObjectMapper();
         this.toolResultCacheProvider = toolResultCacheProvider;
         this.meterRegistryProvider = meterRegistryProvider;
+        this.approvalStoreProvider = approvalStoreProvider;
+        this.agentPropertiesProvider = agentPropertiesProvider;
     }
 
     @PostConstruct
@@ -105,15 +122,11 @@ public class ToolRegistry {
                 if (annotation == null) continue;
 
                 var toolName = annotation.name().isBlank() ? method.getName() : annotation.name();
-                var requiresApproval = method.isAnnotationPresent(RequiresApproval.class);
-                var approvalMessage = "";
-                var dangerous = false;
-
-                if (requiresApproval) {
-                    var approval = method.getAnnotation(RequiresApproval.class);
-                    approvalMessage = approval.message();
-                    dangerous = approval.dangerous();
-                }
+                RequiresApproval approval = method.getAnnotation(RequiresApproval.class);
+                boolean requiresApproval = approval != null;
+                String approvalMessage = requiresApproval ? approval.message() : "";
+                boolean dangerous = requiresApproval && approval.dangerous();
+                String[] showParameters = requiresApproval ? approval.showParameters() : new String[0];
 
                 var def = new ToolDefinition(
                         toolName,
@@ -122,6 +135,7 @@ public class ToolRegistry {
                         requiresApproval,
                         method.isAnnotationPresent(CacheableToolResult.class),
                         approvalMessage,
+                        showParameters,
                         dangerous
                 );
 
@@ -129,6 +143,7 @@ public class ToolRegistry {
                 toolInvocations.put(toolName, new ToolInvocation(
                         bean, method,
                         method.getAnnotation(RequiresRole.class),
+                        approval,
                         method.getAnnotation(CacheableToolResult.class),
                         method.getAnnotation(ToolRetry.class)
                 ));
@@ -236,7 +251,17 @@ public class ToolRegistry {
             return errorJson("Invalid tool arguments: " + e.getMessage());
         }
 
-        // 2. Cacheable read-through (cached @CacheableToolResult)
+        // 2. HITL gate via cached @RequiresApproval. Runs BEFORE the cache so an
+        //    approved tool can't be served by a stale cached result that
+        //    bypassed approval. The tool body is NOT invoked here — we persist
+        //    a pending request (if an ApprovalStore is wired) and return
+        //    {"status":"awaiting_approval","requestId":"..."} for the LLM.
+        RequiresApproval approvalAnn = invocation.requiresApproval();
+        if (approvalAnn != null) {
+            return handleApprovalRequired(toolName, args, approvalAnn, ctx);
+        }
+
+        // 3. Cacheable read-through (cached @CacheableToolResult)
         CacheableToolResult cacheable = invocation.cacheable();
         ToolResultCache cache = toolResultCacheProvider.getIfAvailable();
         MeterRegistry meters = meterRegistryProvider.getIfAvailable();
@@ -283,6 +308,74 @@ public class ToolRegistry {
             cache.put(cacheKey, result, cacheable.ttlSeconds());
         }
         return result;
+    }
+
+    /**
+     * Generate a UUID, persist a pending {@link ApprovalRequest} (if an
+     * {@link ApprovalStore} is available) and return the
+     * {@code {"status":"awaiting_approval","requestId":"..."}} JSON the LLM
+     * surfaces to the caller. Applied uniformly to every chat path that goes
+     * through {@link #executeTool} — the streaming controller, the
+     * non-streaming orchestrator, and any direct invocation.
+     */
+    private String handleApprovalRequired(String toolName, Map<String, String> args,
+                                          RequiresApproval ann, ToolExecutionContext ctx) {
+        String requestId = UUID.randomUUID().toString();
+        ApprovalStore store = approvalStoreProvider.getIfAvailable();
+        if (store != null) {
+            try {
+                int ttl = hitlTtlMinutes();
+                Map<String, Object> parameters = filterShowParameters(args, ann.showParameters());
+                ApprovalRequest req = new ApprovalRequest(
+                        requestId,
+                        ctx.sessionId(),
+                        ctx.securityContext() != null ? ctx.securityContext().userId() : "anonymous",
+                        toolName,
+                        parameters,
+                        ann.message(),
+                        ann.dangerous(),
+                        Instant.now().plusSeconds(ttl * 60L)
+                );
+                store.savePending(requestId, req, Duration.ofMinutes(ttl));
+            } catch (Exception e) {
+                log.warn("[ToolRegistry] Failed to persist pending approval for {}: {}",
+                        toolName, e.getMessage());
+            }
+        } else {
+            log.warn("[ToolRegistry] @RequiresApproval on tool '{}' but no ApprovalStore configured — "
+                    + "request {} cannot be resolved", toolName, requestId);
+        }
+        return "{\"status\":\"awaiting_approval\",\"requestId\":\"" + requestId + "\"}";
+    }
+
+    /**
+     * Apply the {@link RequiresApproval#showParameters()} filter to a raw
+     * arguments map. An empty {@code showParameters} array means "show all".
+     */
+    private Map<String, Object> filterShowParameters(Map<String, String> args, String[] showParameters) {
+        if (args == null || args.isEmpty()) return Map.of();
+        if (showParameters == null || showParameters.length == 0) {
+            return new LinkedHashMap<>(args);
+        }
+        Set<String> include = Set.of(showParameters);
+        Map<String, Object> filtered = new LinkedHashMap<>();
+        for (Map.Entry<String, String> e : args.entrySet()) {
+            if (include.contains(e.getKey())) {
+                filtered.put(e.getKey(), e.getValue());
+            }
+        }
+        return filtered;
+    }
+
+    private int hitlTtlMinutes() {
+        AgentProperties props = agentPropertiesProvider.getIfAvailable();
+        if (props == null) return DEFAULT_HITL_TTL_MINUTES;
+        try {
+            int ttl = props.getHitl().getDefaultTtlMinutes();
+            return ttl > 0 ? ttl : DEFAULT_HITL_TTL_MINUTES;
+        } catch (Exception e) {
+            return DEFAULT_HITL_TTL_MINUTES;
+        }
     }
 
     private String checkRequiresRole(String toolName, RequiresRole annotation, SecurityContext securityContext) {

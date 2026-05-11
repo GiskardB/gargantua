@@ -32,7 +32,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.lang.Nullable;
 
 import java.util.List;
@@ -171,12 +170,13 @@ public class WebAutoConfiguration {
         return new CostAdminController(costRepository);
     }
 
-    // ── Redis-dependent ─────────────────────────────────────────
+    // ── Tool-cache admin (1.2.6+: goes through ToolResultCache abstraction
+    //    so it works for both the Redis and the in-memory backends) ─────
 
     @Bean
     @ConditionalOnMissingBean(ToolCacheAdminController.class)
-    @ConditionalOnBean(StringRedisTemplate.class)
-    public ToolCacheAdminController toolCacheAdminController(StringRedisTemplate redisTemplate) {
-        return new ToolCacheAdminController(redisTemplate);
+    @ConditionalOnBean(ToolResultCache.class)
+    public ToolCacheAdminController toolCacheAdminController(ToolResultCache cache) {
+        return new ToolCacheAdminController(cache);
     }
 }
