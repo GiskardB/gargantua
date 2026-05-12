@@ -6,22 +6,53 @@ Agents need to remember past conversations (working memory), learn from previous
 
 ## Architecture diagram
 
+The four memory layers stack like this:
+
+| Layer | Backend | Scope | Default policy | When it's queried |
+|-------|---------|-------|----------------|--------------------|
+| 🔵 **Working memory** | Redis | Per session | 20 messages · 30 min sliding TTL | Every request |
+| 🟣 **Episodic memory** | MongoDB | Per user, cross-session | 5 most-recent summaries · 365 day TTL | Every request |
+| 🟢 **Knowledge memory** | MongoDB | Per user, permanent | Segment-based (key/value), no TTL | Every request |
+| 🟡 **Vector store (RAG)** | `VectorStorePort` (default: in-memory keyword, see [WIP note](extending.md#rag--vector-store)) | Per skill | Activated only when the skill's `metadata.knowledge-base` is set | Only when the active skill declares a knowledge base |
+
+```mermaid
+flowchart TB
+    REQ([Request])
+    subgraph LAYERS["Memory layers (parallel fetch by MemoryComposer)"]
+        direction TB
+        WM["🔵  Working memory<br/><sub>Redis · session-scoped · last N messages</sub>"]
+        EM["🟣  Episodic memory<br/><sub>MongoDB · cross-session summaries</sub>"]
+        KM["🟢  Knowledge memory<br/><sub>MongoDB · permanent profile segments</sub>"]
+        VS["🟡  Vector store<br/><sub>RAG · only when skill declares knowledge-base</sub>"]
+    end
+    COMP["MemoryComposer<br/><sub>parallel fetch + token-budget truncation</sub>"]
+    OUT([Composed memory<br/>→ system prompt])
+
+    REQ --> COMP
+    COMP --> WM
+    COMP --> EM
+    COMP --> KM
+    COMP -. opt-in via skill .-> VS
+    WM --> COMP
+    EM --> COMP
+    KM --> COMP
+    VS --> COMP
+    COMP --> OUT
+
+    classDef working fill:#1e3a8a,stroke:#3b82f6,color:#fff,rx:6,ry:6
+    classDef episodic fill:#581c87,stroke:#a855f7,color:#fff,rx:6,ry:6
+    classDef knowledge fill:#14532d,stroke:#22c55e,color:#fff,rx:6,ry:6
+    classDef vector fill:#713f12,stroke:#eab308,color:#fff,rx:6,ry:6
+    class WM working
+    class EM episodic
+    class KM knowledge
+    class VS vector
 ```
-┌─────────────────────────────────────────────┐
-│         Working Memory (Redis)              │  Session-scoped, TTL-based
-│         Last N messages of current chat     │  Default: 20 msgs, 30 min TTL
-├─────────────────────────────────────────────┤
-│         Episodic Memory (MongoDB)           │  Cross-session summaries
-│         LLM-compressed past sessions        │  Default: 5 most recent, 365 day TTL
-├─────────────────────────────────────────────┤
-│         Knowledge Memory (MongoDB)          │  Persistent user profile
-│         User preferences, profile data      │  Segment-based (key-value)
-├─────────────────────────────────────────────┤
-│         Vector Store (optional, WIP)        │  Skill-activated RAG layer
-│         VectorStorePort / InMemoryVectorStore│  Only adapter shipped is keyword-based (Jaccard)
-│                                              │  Production adapter (pgvector/Qdrant/…) on roadmap
-└─────────────────────────────────────────────┘
-```
+
+> In embedded mode (`SPRING_PROFILES_ACTIVE=embedded`) every layer is
+> replaced by an in-memory `ConcurrentHashMap`-backed adapter; the API is
+> identical but data is lost on restart. See the project README "Run
+> modes" table for the complete list.
 
 The following sequence shows how the `MemoryComposer` assembles context for each request:
 

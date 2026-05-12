@@ -12,20 +12,43 @@ Guardrails follow the Chain of Responsibility pattern. Every built-in guardrail 
 
 **Output guardrails** run sequentially as a transformation chain. Each one receives the (possibly modified) response from the previous guardrail. The first guardrail to return `BLOCK` halts the chain and the response (or block reason) is surfaced to the caller — subsequent output guardrails do not run.
 
-```
-                         INPUT PIPELINE
-                         (stops at first BLOCK)
+```mermaid
+flowchart LR
+    User([User])
 
-  User ──> Rbac ──> MaxLength ──> PromptInjection ──> TopicScope ──> PiiMasking ──> RateLimit ──> [custom] ──> LLM
-           @Order(5)  @Order(10)    @Order(20)           @Order(30)     @Order(40)     @Order(50)    @Order(60+)
-                                                                                                      |
-                                                                                                      v
-                         OUTPUT PIPELINE
-                         (chained transformation, halts on first BLOCK)
+    subgraph IN["Input pipeline — short-circuits at first BLOCK"]
+        direction LR
+        Rbac["Rbac<br/><sub>@Order 5</sub>"]
+        MaxL["MaxLength<br/><sub>@Order 10</sub>"]
+        Inj["PromptInjection<br/><sub>@Order 20</sub>"]
+        Topic["TopicScope<br/><sub>@Order 30</sub>"]
+        Pii["PiiMasking<br/><sub>@Order 40</sub>"]
+        Rate["RateLimit<br/><sub>@Order 50</sub>"]
+        Custom["[ custom ]<br/><sub>@Order 60+</sub>"]
+        Rbac --> MaxL --> Inj --> Topic --> Pii --> Rate --> Custom
+    end
 
-  User <── SchemaValidator <── ScopeValidator <── Disclaimer <── PiiOutput <──────────────────────── LLM
-           @Order(40)          @Order(30)          @Order(20)     @Order(10)
+    LLM(["LLM call"])
+
+    subgraph OUT["Output pipeline — chained transform, halts at first BLOCK"]
+        direction RL
+        PiiOut["PiiOutput<br/><sub>@Order 10</sub>"]
+        Disc["Disclaimer<br/><sub>@Order 20</sub>"]
+        Scope["ScopeValidator<br/><sub>@Order 30</sub>"]
+        Schema["SchemaValidator<br/><sub>@Order 40</sub>"]
+        PiiOut --> Disc --> Scope --> Schema
+    end
+
+    User --> IN
+    IN --> LLM
+    LLM --> OUT
+    OUT --> User
+
+    classDef phase fill:#0d1b2a,stroke:#415a77,color:#fff,rx:6,ry:6
+    class IN,OUT phase
 ```
+
+> Input guardrails receive a `GuardrailInputContext` (user message, userId, sessionId, activated skill, plus a mutable `attributes` map for inter-guardrail communication — e.g. PII placeholder maps). Output guardrails receive a `GuardrailOutputContext` with the current response text and an `inputAttributes()` map carrying the values the input phase put into context.
 
 Each input guardrail receives a `GuardrailInputContext` containing the user message, userId, sessionId, activated skill, and a mutable `attributes` map for inter-guardrail communication (e.g., PII maps). Each output guardrail receives a `GuardrailOutputContext` with the current response text and an `inputAttributes()` map carrying the values the input phase put into context.
 

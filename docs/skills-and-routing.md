@@ -39,17 +39,18 @@ Do NOT answer questions unrelated to weather. Politely redirect the user.
 | `description` | string | Yes | Short description used by the router to decide whether this skill matches a user query. Keep it under 512 characters for best results. |
 | `version` | string | Yes | Semantic version (e.g. `1.2.0`). Enforced by the linter. |
 | `allowed-tools` | list of strings (or whitespace-separated string) | Yes | Tool method names this skill is permitted to call. Only these tools are exposed to the LLM when the skill is active. Both `["a", "b"]` and `"a b"` are accepted. |
-| `references` | list of strings | No | File paths whose content is appended to the system prompt at activation time. |
-| `metadata.active` | boolean | No | Whether the skill is available for routing. Defaults to `true`. Set to `false` to disable without deleting. |
-| `metadata.domain` | string | No | Logical grouping label (e.g. `weather`, `finance`, `devops`). Used for filtering and observability. |
-| `metadata.output-schema` | string | No | Relative path to a JSON Schema file for structured output. When set, the LLM response is validated against this schema. |
-| `metadata.max-tokens` | integer | No | Maximum token budget for the LLM response within this skill. |
-| `metadata.temperature` | float | No | LLM sampling temperature override for this skill. |
-| `metadata.preferred-model` | string | No | Model identifier to use when this skill is active, overriding the global default. |
-| `metadata.knowledge-base` | string | No | Name of a RAG vector store knowledge base (e.g. `hr-docs`). When set, `RagEnricher` auto-injects retrieved documents into the prompt. **WIP:** the only shipped `VectorStorePort` is the keyword-based `InMemoryVectorStore` — see [`extending.md` → RAG / Vector Store](extending.md#rag--vector-store) for the WIP note and how to plug a real vector DB. |
+| `references` | list of strings | No | File paths whose content is appended to the system prompt at activation time. **Tested** by `agent-example-skill-filesystem`. |
+| `examples` | list of strings | No | Example prompts surfaced via the A2A `/.well-known/agent.json` and the MCP capabilities resource for discovery. Not used at runtime by the router. **Tested** by `agent-example-a2a`. |
+| `metadata.active` | boolean | No | Whether the skill is available for routing. Defaults to `true`. Set to `false` to hide the skill from `SkillRegistry.listMeta()` and from the A2A agent card without deleting the folder. **Tested** by `agent-example-skill-filesystem` and `agent-example-a2a`. |
+| `metadata.domain` | string | No | Logical grouping label (e.g. `weather`, `finance`, `devops`). Used for filtering, observability, A2A skill tags, and as the `domain` selector in LLM routing rules. |
+| `metadata.output-schema` | string | No | Relative path to a JSON Schema file for structured output. When set, `SchemaValidatorGuardrail` validates the LLM response against this schema and triggers a corrective-prompt auto-retry on failure. **Tested** by `agent-example-output-schema`. |
+| `metadata.max-tokens` | integer | No | Maximum token budget for the LLM response within this skill. Overrides the global `agent.llm.primary.max-tokens` for this skill only. |
+| `metadata.temperature` | float | No | LLM sampling temperature override for this skill. Overrides `agent.llm.primary.temperature` for this skill only. |
+| `metadata.preferred-model` | string | No | Model alias (one of `primary` / `fallback` / a custom alias from `agent.llm.models.*`) to use when this skill is active. Resolved by `LlmRouter` and wins over routing rules. |
+| `metadata.knowledge-base` | string | No | Name of a RAG vector store knowledge base (e.g. `hr-docs`). When set, `RagEnricher` auto-injects retrieved documents into the prompt. **Tested** by `agent-example-rag`. **WIP:** the only shipped `VectorStorePort` is the keyword-based `InMemoryVectorStore` — see [`extending.md` → RAG / Vector Store](extending.md#rag--vector-store) for the WIP note and how to plug a real vector DB. |
 | `metadata.rag-max-results` | integer | No | Maximum number of RAG documents to retrieve. Default `5`. |
 | `metadata.rag-min-score` | float | No | Minimum similarity score for RAG results. Default `0.3`. |
-| `metadata.allowed-roles` | list of strings | No | Roles permitted to use this skill (e.g. `[financial-advisor, super-admin]`). If set, `RbacGuardrail` blocks users without a matching role. The `super-admin` role bypasses all restrictions. |
+| `metadata.allowed-roles` | list of strings | No | Roles permitted to use this skill (e.g. `[financial-advisor, super-admin]`). If set, `RbacGuardrail` blocks users without a matching role. The `super-admin` role bypasses all restrictions. **Tested** by `agent-example-tool-rbac` (tool-level RBAC, same store). |
 | `metadata.memory-layers` | list of strings | No | Subset of memory layers to fetch for this skill: `working`, `episodic`, `knowledge` (case-insensitive). When set, layers not listed are skipped — their port (Redis or MongoDB) is not queried. Defaults to all three layers. Use it for stateless skills (greetings, simple Q&A) to save a Redis/MongoDB round-trip. See [Memory System](memory-system.md). |
 
 ### Folder Structure
@@ -60,18 +61,25 @@ skills/
     ├── SKILL.md              # Required — skill definition
     ├── api-notes.md          # Referenced via `references:` in frontmatter
     ├── unit-guide.md
-    ├── assets/
-    │   └── schema.json       # Optional — JSON Schema for structured output
-    └── evals/
-        └── evals.json        # Optional — evaluation golden dataset
+    ├── references/           # Optional — auto-appended to references list
+    │   └── api-docs.md
+    └── assets/
+        └── schema.json       # Optional — JSON Schema for structured output
 ```
 
-- **`references:` (top-level frontmatter list)**: each path listed is appended to the system prompt when the skill is activated. Use it for domain knowledge, style guides, or API documentation that the LLM should always have in context.
+- **`references:` (top-level frontmatter list)** — each path listed is appended to the system prompt when the skill is activated. Use it for domain knowledge, style guides, or API documentation that the LLM should always have in context. Example:
 
-- **`references/` folder (optional)**: in addition to the frontmatter list, `FilesystemSkillRegistry` reads every readable file under `<skill>/references/` (sorted by URI for deterministic ordering) and appends each file's contents to the skill's reference list — frontmatter entries first, folder files after. Drop docs in there and they're picked up at the next skill load with no SKILL.md edit.
+  ```yaml
+  references:
+    - api-notes.md
+    - unit-guide.md
+  ```
 
-- **assets/**: Static resources referenced by frontmatter fields (e.g. `output-schema`).
-- **evals/**: Optional golden input/output pairs consumed by external evaluation tooling (such as [Gavel](https://github.com/giskardb/gavel)). The skill linter warns if this directory is missing.
+  The agent assembles `system prompt = SKILL.md body + "\n\n" + concatenated references`. See the `agent-example-skill-filesystem` example for a complete end-to-end test (`support-skill` exercises the `references/` folder auto-append).
+
+- **`references/` folder (optional)** — in addition to the frontmatter list, `FilesystemSkillRegistry` reads every readable file under `<skill>/references/` (sorted by URI for deterministic ordering) and appends each file's contents to the skill's reference list — **frontmatter entries first, folder files after**. Drop docs in there and they're picked up at the next skill load with no SKILL.md edit.
+
+- **assets/** — static resources referenced by frontmatter fields (e.g. `output-schema`).
 
 ### Naming Rules
 
@@ -100,9 +108,12 @@ The baseline implementation. At startup it scans `classpath:skills/` for directo
 
 A decorator that wraps any other registry with a [Caffeine](https://github.com/ben-manes/caffeine) cache. Parsed skill cards are cached in memory to avoid repeated filesystem reads and YAML parsing.
 
+**This is the default registry implementation** — `SkillRegistryAutoConfiguration` registers a `CachedSkillRegistry` around the composite `(filesystem + classpath-jar + annotated)` chain whenever `agent.skill.hot-reload=false` (the default). Configure the cache via:
+
 ```yaml
 agent:
   skill:
+    hot-reload: false           # default — uses CachedSkillRegistry
     cache-ttl-minutes: 60       # legacy TTL knob (used when `cache.ttl-seconds` is unset)
     cache:
       ttl-seconds: 0            # 0 = fall back to `cache-ttl-minutes` × 60
@@ -148,8 +159,15 @@ Input → Embedding (all-MiniLM-L6-v2-quantized, in-process, ~2-5ms)
       → Cosine similarity vs pre-computed skill embeddings
       → If score >= threshold (default 0.6): SEMANTIC routing
       → If score <  threshold: LLM routing fallback (~300ms)
-      → If forceSkill header present: FORCED routing (skip all matching)
+      → If forceSkill provided (header OR body field): FORCED routing (skip all matching)
 ```
+
+> "Forced routing" is triggered when the HTTP request carries an
+> `X-Force-Skill: <skill-name>` header, **or** when the JSON request
+> body includes a `"forceSkill": "<skill-name>"` field (the body field
+> wins if both are present). The header is parsed by
+> `ChatController` / `ChatStreamController` and turned into
+> `AgentRequest.forceSkill` before the orchestrator sees the request.
 
 - **Semantic routing** uses the [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) model running in-process via ONNX Runtime. Skill description embeddings are pre-computed at boot and cached. Typical latency is 2-5ms.
 - **LLM routing** sends the user message along with all skill names and descriptions to the LLM and asks it to pick the best match. This is slower (~300ms) but handles nuanced or multi-domain queries better.
@@ -175,19 +193,14 @@ agent:
 
 ### Force a Specific Skill
 
-There are three ways to bypass routing and force a particular skill.
+Two ways to bypass routing and force a particular skill:
 
-**Via HTTP header:**
+**Via HTTP header** — passed by the API gateway / your client, e.g. `curl -H "X-Force-Skill: weather-skill"`:
 ```
 X-Force-Skill: weather-skill
 ```
 
-**Via CLI:**
-```
-\skill weather-skill
-```
-
-**Via API request body:**
+**Via API request body** — when calling the JSON endpoint directly:
 ```json
 {
   "message": "What is the temperature in Berlin?",
@@ -195,7 +208,7 @@ X-Force-Skill: weather-skill
 }
 ```
 
-Forced routing skips both semantic and LLM matching. If the specified skill does not exist or is inactive, the request fails with a `SkillNotFoundException`.
+If both are present, the JSON body field wins. Forced routing skips both semantic and LLM matching. If the specified skill does not exist or is inactive, the request fails with a `SkillNotFoundException`.
 
 ---
 
@@ -243,7 +256,6 @@ The linter enforces the following rules:
 | `name-matches-folder` | ERROR | The `name` field in frontmatter must match the containing folder name. |
 | `version-semver` | ERROR | The `version` field must be valid semantic versioning (e.g. `1.0.0`). |
 | `description-length` | WARNING | Descriptions longer than 512 characters may degrade routing accuracy. |
-| `evals-present` | WARNING | Neither the `evals/` directory nor `evals.json` is present. |
 | `active-missing` | WARNING | The `metadata.active` field is not set. The skill will default to active, but being explicit is preferred. |
 
 A build with any ERROR-level violation will fail. WARN-level violations are reported but do not break the build.

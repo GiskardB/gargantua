@@ -81,6 +81,8 @@ Attempt 3 → fails → exception propagated to agent
 
 Pauses agent execution and requests human approval before the tool runs. This is essential for tools that perform destructive, costly, or irreversible actions.
 
+> **Tested** by [`agent-example-tool-approval`](https://github.com/GiskardB/gargantua-examples/tree/main/agent-example-tool-approval) — pins the full lifecycle: `ToolDefinition` metadata, `ApprovalStore` save/get/resolve/expiry with lazy eviction, and the REST resolution endpoint at `POST /api/agent/approval/{id}` (200 on resolve, 410 on unknown id). 7 assertions, no infrastructure.
+
 ```java
 @RequiresApproval(
     message = "The agent wants to send an alert",
@@ -135,6 +137,8 @@ When `auto-deny-on-expiry` is `true` and the TTL elapses, the agent receives the
 ## @RequiresRole — Role-Based Access Control on tools
 
 Restricts a tool method to callers that have at least one of the listed roles in their `SecurityContext`. `ToolRegistry.executeTool` checks the annotation before any cache lookup or invocation; on denial it returns a `{"error":"Access denied: ..."}` payload that the LLM sees as the tool result, so it can either pick a different tool or apologise. The skill-level `allowed-roles` check in `RbacGuardrail` runs in addition, earlier in the pipeline — `@RequiresRole` complements it for finer per-tool gating.
+
+> **Tested** by [`agent-example-tool-rbac`](https://github.com/GiskardB/gargantua-examples/tree/main/agent-example-tool-rbac) — every branch: fail-closed without `SecurityContext`, deny with wrong role, allow with required role, any-of semantics on multi-role annotation, `super-admin` wildcard, no-annotation control. 8 assertions, no infrastructure.
 
 ```java
 import ai.gargantua.core.security.RequiresRole;
