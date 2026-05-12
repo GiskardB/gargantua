@@ -381,6 +381,14 @@ public class ChatStreamController {
         if (toolSpecs != null && !toolSpecs.isEmpty()) {
             requestBuilder.toolSpecifications(toolSpecs);
         }
+        // Apply skill-level overrides (v1.2.17+): SKILL.md `metadata.temperature`
+        // and `metadata.max-tokens` win over the model's defaults for this turn.
+        if (skillCard != null && skillCard.temperature() != null) {
+            requestBuilder.temperature(skillCard.temperature());
+        }
+        if (skillCard != null && skillCard.maxTokens() != null && skillCard.maxTokens() > 0) {
+            requestBuilder.maxOutputTokens(skillCard.maxTokens());
+        }
 
         streamingModel.chat(requestBuilder.build(), new StreamingChatResponseHandler() {
             @Override

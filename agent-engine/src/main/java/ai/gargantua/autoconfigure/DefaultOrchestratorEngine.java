@@ -366,7 +366,7 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
                 allocation.systemPrompt(), request.message(), memory.workingMessages());
 
         var toolContext = ToolExecutionContext.of(securityContext, effectiveSessionId);
-        var rawResponse = executeLlmWithTools(model, messages, toolSpecs, toolsCalled, toolContext);
+        var rawResponse = executeLlmWithTools(model, messages, toolSpecs, toolsCalled, toolContext, skillCard);
         log.info("[Pipeline] Step 9 — LLM call complete, tools called: {}", toolsCalled);
 
         // Expose the skill's output schema to SchemaValidatorGuardrail via the input attributes.
@@ -503,7 +503,7 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
                             + detailed.blockedReason()
                             + ". Re-emit a valid response that conforms to the schema; "
                             + "do not include any prose outside the JSON."));
-            currentResponse = executeLlmWithTools(model, messages, toolSpecs, toolsCalled, toolContext);
+            currentResponse = executeLlmWithTools(model, messages, toolSpecs, toolsCalled, toolContext, skillCard);
         }
         return currentResponse;
     }
@@ -511,19 +511,33 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
     /**
      * Execute the LLM with a tool calling loop. The LLM may request tool executions;
      * each tool result is fed back until the LLM produces a final text response.
+     *
+     * <p>When {@code skillCard} carries non-null {@code temperature} / {@code maxTokens}
+     * values, both are applied to every {@link ChatRequest} in the loop — those skill-level
+     * overrides took effect from v1.2.17 (previously parsed but never wired through).</p>
      */
     private String executeLlmWithTools(ChatModel model,
                                         List<dev.langchain4j.data.message.ChatMessage> messages,
                                         List<ToolSpecification> toolSpecs,
                                         List<String> toolsCalled,
-                                        ToolExecutionContext toolContext) {
+                                        ToolExecutionContext toolContext,
+                                        @Nullable SkillCard skillCard) {
         int maxIterations = 10;
+
+        Double skillTemperature = skillCard != null ? skillCard.temperature() : null;
+        Integer skillMaxTokens   = skillCard != null ? skillCard.maxTokens() : null;
 
         for (int i = 0; i < maxIterations; i++) {
             ChatRequest.Builder requestBuilder = ChatRequest.builder()
                     .messages(messages);
             if (toolSpecs != null && !toolSpecs.isEmpty()) {
                 requestBuilder.toolSpecifications(toolSpecs);
+            }
+            if (skillTemperature != null) {
+                requestBuilder.temperature(skillTemperature);
+            }
+            if (skillMaxTokens != null && skillMaxTokens > 0) {
+                requestBuilder.maxOutputTokens(skillMaxTokens);
             }
 
             ChatResponse chatResponse = model.chat(requestBuilder.build());
