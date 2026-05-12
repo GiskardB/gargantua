@@ -38,7 +38,14 @@ import java.util.concurrent.TimeUnit;
  * operations at {@code /a2a}.
  */
 @RestController
-@Tag(name = "A2A", description = "Agent-to-Agent protocol endpoints")
+@Tag(
+        name = "A2A — Agent-to-Agent",
+        description = "[A2A protocol v1.0](https://a2a-protocol.org) discovery and JSON-RPC surface. "
+                + "Other agents discover this one via `GET /.well-known/agent.json` (the AgentCard) "
+                + "and send tasks via JSON-RPC over `POST /a2a` (`message/send`, `tasks/get`, "
+                + "`tasks/cancel`). The framework's own `HttpA2AClient` consumes this same surface "
+                + "to delegate tasks to remote agents."
+)
 public class CapabilitiesController {
 
     private static final Logger log = LoggerFactory.getLogger(CapabilitiesController.class);
@@ -57,8 +64,19 @@ public class CapabilitiesController {
     // ==================== Agent Card (Discovery) ====================
 
     @GetMapping(value = "/.well-known/agent.json", produces = MediaType.APPLICATION_JSON_VALUE)
-    @Operation(summary = "A2A Agent Card", description = "Returns the agent's A2A Agent Card for discovery by other agents.")
-    @ApiResponse(responseCode = "200", description = "Agent Card")
+    @Operation(
+            summary = "A2A Agent Card",
+            description = """
+                    Returns the agent's A2A v1.0 AgentCard for discovery. The card carries
+                    server identity, supported capabilities (streaming, push notifications),
+                    default I/O modes, the live skill listing (only `metadata.active=true`
+                    skills) and the auth scheme set.
+
+                    Cached for 60s by the response (`Cache-Control: max-age=60`). The
+                    `url` field is derived from the request's scheme/host so the same
+                    deployment is discoverable behind a reverse proxy.
+                    """)
+    @ApiResponse(responseCode = "200", description = "AgentCard JSON conforming to the A2A v1.0 schema.")
     public ResponseEntity<AgentCard> wellKnownAgentJson(HttpServletRequest request) {
         return agentCardResponse(request);
     }
@@ -75,8 +93,26 @@ public class CapabilitiesController {
 
     @SuppressWarnings("unchecked")
     @PostMapping(value = "/a2a", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    @Operation(summary = "A2A JSON-RPC endpoint", description = "Handles A2A protocol operations: message/send, tasks/get, tasks/cancel.")
-    @ApiResponse(responseCode = "200", description = "JSON-RPC response")
+    @Operation(
+            summary = "A2A JSON-RPC endpoint",
+            description = """
+                    JSON-RPC 2.0 entry point for the A2A protocol. Supported methods:
+
+                    - `message/send`  → invokes the orchestrator and returns an `A2ATask`
+                                        with `status=completed` (or `failed` on error) and
+                                        an `artifacts: [response]` payload. Optional
+                                        `params.skillHint` is mapped to `AgentRequest.forceSkill`.
+                    - `tasks/get`     → currently returns `-32602` (synchronous execution,
+                                        no task storage yet).
+                    - `tasks/cancel`  → currently returns `-32602` for the same reason.
+
+                    Returns HTTP 200 with the JSON-RPC envelope in every case (success or
+                    error). The `error.code` field follows the JSON-RPC spec:
+                    `-32600` Invalid Request, `-32601` Method not found, `-32602` Invalid
+                    params, `-32603` Internal error.
+                    """)
+    @ApiResponse(responseCode = "200",
+            description = "JSON-RPC envelope. Examine `result` (success) or `error` (failure) inside the response.")
     public ResponseEntity<Map<String, Object>> handleA2A(@RequestBody Map<String, Object> jsonRpc) {
         var method = (String) jsonRpc.get("method");
         var id = jsonRpc.get("id");

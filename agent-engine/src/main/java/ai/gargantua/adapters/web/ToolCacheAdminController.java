@@ -25,7 +25,13 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/admin/tool-cache")
-@Tag(name = "Admin — Tool Cache")
+@Tag(
+        name = "Admin — Tool Cache",
+        description = "Inspect and invalidate the `ToolResultCache` (read-through cache for tools "
+                + "annotated with `@CacheableToolResult`). Backed by Redis in production and an "
+                + "in-memory `ConcurrentHashMap` in embedded mode — the admin endpoints work the same "
+                + "way against both."
+)
 public class ToolCacheAdminController {
 
     private static final String CACHE_KEY_PREFIX = "tool-cache:";

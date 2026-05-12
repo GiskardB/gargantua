@@ -7,7 +7,7 @@
 
   <groupId>ai.gargantua</groupId>
   <artifactId>gargantua-parent</artifactId>
-  <version>1.2.15</version>
+  <version>1.2.16</version>
   <packaging>pom</packaging>
   <name>Gargantua AI Agent Framework</name>
   <url>https://github.com/GiskardB/gargantua</url>

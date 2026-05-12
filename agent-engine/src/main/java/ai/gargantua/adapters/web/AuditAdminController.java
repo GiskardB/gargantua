@@ -23,7 +23,14 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/admin/audit")
-@Tag(name = "Admin \u2014 Audit")
+@Tag(
+        name = "Admin \u2014 Audit",
+        description = "Append-only audit trail of every agent invocation. `AuditService.recordRequest` "
+                + "writes one `AuditEvent` per `OrchestratorEngine.invoke()` capturing the input message, "
+                + "routing decision, tools called, every guardrail's verdict, token counts, USD cost, "
+                + "duration and the dry-run flag. Storage backend: `MongoAuditStore` (production) or "
+                + "`InMemoryAuditStore` (embedded mode)."
+)
 public class AuditAdminController {
 
     private final AuditStore auditStore;

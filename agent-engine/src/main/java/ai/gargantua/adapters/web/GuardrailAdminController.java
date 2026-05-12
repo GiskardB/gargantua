@@ -3,6 +3,7 @@ package ai.gargantua.adapters.web;
 import ai.gargantua.core.guardrail.InputGuardrail;
 import ai.gargantua.core.guardrail.OutputGuardrail;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
@@ -25,7 +26,12 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @RestController
 @RequestMapping("/api/admin/guardrails")
-@Tag(name = "Admin \u2014 Guardrails")
+@Tag(
+        name = "Admin \u2014 Guardrails",
+        description = "Inspect and toggle the input/output guardrail pipeline at runtime. The toggle "
+                + "is in-process only (it flips an in-memory set on this node); persist via the "
+                + "`agent.guardrail.*.<name>-enabled` properties for cluster-wide changes."
+)
 public class GuardrailAdminController {
 
     private final List<InputGuardrail> inputGuardrails;
@@ -40,8 +46,15 @@ public class GuardrailAdminController {
     }
 
     @GetMapping
-    @Operation(summary = "List guardrail pipeline", description = "Returns all configured guardrails with their enabled state.")
-    @ApiResponse(responseCode = "200", description = "Guardrail pipeline")
+    @Operation(
+            summary = "List the guardrail pipeline",
+            description = "Returns every input and output guardrail discovered by Spring, in the order "
+                    + "the pipeline runs them, with their per-node `enabled` state. Disabled guardrails "
+                    + "still show up in the list — the runtime simply skips them."
+    )
+    @ApiResponse(responseCode = "200",
+            description = "Object with `inputGuardrails` and `outputGuardrails` arrays. Each entry: "
+                    + "`{name, type: \"INPUT\"|\"OUTPUT\", enabled}`.")
     public ResponseEntity<Map<String, Object>> listGuardrails() {
         List<Map<String, Object>> input = new ArrayList<>();
         for (InputGuardrail g : inputGuardrails) {
@@ -68,9 +81,19 @@ public class GuardrailAdminController {
     }
 
     @PostMapping("/{guardrailName}/toggle")
-    @Operation(summary = "Toggle guardrail", description = "Enables or disables a specific guardrail.")
-    @ApiResponse(responseCode = "200", description = "Guardrail toggled")
-    public ResponseEntity<Map<String, Object>> toggleGuardrail(@PathVariable String guardrailName) {
+    @Operation(
+            summary = "Toggle a guardrail on/off (in-process)",
+            description = "Flips the enabled state for the named guardrail on **this** node only. "
+                    + "Useful for incident response (e.g. quickly silencing a false-positive PromptInjection "
+                    + "rule). For permanent / cluster-wide changes, set the corresponding "
+                    + "`agent.guardrail.*.<name>-enabled` property and restart."
+    )
+    @ApiResponse(responseCode = "200",
+            description = "Body returns `{name, enabled}` reflecting the new state.")
+    public ResponseEntity<Map<String, Object>> toggleGuardrail(
+            @Parameter(description = "Guardrail name as reported by `GET /api/admin/guardrails`.",
+                    example = "prompt-injection")
+            @PathVariable String guardrailName) {
         boolean wasDisabled = disabledGuardrails.contains(guardrailName);
         if (wasDisabled) {
             disabledGuardrails.remove(guardrailName);

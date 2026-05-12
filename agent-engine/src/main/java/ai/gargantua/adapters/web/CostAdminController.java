@@ -25,7 +25,13 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/admin/costs")
 @ConditionalOnBean(MongoCostTrackingRepository.class)
-@Tag(name = "Admin \u2014 Costs")
+@Tag(
+        name = "Admin \u2014 Costs",
+        description = "Aggregated LLM cost metrics from `MongoCostTrackingRepository`. Every chat "
+                + "request emits one or more `CostTrackingEvent` records (one per LLM call: routing, "
+                + "primary, summarizer); these endpoints expose roll-ups by skill / provider / user / "
+                + "day. USD figures are computed from `agent.cost-tracking.pricing`."
+)
 public class CostAdminController {
 
     private final MongoCostTrackingRepository costRepository;

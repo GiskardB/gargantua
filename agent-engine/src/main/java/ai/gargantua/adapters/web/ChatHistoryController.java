@@ -29,7 +29,13 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/agent/chat")
 @ConditionalOnBean(MongoTemplate.class)
-@Tag(name = "History")
+@Tag(
+        name = "History",
+        description = "Browse and manage long-term chat history persisted to MongoDB. Sessions, paginated "
+                + "messages and full-text search are available; deletion endpoints (per-session and "
+                + "per-user) implement the GDPR right-to-erasure. Only registered when `MongoTemplate` "
+                + "is in the context — embedded mode does not expose these endpoints."
+)
 public class ChatHistoryController {
 
     private static final String SESSIONS_COLLECTION = "chat_sessions";

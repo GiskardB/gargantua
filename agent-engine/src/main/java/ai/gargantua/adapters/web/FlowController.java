@@ -22,7 +22,14 @@ import java.util.UUID;
  */
 @RestController
 @RequestMapping("/api/flows")
-@Tag(name = "Flows", description = "Multi-step agent flow execution")
+@Tag(
+        name = "Flows",
+        description = "Discover and execute `@AgentsFlow` declarations. A flow chains multiple skills "
+                + "(`SEQUENTIAL` / `LOOP` / `PARALLEL` step types) into a single composite invocation; "
+                + "this endpoint returns the final result plus a step-by-step trace so callers can see "
+                + "exactly which skill ran with which output. See the `agent-example-agents-flow` "
+                + "per-feature example for the registration contract."
+)
 public class FlowController {
 
     private final FlowRegistry flowRegistry;

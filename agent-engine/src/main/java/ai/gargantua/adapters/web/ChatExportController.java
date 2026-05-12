@@ -30,7 +30,13 @@ import java.util.StringJoiner;
 @RestController
 @RequestMapping("/api/agent/chat/export")
 @ConditionalOnBean(MongoTemplate.class)
-@Tag(name = "History")
+@Tag(
+        name = "History — Export",
+        description = "Bulk export chat history for analytics, compliance or off-platform processing. "
+                + "Single-session and full-user exports both support multiple formats (JSON / Markdown — "
+                + "see the `format` query parameter). Only registered when `MongoTemplate` is on the "
+                + "classpath."
+)
 public class ChatExportController {
 
     private static final String MESSAGES_COLLECTION = "chat_messages";
