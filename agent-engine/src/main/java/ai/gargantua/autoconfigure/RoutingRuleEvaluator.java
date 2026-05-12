@@ -5,9 +5,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -26,6 +29,14 @@ import java.util.regex.PatternSyntaxException;
  * must match for the rule to fire. Unknown keys fall back to attribute
  * equality so user-defined headers (e.g. {@code priority: high}) keep
  * working without an evaluator entry.</p>
+ *
+ * <p><b>Binding shape tolerance (v1.2.11+).</b> Spring Boot's
+ * {@code @ConfigurationProperties} binder serialises YAML lists nested
+ * inside a {@code Map<String, Object>} as <em>indexed maps</em>
+ * (e.g. {@code values: [a, b]} → {@code values: {0=a, 1=b}}). The evaluator
+ * therefore accepts both shapes via {@link #coerceList(Object)} for every
+ * list-valued field ({@code values}, {@code days}, {@code patterns}, and
+ * the {@code AND} / {@code OR} combinator arms).</p>
  */
 public class RoutingRuleEvaluator {
 
@@ -70,10 +81,11 @@ public class RoutingRuleEvaluator {
     }
 
     private boolean evaluateCombinator(Object spec, LlmRoutingContext ctx, boolean requireAll) {
-        if (!(spec instanceof List<?> list) || list.isEmpty()) {
+        List<Object> arms = coerceList(spec);
+        if (arms.isEmpty()) {
             return false;
         }
-        for (Object element : list) {
+        for (Object element : arms) {
             if (!(element instanceof Map<?, ?> map)) continue;
             @SuppressWarnings("unchecked")
             boolean matched = matches((Map<String, Object>) map, ctx);
@@ -87,13 +99,12 @@ public class RoutingRuleEvaluator {
         if (spec instanceof Map<?, ?> map) {
             String op = stringField(map, "operator", "EQ").toUpperCase(Locale.ROOT);
             Object value = map.get("value");
-            Object values = map.get("values");
+            List<Object> values = coerceList(map.get("values"));
             return switch (op) {
                 case "EQ" -> value != null && value.toString().equals(actual);
-                case "IN" -> values instanceof List<?> l && l.stream()
-                        .map(Object::toString).anyMatch(s -> s.equals(actual));
-                case "NOT_IN" -> values instanceof List<?> l && l.stream()
-                        .map(Object::toString).noneMatch(s -> s.equals(actual));
+                case "IN" -> values.stream().map(Object::toString).anyMatch(s -> s.equals(actual));
+                case "NOT_IN" -> !values.isEmpty()
+                        && values.stream().map(Object::toString).noneMatch(s -> s.equals(actual));
                 default -> {
                     log.warn("Unknown string operator '{}', falling back to EQ", op);
                     yield value != null && value.toString().equals(actual);
@@ -135,14 +146,13 @@ public class RoutingRuleEvaluator {
         return !now.isBefore(from) || now.isBefore(to);
     }
 
-    @SuppressWarnings("unchecked")
     private boolean matchDayOfWeek(Object spec, LlmRoutingContext ctx) {
         if (!(spec instanceof Map<?, ?> map) || ctx.requestDay() == null) return false;
-        Object days = map.get("days");
-        if (!(days instanceof List<?> list)) return false;
+        List<Object> days = coerceList(map.get("days"));
+        if (days.isEmpty()) return false;
         String today = ctx.requestDay().name().toUpperCase(Locale.ROOT);
         String todayShort = today.substring(0, Math.min(3, today.length()));
-        for (Object day : list) {
+        for (Object day : days) {
             if (day == null) continue;
             String d = day.toString().trim().toUpperCase(Locale.ROOT);
             if (d.equals(today) || d.equals(todayShort)) return true;
@@ -158,13 +168,12 @@ public class RoutingRuleEvaluator {
         return ThreadLocalRandom.current().nextDouble() * 100.0 < percentage;
     }
 
-    @SuppressWarnings("unchecked")
     private boolean matchInputContains(Object spec, String userMessage) {
         if (userMessage == null || !(spec instanceof Map<?, ?> map)) return false;
-        Object patterns = map.get("patterns");
-        if (!(patterns instanceof List<?> list)) return false;
+        List<Object> patterns = coerceList(map.get("patterns"));
+        if (patterns.isEmpty()) return false;
         String haystack = userMessage.toLowerCase(Locale.ROOT);
-        for (Object pattern : list) {
+        for (Object pattern : patterns) {
             if (pattern == null) continue;
             if (haystack.contains(pattern.toString().toLowerCase(Locale.ROOT))) return true;
         }
@@ -198,6 +207,53 @@ public class RoutingRuleEvaluator {
         };
     }
 
+    /**
+     * Coerce a binder-shaped value into a {@code List<Object>}. Accepts:
+     * <ul>
+     *   <li>{@code null} → empty list</li>
+     *   <li>{@code List<?>} → returned as-is (defensive copy)</li>
+     *   <li>{@code Map<?,?>} whose keys are integer-like strings ({@code "0", "1", ...}) —
+     *       the Spring Boot 4 binder shape for YAML lists nested inside
+     *       {@code Map<String,Object>}; values are returned in key order.</li>
+     *   <li>Any other scalar → singleton list (so {@code patterns: TODO}
+     *       behaves like {@code patterns: [TODO]}, a small QoL fallback).</li>
+     * </ul>
+     */
+    static List<Object> coerceList(Object raw) {
+        if (raw == null) {
+            return List.of();
+        }
+        if (raw instanceof List<?> list) {
+            return new ArrayList<>(list);
+        }
+        if (raw instanceof Map<?, ?> map) {
+            // Sort entries by integer key when all keys parse as ints; this is
+            // the indexed-Map shape the Spring Boot binder produces for YAML
+            // lists inside a Map<String,Object>. Fall back to insertion order
+            // if any key is non-numeric.
+            var sorted = new TreeMap<Integer, Object>();
+            boolean allNumericKeys = true;
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                Object key = entry.getKey();
+                if (key == null) { allNumericKeys = false; break; }
+                try {
+                    sorted.put(Integer.parseInt(key.toString()), entry.getValue());
+                } catch (NumberFormatException e) {
+                    allNumericKeys = false;
+                    break;
+                }
+            }
+            if (allNumericKeys) {
+                return new ArrayList<>(sorted.values());
+            }
+            // Non-indexed map — not a list, return empty (caller will treat
+            // as "no list configured" and bail out).
+            return List.of();
+        }
+        // Scalar QoL — treat `patterns: TODO` as `patterns: [TODO]`.
+        return List.of(raw);
+    }
+
     private LocalTime parseTime(Object raw) {
         if (raw == null) return null;
         try {
@@ -226,4 +282,9 @@ public class RoutingRuleEvaluator {
         try { return Double.parseDouble(value.toString()); }
         catch (NumberFormatException e) { return defaultValue; }
     }
+
+    // Comparator is imported for potential future use by callers that need
+    // to sort condition entries deterministically; not currently used here.
+    @SuppressWarnings("unused")
+    private static final Comparator<Object> NULL_LAST = Comparator.nullsLast(Comparator.comparing(Object::toString));
 }
