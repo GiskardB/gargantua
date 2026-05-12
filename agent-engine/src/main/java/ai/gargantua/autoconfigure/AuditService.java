@@ -8,7 +8,6 @@ import ai.gargantua.core.orchestrator.AgentResponse;
 import ai.gargantua.core.orchestrator.RoutingResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.List;
@@ -20,10 +19,15 @@ import java.util.UUID;
  * Called by {@link DefaultOrchestratorEngine} after every {@code invoke()}.
  * Skipped if auditing is disabled in configuration.
  *
+ * <p><b>v1.2.12+ — null-safe store.</b> When no {@link AuditStore} is wired
+ * the service is registered as a runtime no-op; {@link #isActive()} reflects
+ * the wired state. This lets {@link AuditAutoConfiguration} sidestep the
+ * registration-phase {@code @ConditionalOnBean} race that previously hid
+ * the bean in embedded mode.</p>
+ *
  * @see AuditEvent
  * @see AuditStore
  */
-@Component
 public class AuditService {
 
     private static final Logger log = LoggerFactory.getLogger(AuditService.class);
@@ -37,13 +41,21 @@ public class AuditService {
     }
 
     /**
+     * True when an {@link AuditStore} was wired and audit is enabled in
+     * configuration. When false, {@link #recordRequest} is a no-op.
+     */
+    public boolean isActive() {
+        return auditStore != null && props.getAudit().isEnabled();
+    }
+
+    /**
      * Records an audit event from the completed request.
      * Called by DefaultOrchestratorEngine after every invoke().
-     * Skipped if auditing is disabled in config.
+     * Skipped if auditing is disabled in config OR if no store is wired.
      */
     public void recordRequest(AgentRequest request, AgentResponse response,
                                RoutingResult routing, List<GuardrailResult> guardrailResults) {
-        if (!props.getAudit().isEnabled()) {
+        if (!isActive()) {
             return;
         }
 
