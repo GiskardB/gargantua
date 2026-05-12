@@ -25,6 +25,12 @@ import java.util.List;
  *
  * <p>If the skill does NOT declare a knowledge-base, this enricher returns null
  * and adds zero overhead to the prompt.</p>
+ *
+ * <p>If no {@link VectorStorePort} is wired (i.e. {@link #vectorStore} is
+ * {@code null}), the enricher is a runtime no-op for every skill — even those
+ * that <em>do</em> declare a knowledge-base. This lets {@link RagAutoConfiguration}
+ * register the bean unconditionally, sidestepping the {@code @ConditionalOnBean}
+ * vs. profile-gated-producer ordering trap that v1.2.8 only partially closed.</p>
  */
 public class RagEnricher implements ContextEnricher {
 
@@ -53,8 +59,17 @@ public class RagEnricher implements ContextEnricher {
         return null; // runs for all skills, but returns null if no RagConfig
     }
 
+    /** True when a {@link VectorStorePort} was wired and RAG is reachable. */
+    public boolean isActive() {
+        return vectorStore != null;
+    }
+
     @Override
     public String enrich(EnricherContext ctx) {
+        if (vectorStore == null) {
+            return null;
+        }
+
         SkillCard skillCard;
         try {
             skillCard = skillRegistry.load(ctx.skillName());
