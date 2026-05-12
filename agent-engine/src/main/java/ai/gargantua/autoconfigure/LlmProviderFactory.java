@@ -8,6 +8,8 @@ import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.anthropic.AnthropicChatModel;
 import dev.langchain4j.model.anthropic.AnthropicStreamingChatModel;
+import dev.langchain4j.model.azure.AzureOpenAiChatModel;
+import dev.langchain4j.model.azure.AzureOpenAiStreamingChatModel;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
@@ -192,8 +194,17 @@ public class LlmProviderFactory {
                     .logRequests(log.isDebugEnabled())
                     .logResponses(log.isDebugEnabled())
                     .build();
+            case "azure-openai" -> AzureOpenAiChatModel.builder()
+                    .endpoint(config.getEndpoint())
+                    .apiKey(apiKey)
+                    .deploymentName(resolveAzureDeployment(config))
+                    .serviceVersion(resolveAzureServiceVersion(config))
+                    .temperature(config.getTemperature())
+                    .maxTokens(config.getMaxTokens())
+                    .logRequestsAndResponses(log.isDebugEnabled())
+                    .build();
             default -> {
-                // openai, azure-openai, ollama all speak OpenAI-compatible protocol
+                // openai, ollama and any OpenAI-compatible gateway (Bifrost, vLLM, …)
                 String baseUrl = normalizeEndpoint(config.getEndpoint());
                 yield OpenAiChatModel.builder()
                         .baseUrl(baseUrl)
@@ -236,6 +247,15 @@ public class LlmProviderFactory {
                     .logRequests(log.isDebugEnabled())
                     .logResponses(log.isDebugEnabled())
                     .build();
+            case "azure-openai" -> AzureOpenAiStreamingChatModel.builder()
+                    .endpoint(config.getEndpoint())
+                    .apiKey(apiKey)
+                    .deploymentName(resolveAzureDeployment(config))
+                    .serviceVersion(resolveAzureServiceVersion(config))
+                    .temperature(config.getTemperature())
+                    .maxTokens(config.getMaxTokens())
+                    .logRequestsAndResponses(log.isDebugEnabled())
+                    .build();
             default -> {
                 String baseUrl = normalizeEndpoint(config.getEndpoint());
                 yield OpenAiStreamingChatModel.builder()
@@ -248,6 +268,34 @@ public class LlmProviderFactory {
                         .build();
             }
         };
+    }
+
+    /**
+     * Resolve the Azure deployment name. Defaults to {@code config.model}
+     * when {@code agent.llm.*.deployment-name} is left blank — Azure
+     * deployments are conventionally named after the underlying model id
+     * (e.g. {@code gpt-4o}), so this keeps the simple case zero-config.
+     */
+    private String resolveAzureDeployment(AgentProperties.LlmModelConfig config) {
+        String deployment = config.getDeploymentName();
+        return (deployment != null && !deployment.isBlank()) ? deployment : config.getModel();
+    }
+
+    /**
+     * Resolve the Azure {@code api-version} (LangChain4j calls it
+     * {@code serviceVersion}). Required for Azure Foundry — if left blank
+     * we fall back to a sensible recent default and log a hint, but the
+     * caller really should configure {@code agent.llm.*.api-version}
+     * explicitly to match the Azure deployment's contract.
+     */
+    private String resolveAzureServiceVersion(AgentProperties.LlmModelConfig config) {
+        String version = config.getApiVersion();
+        if (version != null && !version.isBlank()) {
+            return version;
+        }
+        log.warn("Azure OpenAI provider configured without agent.llm.*.api-version; "
+                + "falling back to '2024-08-01-preview'. Set the version explicitly to match your deployment.");
+        return "2024-08-01-preview";
     }
 
     /**

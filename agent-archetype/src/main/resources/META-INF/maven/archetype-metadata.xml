@@ -39,6 +39,7 @@
       <directory></directory>
       <includes>
         <include>docker-compose.yml</include>
+        <include>README.md</include>
       </includes>
     </fileSet>
     <!-- Static files copied verbatim. Note: .gitignore ships as "gitignore"

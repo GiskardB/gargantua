@@ -211,4 +211,64 @@ class LlmProviderFactoryTest {
             assertThat(model1).isSameAs(model2);
         }
     }
+
+    @Nested
+    @DisplayName("Azure OpenAI provider (1.2.15+)")
+    class AzureOpenAi {
+
+        @Test
+        @DisplayName("provider=azure-openai with explicit api-version + deployment-name builds an AzureOpenAiChatModel")
+        void azureWithExplicitVersionAndDeployment() {
+            properties.getLlm().getPrimary().setProvider("azure-openai");
+            properties.getLlm().getPrimary().setEndpoint("https://my-foundry.openai.azure.com");
+            properties.getLlm().getPrimary().setApiKey("azure-key");
+            properties.getLlm().getPrimary().setModel("gpt-4o");
+            properties.getLlm().getPrimary().setDeploymentName("gpt-4o-prod");
+            properties.getLlm().getPrimary().setApiVersion("2024-08-01-preview");
+
+            var model = factory.getModel("primary");
+            assertThat(model).isInstanceOf(dev.langchain4j.model.azure.AzureOpenAiChatModel.class);
+        }
+
+        @Test
+        @DisplayName("Empty deployment-name falls back to model id (Azure deployments are conventionally named after the model)")
+        void azureDeploymentDefaultsToModel() {
+            properties.getLlm().getPrimary().setProvider("azure-openai");
+            properties.getLlm().getPrimary().setEndpoint("https://my-foundry.openai.azure.com");
+            properties.getLlm().getPrimary().setApiKey("azure-key");
+            properties.getLlm().getPrimary().setModel("gpt-4o-mini");
+            properties.getLlm().getPrimary().setApiVersion("2024-08-01-preview");
+            // deployment-name left blank
+
+            // Builds successfully — exercises the resolveAzureDeployment fallback path.
+            var model = factory.getModel("primary");
+            assertThat(model).isInstanceOf(dev.langchain4j.model.azure.AzureOpenAiChatModel.class);
+        }
+
+        @Test
+        @DisplayName("Empty api-version falls back to a default + warns (resolveAzureServiceVersion contract)")
+        void azureApiVersionDefaultIsApplied() {
+            properties.getLlm().getPrimary().setProvider("azure-openai");
+            properties.getLlm().getPrimary().setEndpoint("https://my-foundry.openai.azure.com");
+            properties.getLlm().getPrimary().setApiKey("azure-key");
+            properties.getLlm().getPrimary().setModel("gpt-4o");
+            // api-version intentionally left blank — caller misconfiguration
+
+            var model = factory.getModel("primary");
+            assertThat(model).isInstanceOf(dev.langchain4j.model.azure.AzureOpenAiChatModel.class);
+        }
+
+        @Test
+        @DisplayName("provider=openai still picks the OpenAI-compatible builder, not Azure")
+        void openAiProviderUnchanged() {
+            properties.getLlm().getPrimary().setProvider("openai");
+            properties.getLlm().getPrimary().setEndpoint("http://localhost:11434/v1");
+            properties.getLlm().getPrimary().setApiKey("k");
+            properties.getLlm().getPrimary().setModel("gpt-4o");
+
+            var model = factory.getModel("primary");
+            assertThat(model).isInstanceOf(dev.langchain4j.model.openai.OpenAiChatModel.class);
+            assertThat(model).isNotInstanceOf(dev.langchain4j.model.azure.AzureOpenAiChatModel.class);
+        }
+    }
 }

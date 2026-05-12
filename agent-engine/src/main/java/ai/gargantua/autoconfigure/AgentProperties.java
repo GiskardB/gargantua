@@ -223,6 +223,18 @@ public class AgentProperties {
         private String endpoint = "";
         private double temperature = 0.7;
         private int maxTokens = 4096;
+        /**
+         * Azure OpenAI service version (e.g. {@code 2024-08-01-preview}). Required
+         * when {@code provider=azure-openai}; ignored for every other provider.
+         * Maps to {@code AzureOpenAiChatModel.builder().serviceVersion(...)}.
+         */
+        private String apiVersion = "";
+        /**
+         * Azure OpenAI deployment name. When {@code provider=azure-openai},
+         * either set this explicitly or leave blank to fall back to {@code model}
+         * (Azure deployments are usually named after the underlying model).
+         */
+        private String deploymentName = "";
 
         public String getProvider() { return provider; }
         public void setProvider(String provider) { this.provider = provider; }
@@ -241,6 +253,12 @@ public class AgentProperties {
 
         public int getMaxTokens() { return maxTokens; }
         public void setMaxTokens(int maxTokens) { this.maxTokens = maxTokens; }
+
+        public String getApiVersion() { return apiVersion; }
+        public void setApiVersion(String apiVersion) { this.apiVersion = apiVersion; }
+
+        public String getDeploymentName() { return deploymentName; }
+        public void setDeploymentName(String deploymentName) { this.deploymentName = deploymentName; }
     }
 
     public static class RoutingRule {

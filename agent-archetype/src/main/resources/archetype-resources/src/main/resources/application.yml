@@ -21,9 +21,13 @@ ${symbol_pound}   LLM_FALLBACK_PROVIDER    Fallback provider when primary fails 
 ${symbol_pound}   LLM_FALLBACK_MODEL       Fallback model name (default: claude-sonnet-4-20250514)
 ${symbol_pound}   LLM_FALLBACK_API_KEY     Fallback API key (optional)
 ${symbol_pound}
+${symbol_pound}   LLM_PRIMARY_API_VERSION       Azure OpenAI service version, e.g. 2024-08-01-preview.
+${symbol_pound}                                 Required when LLM_PRIMARY_PROVIDER=azure-openai.
+${symbol_pound}   LLM_PRIMARY_DEPLOYMENT_NAME   Azure deployment name. Defaults to LLM_PRIMARY_MODEL when blank.
+${symbol_pound}
 ${symbol_pound}   LLM_ROUTING_PROVIDER     Routing model provider (default: ollama / phi4-mini, local)
 ${symbol_pound}   LLM_ROUTING_MODEL        Routing model name (default: phi4-mini)
-${symbol_pound}   LLM_ROUTING_API_KEY      Not needed for Ollama
+${symbol_pound}   LLM_ROUTING_API_KEY      Not needed for Ollama; set when routing on a cloud provider
 ${symbol_pound}
 ${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}
 
@@ -33,9 +37,12 @@ spring:
   threads:
     virtual:
       enabled: true
-  ${symbol_pound} Spring Boot 4 split MongoDB connection settings out of `spring.data.mongodb`
-  ${symbol_pound} into the new `spring.mongodb` namespace. Set BOTH so the configuration is
-  ${symbol_pound} robust against either autoconfiguration class winning.
+  ${symbol_pound} Spring Boot 4 reorganised the MongoDB auto-configuration: the driver
+  ${symbol_pound} reads `spring.mongodb.uri` (in `MongoAutoConfiguration`) while
+  ${symbol_pound} Spring Data still reads `spring.data.mongodb.uri` (in
+  ${symbol_pound} `DataMongoAutoConfiguration`). We set both because the framework
+  ${symbol_pound} uses both layers — drop one or the other only if you know which
+  ${symbol_pound} auto-configuration your app actually pulls in.
   mongodb:
     uri: ${symbol_dollar}{MONGODB_URI:mongodb://localhost:27017/${artifactId}}
   data:
@@ -63,11 +70,18 @@ agent:
       endpoint: ${symbol_dollar}{LLM_PRIMARY_ENDPOINT:}
       temperature: ${symbol_dollar}{LLM_PRIMARY_TEMPERATURE:0.7}
       max-tokens: ${symbol_dollar}{LLM_PRIMARY_MAX_TOKENS:1000}
+      ${symbol_pound} Azure OpenAI only — Foundry requires an api-version and (typically)
+      ${symbol_pound} a deployment name distinct from the model id. Both are no-ops
+      ${symbol_pound} when provider != azure-openai.
+      api-version: ${symbol_dollar}{LLM_PRIMARY_API_VERSION:}
+      deployment-name: ${symbol_dollar}{LLM_PRIMARY_DEPLOYMENT_NAME:}
     fallback:
       provider: ${symbol_dollar}{LLM_FALLBACK_PROVIDER:anthropic}
       model: ${symbol_dollar}{LLM_FALLBACK_MODEL:claude-sonnet-4-20250514}
       api-key: ${symbol_dollar}{LLM_FALLBACK_API_KEY:}
       endpoint: ${symbol_dollar}{LLM_FALLBACK_ENDPOINT:}
+      api-version: ${symbol_dollar}{LLM_FALLBACK_API_VERSION:}
+      deployment-name: ${symbol_dollar}{LLM_FALLBACK_DEPLOYMENT_NAME:}
     routing-model:
       provider: ${symbol_dollar}{LLM_ROUTING_PROVIDER:ollama}
       model: ${symbol_dollar}{LLM_ROUTING_MODEL:phi4-mini}
