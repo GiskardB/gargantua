@@ -1,7 +1,9 @@
 package ai.gargantua.autoconfigure;
 
+import ai.gargantua.core.rag.EmbeddingPort;
 import ai.gargantua.core.rag.VectorStorePort;
 import ai.gargantua.core.skill.SkillRegistry;
+import dev.langchain4j.model.embedding.onnx.allminilml6v2q.AllMiniLmL6V2QuantizedEmbeddingModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -33,6 +35,22 @@ import org.springframework.context.annotation.Bean;
 public class RagAutoConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(RagAutoConfiguration.class);
+
+    /**
+     * Default {@link EmbeddingPort} that wraps the in-process ONNX MiniLM
+     * model already on the classpath (the same one the semantic router uses).
+     * Override by registering your own {@code EmbeddingPort} bean — typical
+     * production setup is a {@link LangChain4jEmbeddingAdapter} around an
+     * OpenAI / Cohere / Vertex AI embedding model. Added in v1.2.18 to
+     * power the new cosine-similarity in-memory vector store.
+     */
+    @Bean
+    @ConditionalOnMissingBean(EmbeddingPort.class)
+    public EmbeddingPort defaultEmbeddingPort() {
+        log.info("Default EmbeddingPort: in-process all-MiniLM-L6-v2-quantized (384 dims). "
+                + "Override with your own EmbeddingPort @Bean for production-grade models.");
+        return new LangChain4jEmbeddingAdapter(new AllMiniLmL6V2QuantizedEmbeddingModel());
+    }
 
     @Bean
     @ConditionalOnMissingBean(RagEnricher.class)

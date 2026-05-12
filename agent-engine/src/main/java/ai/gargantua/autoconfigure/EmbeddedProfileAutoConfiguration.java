@@ -5,7 +5,9 @@ import ai.gargantua.core.hitl.ApprovalStore;
 import ai.gargantua.core.memory.EpisodicMemoryPort;
 import ai.gargantua.core.memory.KnowledgeMemoryPort;
 import ai.gargantua.core.memory.WorkingMemoryPort;
+import ai.gargantua.core.rag.EmbeddingPort;
 import ai.gargantua.core.rag.VectorStorePort;
+import ai.gargantua.memory.adapters.inmemory.EmbeddingInMemoryVectorStore;
 import ai.gargantua.memory.adapters.inmemory.InMemoryApprovalStore;
 import ai.gargantua.memory.adapters.inmemory.InMemoryAuditStore;
 import ai.gargantua.memory.adapters.inmemory.InMemoryEpisodicMemoryAdapter;
@@ -14,6 +16,7 @@ import ai.gargantua.memory.adapters.inmemory.InMemoryVectorStore;
 import ai.gargantua.memory.adapters.inmemory.InMemoryWorkingMemoryAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
@@ -78,8 +81,20 @@ public class EmbeddedProfileAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean(VectorStorePort.class)
-    public VectorStorePort inMemoryVectorStore() {
-        log.info("Using in-memory vector store (keyword-based, not for production)");
+    public VectorStorePort inMemoryVectorStore(ObjectProvider<EmbeddingPort> embeddingPortProvider) {
+        // v1.2.18+: when an EmbeddingPort is wired (RagAutoConfiguration registers
+        // a default in-process MiniLM one) we get real cosine-similarity RAG out
+        // of the box. Without an EmbeddingPort we fall back to the legacy
+        // Jaccard keyword store — useful for tests that exclude the embedding
+        // model or want fully deterministic scoring.
+        EmbeddingPort embeddingPort = embeddingPortProvider.getIfAvailable();
+        if (embeddingPort != null) {
+            log.info("Using in-memory vector store with cosine similarity over {}-dim embeddings "
+                    + "(EmbeddingPort: {})", embeddingPort.dimension(),
+                    embeddingPort.getClass().getSimpleName());
+            return new EmbeddingInMemoryVectorStore(embeddingPort);
+        }
+        log.info("Using in-memory vector store (keyword-based Jaccard fallback — no EmbeddingPort wired)");
         return new InMemoryVectorStore();
     }
 
