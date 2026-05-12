@@ -66,7 +66,7 @@ If both `skills/coder/SKILL.md` and `@AgentSkill(name = "coder")` exist, the **f
 | `domain` | String | `"general"` | Domain for disclaimers and LLM routing rules |
 | `active` | boolean | `true` | If false, skill is invisible to routing |
 | `allowedRoles` | String[] | `{}` | RBAC: roles that can use this skill. Empty = no restriction. |
-| `knowledgeBase` | String | `""` | RAG: vector store collection name. Empty = no RAG. |
+| `knowledgeBase` | String | `""` | RAG: vector store collection name. Empty = no RAG. **WIP:** the only shipped `VectorStorePort` is the keyword-based `InMemoryVectorStore` — see [`extending.md` → RAG / Vector Store](extending.md#rag--vector-store). |
 | `ragMaxResults` | int | `5` | Max RAG chunks to retrieve |
 | `ragMinScore` | double | `0.3` | Min similarity score for RAG results |
 | `temperature` | double | `-1` | LLM temperature override. -1 = use default. |

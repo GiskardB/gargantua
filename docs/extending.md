@@ -419,6 +419,23 @@ agent:
 
 ## RAG / Vector Store
 
+> ⚠️ **Work in progress — retrieval engine is keyword-based, not embedding-based.**
+> As of v1.2.10 the framework ships **one** `VectorStorePort` implementation —
+> `InMemoryVectorStore` — and it uses **Jaccard similarity over lowercased word
+> tokens**, not vector embeddings. There is no shipped adapter for pgvector,
+> Qdrant, Milvus, Pinecone or any other production vector DB yet, and no built-in
+> embedding model is invoked on RAG ingestion or query (the ONNX
+> `all-MiniLM-L6-v2` model wired into the framework is used only for *skill
+> routing*, not for RAG retrieval).
+>
+> What the wiring *does* pin today: `SKILL.md metadata.knowledge-base` →
+> `RagConfig` → `VectorStorePort.search(...)` → `RagEnricher` injects a
+> `RELEVANT_DOCUMENTS` section into the system prompt with `maxResults` /
+> `minScore` honoured. That contract is stable. For production use, implement
+> your own `VectorStorePort` against a real vector DB + embedding model as
+> shown below — your bean wins via `@ConditionalOnMissingBean`. A first-party
+> embedding port and pgvector / Qdrant adapter are on the roadmap.
+
 Skills can declare a knowledge base to enable retrieval-augmented generation. When a skill has `metadata.knowledge-base` set, the `RagEnricher` automatically queries the vector store and injects the most relevant documents into the system prompt. If a skill has no `knowledge-base`, there is zero overhead.
 
 ### Declare a knowledge base in SKILL.md
@@ -440,7 +457,7 @@ metadata:
 
 ### Implement a custom VectorStorePort
 
-The framework provides `InMemoryVectorStore` for embedded mode. For production, implement `VectorStorePort` with your preferred vector database:
+The framework provides `InMemoryVectorStore` (keyword-based, demo/embedded only — see the WIP note at the top of this section). For production, implement `VectorStorePort` with your preferred vector database **and** an embedding model — the snippet below is illustrative; classes like `PineconeVectorStore` are not shipped by the framework, you write them:
 
 ```java
 import ai.gargantua.core.rag.VectorStorePort;
@@ -452,8 +469,10 @@ public class VectorStoreConfig {
 
     @Bean
     public VectorStorePort vectorStore() {
-        return new PineconeVectorStore(pineconeClient);
-        // The framework's InMemoryVectorStore will NOT be registered
+        // Your implementation — typically: embed the query, kNN-search the
+        // vector DB, return RetrievedChunk(content, source, score).
+        return new MyPineconeVectorStore(pineconeClient, embeddingModel);
+        // The framework's InMemoryVectorStore will NOT be registered.
     }
 }
 ```

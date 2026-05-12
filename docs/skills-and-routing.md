@@ -46,7 +46,7 @@ Do NOT answer questions unrelated to weather. Politely redirect the user.
 | `metadata.max-tokens` | integer | No | Maximum token budget for the LLM response within this skill. |
 | `metadata.temperature` | float | No | LLM sampling temperature override for this skill. |
 | `metadata.preferred-model` | string | No | Model identifier to use when this skill is active, overriding the global default. |
-| `metadata.knowledge-base` | string | No | Name of a RAG vector store knowledge base (e.g. `hr-docs`). When set, `RagEnricher` auto-injects retrieved documents into the prompt. |
+| `metadata.knowledge-base` | string | No | Name of a RAG vector store knowledge base (e.g. `hr-docs`). When set, `RagEnricher` auto-injects retrieved documents into the prompt. **WIP:** the only shipped `VectorStorePort` is the keyword-based `InMemoryVectorStore` — see [`extending.md` → RAG / Vector Store](extending.md#rag--vector-store) for the WIP note and how to plug a real vector DB. |
 | `metadata.rag-max-results` | integer | No | Maximum number of RAG documents to retrieve. Default `5`. |
 | `metadata.rag-min-score` | float | No | Minimum similarity score for RAG results. Default `0.3`. |
 | `metadata.allowed-roles` | list of strings | No | Roles permitted to use this skill (e.g. `[financial-advisor, super-admin]`). If set, `RbacGuardrail` blocks users without a matching role. The `super-admin` role bypasses all restrictions. |
