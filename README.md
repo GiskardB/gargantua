@@ -33,35 +33,16 @@ This is the recommended path. No `settings.xml` changes, no extra `<repository>`
 </dependency>
 ```
 
-### Option B — generate a fresh project from the Maven archetype (JitPack)
+### Option B — generate a fresh project from the Maven archetype (Maven Central)
 
-The Maven archetype is currently published only on JitPack. The `maven-archetype-plugin` ignores `-DarchetypeRepository` for the archetype itself, so for **this specific command** the JitPack profile must live in `~/.m2/settings.xml`. Create the file if missing:
-
-```xml
-<settings>
-  <profiles>
-    <profile>
-      <id>jitpack</id>
-      <repositories>
-        <repository><id>jitpack.io</id><url>https://jitpack.io</url></repository>
-      </repositories>
-      <pluginRepositories>
-        <pluginRepository><id>jitpack.io</id><url>https://jitpack.io</url></pluginRepository>
-      </pluginRepositories>
-    </profile>
-  </profiles>
-  <activeProfiles><activeProfile>jitpack</activeProfile></activeProfiles>
-</settings>
-```
-
-> Only the archetype command needs this. Once your project is generated it pulls the framework jars from Maven Central — no `settings.xml` needed at runtime.
+Both the framework jars **and the archetype itself** are published to Maven Central. No `settings.xml` edit, no extra repository — Central is queried by default.
 
 ```bash
 # 1. Generate a new agent project
 mvn archetype:generate \
-  -DarchetypeGroupId=com.github.giskardb.gargantua \
+  -DarchetypeGroupId=io.github.giskardb \
   -DarchetypeArtifactId=agent-archetype \
-  -DarchetypeVersion=v1.2.19 \
+  -DarchetypeVersion=1.2.19 \
   -DgroupId=com.mycompany -DartifactId=my-agent \
   -Dversion=1.0.0 -DagentName=MyAgent -DinteractiveMode=false
 
@@ -98,6 +79,43 @@ curl -X POST http://localhost:8080/api/agent/chat \
 ```
 
 That's a running agent with skill routing, guardrails, memory, streaming, and a REST API. Read on to add your own tools and skills.
+
+<details>
+<summary>Need a snapshot or branch build? Use JitPack (optional)</summary>
+
+JitPack ships **every commit** (including untagged branches and `develop-SNAPSHOT`), useful when you need a fix that hasn't been promoted to Central yet. Because `maven-archetype-plugin` ignores `-DarchetypeRepository` when resolving the archetype itself, the JitPack repository must live in `~/.m2/settings.xml`:
+
+```xml
+<settings>
+  <profiles>
+    <profile>
+      <id>jitpack</id>
+      <repositories>
+        <repository><id>jitpack.io</id><url>https://jitpack.io</url></repository>
+      </repositories>
+      <pluginRepositories>
+        <pluginRepository><id>jitpack.io</id><url>https://jitpack.io</url></pluginRepository>
+      </pluginRepositories>
+    </profile>
+  </profiles>
+  <activeProfiles><activeProfile>jitpack</activeProfile></activeProfiles>
+</settings>
+```
+
+Then generate with the JitPack coordinates (note the `v` prefix on the version):
+
+```bash
+mvn archetype:generate \
+  -DarchetypeGroupId=com.github.giskardb.gargantua \
+  -DarchetypeArtifactId=agent-archetype \
+  -DarchetypeVersion=v1.2.19 \
+  -DgroupId=com.mycompany -DartifactId=my-agent \
+  -Dversion=1.0.0 -DagentName=MyAgent -DinteractiveMode=false
+```
+
+For released tags you don't need this — Maven Central serves the archetype too.
+
+</details>
 
 ---
 
@@ -269,23 +287,21 @@ The "60 seconds" quickstart uses **embedded mode** (everything in-memory, no Doc
 
 ### 1. Generate the project
 
-> **First-time setup:** declare JitPack in `~/.m2/settings.xml` once — see the
-> snippet in [Try it in 60 seconds](#try-it-in-60-seconds). The
-> `maven-archetype-plugin` doesn't honour `-DarchetypeRepository` reliably, so
-> the repository has to be visible at the Maven-settings level for the
-> `archetype:generate` lookup to find the JitPack-published archetype.
+The archetype lives on Maven Central along with the rest of the framework — no `settings.xml` required.
 
 ```bash
 mvn archetype:generate \
-  -DarchetypeGroupId=com.github.giskardb.gargantua \
+  -DarchetypeGroupId=io.github.giskardb \
   -DarchetypeArtifactId=agent-archetype \
-  -DarchetypeVersion=v1.2.8 \
+  -DarchetypeVersion=1.2.19 \
   -DgroupId=com.mycompany \
   -DartifactId=my-agent \
   -Dversion=1.0.0 \
   -DagentName=MyAgent \
   -DinteractiveMode=false
 ```
+
+> Need a snapshot or branch build? Use the JitPack flavour — see the collapsible block in [Try it in 60 seconds](#try-it-in-60-seconds).
 
 This generates:
 
@@ -455,45 +471,55 @@ That's it. The framework handles routing, memory, guardrails, streaming, and eve
 
 Gargantua is distributed as a set of Maven libraries. You don't clone this repo -- you add dependencies.
 
-| Artifact | GroupId | Description |
-|----------|---------|-------------|
-| `agent-core` | `ai.gargantua` | Pure domain: records, interfaces, annotations. Zero Spring deps. |
-| `agent-memory-sdk` | `ai.gargantua` | Standalone 3-layer memory (Redis + MongoDB). Reusable in any project. |
-| `agent-engine` | `ai.gargantua` | Auto-configuration, guardrails, routing, orchestrator, tool registry, REST controllers, skill registries, admin endpoints. |
-| `agent-mcp-server` | `ai.gargantua` | MCP Server gateway (optional). |
-| `agent-skill-linter-maven-plugin` | `ai.gargantua` | Build-time SKILL.md validation. |
-| `agent-archetype` | `ai.gargantua` | Maven archetype to scaffold new agent projects. |
+| Artifact | Maven Central groupId | JitPack groupId | Description |
+|----------|------------------------|------------------|-------------|
+| `agent-core` | `io.github.giskardb` | `com.github.giskardb.gargantua` | Pure domain: records, interfaces, annotations. Zero Spring deps. |
+| `agent-memory-sdk` | `io.github.giskardb` | `com.github.giskardb.gargantua` | Standalone 3-layer memory (Redis + MongoDB). Reusable in any project. |
+| `agent-engine` | `io.github.giskardb` | `com.github.giskardb.gargantua` | Auto-configuration, guardrails, routing, orchestrator, tool registry, REST controllers, skill registries, admin endpoints. |
+| `agent-mcp-server` | `io.github.giskardb` | `com.github.giskardb.gargantua` | MCP Server gateway (optional). |
+| `agent-skill-linter-maven-plugin` | `io.github.giskardb` | `com.github.giskardb.gargantua` | Build-time SKILL.md validation. |
+| `agent-archetype` | `io.github.giskardb` | `com.github.giskardb.gargantua` | Maven archetype to scaffold new agent projects. |
 
-### Repository setup — JitPack
+Two distribution channels, same source code:
 
-Gargantua is published via **JitPack** — no authentication, no `settings.xml`, just add the repository.
+| Channel | When to use | Versioning |
+|---------|-------------|------------|
+| **Maven Central** *(default)* | Tagged releases — signed, immutable, queried by default. No `settings.xml` needed. | semver, no prefix (`1.2.19`) |
+| **JitPack** | Snapshots, intermediate tags, `develop-SNAPSHOT`, branch builds — built on-demand. | mirrors Git tags (`v1.2.19`) |
 
-> 📦 **Browse the published artifacts and build logs at [jitpack.io/#GiskardB/gargantua](https://jitpack.io/#GiskardB/gargantua)** — every Git tag becomes a downloadable Maven version.
-
-```xml
-<repositories>
-    <repository>
-        <id>jitpack.io</id>
-        <url>https://jitpack.io</url>
-    </repository>
-</repositories>
-<pluginRepositories>
-    <pluginRepository>
-        <id>jitpack.io</id>
-        <url>https://jitpack.io</url>
-    </pluginRepository>
-</pluginRepositories>
-```
-
-> JitPack uses the groupId `com.github.giskardb.gargantua` and versions match Git tags (e.g. `v1.2.8`).
->
-> If you used the Maven archetype, the repository is **already configured** in the generated `pom.xml`.
-
-### Typical dependency setup (JitPack)
+### Maven Central (recommended)
 
 ```xml
 <properties>
-    <gargantua.version>v1.2.8</gargantua.version>
+    <gargantua.version>1.2.19</gargantua.version>
+</properties>
+
+<dependencies>
+    <!-- Core engine: orchestrator, guardrails, routing, memory, REST API, admin endpoints, skill registries -->
+    <dependency>
+        <groupId>io.github.giskardb</groupId>
+        <artifactId>agent-engine</artifactId>
+        <version>${gargantua.version}</version>
+    </dependency>
+
+    <!-- Optional: MCP server gateway -->
+    <dependency>
+        <groupId>io.github.giskardb</groupId>
+        <artifactId>agent-mcp-server</artifactId>
+        <version>${gargantua.version}</version>
+    </dependency>
+</dependencies>
+```
+
+No `<repositories>` block needed — Maven Central is in the default Maven repository list.
+
+### JitPack (snapshots and intermediate builds)
+
+> 📦 **Browse the published artifacts and build logs at [jitpack.io/#GiskardB/gargantua](https://jitpack.io/#GiskardB/gargantua)** — every Git commit and tag becomes a downloadable Maven version.
+
+```xml
+<properties>
+    <gargantua.version>v1.2.19</gargantua.version>
 </properties>
 
 <repositories>
@@ -504,21 +530,15 @@ Gargantua is published via **JitPack** — no authentication, no `settings.xml`,
 </repositories>
 
 <dependencies>
-    <!-- Core engine: orchestrator, guardrails, routing, memory, REST API, admin endpoints, skill registries -->
     <dependency>
         <groupId>com.github.giskardb.gargantua</groupId>
         <artifactId>agent-engine</artifactId>
         <version>${gargantua.version}</version>
     </dependency>
-
-    <!-- Optional: MCP server gateway -->
-    <dependency>
-        <groupId>com.github.giskardb.gargantua</groupId>
-        <artifactId>agent-mcp-server</artifactId>
-        <version>${gargantua.version}</version>
-    </dependency>
 </dependencies>
 ```
+
+JitPack uses the groupId `com.github.giskardb.gargantua` and versions match Git tags (`vX.Y.Z`). Use this channel for `develop-SNAPSHOT` or fix branches not yet on Central.
 
 ---
 

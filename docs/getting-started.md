@@ -19,11 +19,23 @@ This guide walks you through installing, running, and customizing your first age
 
 > No Docker, no MongoDB, no Redis — everything runs in-memory.
 
-### 1. Tell Maven where to find JitPack (archetype generation only)
+### 1. Generate a new agent project
 
-> **You only need this step if you generate a project from the Maven archetype** (Section 2 below). If you're adding Gargantua as a dependency in an existing `pom.xml`, **skip straight to Section 2's "Maven Central" block** — Central is queried by default and no `settings.xml` edit is required.
+The archetype lives on Maven Central along with the rest of the framework — no `settings.xml` edit, no extra `<repository>` block.
 
-The Maven archetype is currently published on JitPack. The `maven-archetype-plugin` ignores `-DarchetypeRepository` for the archetype itself, so the JitPack repository must live in `~/.m2/settings.xml`. Append this profile (create the file if missing):
+```bash
+mvn archetype:generate \
+  -DarchetypeGroupId=io.github.giskardb \
+  -DarchetypeArtifactId=agent-archetype \
+  -DarchetypeVersion=1.2.19 \
+  -DgroupId=com.mycompany -DartifactId=my-agent \
+  -Dversion=1.0.0 -DagentName=MyAgent -DinteractiveMode=false
+```
+
+<details>
+<summary>Need a snapshot or branch build? Use JitPack (optional)</summary>
+
+JitPack ships **every commit** (including untagged branches and `develop-SNAPSHOT`). Because `maven-archetype-plugin` ignores `-DarchetypeRepository` when resolving the archetype itself, the JitPack repository must live in `~/.m2/settings.xml`:
 
 ```xml
 <settings>
@@ -42,9 +54,7 @@ The Maven archetype is currently published on JitPack. The `maven-archetype-plug
 </settings>
 ```
 
-Once your project exists, the framework dependencies are resolved from Maven Central — no `settings.xml` is needed at runtime.
-
-### 2. Generate a new agent project
+Then generate with the JitPack coordinates (note the `v` prefix on the version):
 
 ```bash
 mvn archetype:generate \
@@ -54,6 +64,10 @@ mvn archetype:generate \
   -DgroupId=com.mycompany -DartifactId=my-agent \
   -Dversion=1.0.0 -DagentName=MyAgent -DinteractiveMode=false
 ```
+
+For released tags you don't need this — Maven Central serves the archetype too.
+
+</details>
 
 This generates a Maven project with:
 
@@ -73,7 +87,7 @@ my-agent/
         └── sample-skill/SKILL.md    # example skill
 ```
 
-### 3. Run it
+### 2. Run it
 
 ```bash
 cd my-agent
@@ -85,7 +99,7 @@ SPRING_PROFILES_ACTIVE=embedded \
 mvn spring-boot:run
 ```
 
-### 4. Talk to your agent
+### 3. Talk to your agent
 
 ```bash
 curl -X POST http://localhost:8080/api/agent/chat \
@@ -121,7 +135,7 @@ For production-like setups with persistent memory, chat history, and a local rou
 
 ### 1. Generate the project
 
-Use the same `mvn archetype:generate` command from step 2 above.
+Use the same `mvn archetype:generate` command from step 1 of the "Try it in 60 seconds" section above.
 
 ### 2. Start infrastructure
 
@@ -333,7 +347,7 @@ Use JitPack for `develop-SNAPSHOT` or for fix branches that have not yet been ta
 | `agent-skill-linter-maven-plugin` | `io.github.giskardb` | `com.github.giskardb.gargantua` | Build-time SKILL.md validation. |
 | `agent-archetype` | `io.github.giskardb` | `com.github.giskardb.gargantua` | Maven archetype to scaffold new agent projects. |
 
-> The Maven archetype today is published to JitPack only (it's typically resolved through `-DarchetypeRepository=https://jitpack.io` at generation time). Use the JitPack coord for `mvn archetype:generate` and the Maven Central coord for runtime dependencies.
+> The archetype is on **both** channels. Default to the Maven Central coordinates (`io.github.giskardb:agent-archetype:1.2.19`) — no `settings.xml` needed. Fall back to the JitPack coordinates (`com.github.giskardb.gargantua:agent-archetype:v1.2.19`) only when you need a snapshot or branch build that isn't on Central yet.
 
 ---
 
