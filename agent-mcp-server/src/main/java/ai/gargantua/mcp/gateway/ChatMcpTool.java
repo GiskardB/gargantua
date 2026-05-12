@@ -6,8 +6,6 @@ import ai.gargantua.core.orchestrator.OrchestratorEngine;
 import ai.gargantua.mcp.AgentMcpProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Component;
 
 import java.util.UUID;
 
@@ -20,9 +18,10 @@ import java.util.UUID;
  * <p>When the bean is constructed, the configured tool name and description are logged.
  * Each {@link #chat(String, String, String)} call produces a fresh agent invocation
  * through the full pipeline (guardrails → routing → memory → LLM → output guardrails).</p>
+ *
+ * <p>Registered via {@code AgentMcpServerAutoConfiguration} when
+ * {@code agent.mcp.enabled=true} (v1.2.13+).</p>
  */
-@Component
-@ConditionalOnProperty(name = "agent.mcp.enabled", havingValue = "true")
 public class ChatMcpTool {
 
     private static final Logger log = LoggerFactory.getLogger(ChatMcpTool.class);

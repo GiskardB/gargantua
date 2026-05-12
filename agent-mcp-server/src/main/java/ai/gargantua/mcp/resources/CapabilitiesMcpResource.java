@@ -8,8 +8,6 @@ import ai.gargantua.mcp.AgentMcpProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Component;
 
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -28,9 +26,10 @@ import java.util.Map;
  * <p>Both registries are injected via {@link ObjectProvider} so that the resource
  * still functions when one of them is missing — e.g. a minimal MCP gateway with no
  * skills or no tools.</p>
+ *
+ * <p>Registered via {@code AgentMcpServerAutoConfiguration} when
+ * {@code agent.mcp.enabled=true} (v1.2.13+).</p>
  */
-@Component
-@ConditionalOnProperty(name = "agent.mcp.enabled", havingValue = "true")
 public class CapabilitiesMcpResource {
 
     private static final Logger log = LoggerFactory.getLogger(CapabilitiesMcpResource.class);
