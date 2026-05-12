@@ -15,8 +15,15 @@ import org.springframework.context.annotation.Bean;
  * and a {@link SkillRegistry} are available. If no vector store is configured
  * (e.g., non-embedded mode without an external vector DB), the enricher is
  * simply not created and RAG is inactive.</p>
+ *
+ * <p>Declares {@code @AutoConfigureAfter(EmbeddedProfileAutoConfiguration.class)}
+ * (1.2.8+) so that, in embedded mode, the in-memory {@code VectorStorePort}
+ * bean is registered <em>before</em> this configuration's
+ * {@link ConditionalOnBean} predicate is evaluated. Without this, embedded
+ * apps would silently get no {@link RagEnricher}, and any skill declaring
+ * {@code metadata.knowledge-base} would behave as if RAG were disabled.</p>
  */
-@AutoConfiguration
+@AutoConfiguration(after = EmbeddedProfileAutoConfiguration.class)
 public class RagAutoConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(RagAutoConfiguration.class);
