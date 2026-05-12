@@ -6,9 +6,9 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>ai.gargantua</groupId>
+    <groupId>io.github.giskardb</groupId>
     <artifactId>gargantua-parent</artifactId>
-    <version>1.2.18</version>
+    <version>1.2.19</version>
   </parent>
 
   <artifactId>agent-core</artifactId>

@@ -1,0 +1,134 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# Gargantua AI Agent Framework — Maven Central release
+#
+# Publishes signed artifacts to Maven Central (groupId io.github.giskardb)
+# via the Sonatype Central Portal API. Runs in parallel with release.yml
+# (which handles the GitHub Release) and JitPack (which builds on demand).
+#
+# Triggered by:
+#   1. Push of a version tag (v*.*.*) — automatic on every release.
+#   2. Manual dispatch — used for the first release while the workflow
+#      is being validated, and for re-runs if Central rejects an upload.
+#
+# Required GitHub secrets (set under repo Settings → Secrets and variables):
+#   - MAVEN_CENTRAL_USERNAME  Sonatype Central Portal "User Token Username"
+#   - MAVEN_CENTRAL_TOKEN     Sonatype Central Portal "User Token Password"
+#   - GPG_PRIVATE_KEY         Armored private key (output of `gpg --armor --export-secret-keys <id>`)
+#   - GPG_PASSPHRASE          Passphrase for the GPG key
+# ══════════════════════════════════════════════════════════════════════════════
+
+name: Release to Maven Central
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. 1.2.19). Required for manual dispatch.'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  MAVEN_OPTS: -Xmx1024m
+
+concurrency:
+  group: maven-central-release
+  cancel-in-progress: false   # never cancel a release mid-publish
+
+jobs:
+  publish:
+    name: Build, sign and deploy to Maven Central
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      # ── Java + GPG + Maven settings (Central server credentials) ────────────
+      - name: Set up JDK 21 and GPG
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+          # `server-id` here matches the `<publishingServerId>central</…>` in
+          # the parent pom's release profile. setup-java auto-generates
+          # ~/.m2/settings.xml with this server entry, pulling the username
+          # and password from the env vars below.
+          server-id: central
+          server-username: MAVEN_CENTRAL_USERNAME
+          server-password: MAVEN_CENTRAL_TOKEN
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg-passphrase: GPG_PASSPHRASE
+
+      # ── Determine version (tag or manual input) ─────────────────────────────
+      - name: Resolve release version
+        id: version
+        run: |
+          if [[ -n "${{ inputs.version }}" ]]; then
+            VERSION="${{ inputs.version }}"
+          elif [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            echo "::error::No version available — provide one via workflow_dispatch input or push a v*.*.* tag."
+            exit 1
+          fi
+          # Maven Central rejects -SNAPSHOT under the new portal, so refuse early.
+          if [[ "${VERSION}" == *-SNAPSHOT ]]; then
+            echo "::error::SNAPSHOT versions are not supported by the Central Portal. Use JitPack for snapshots."
+            exit 1
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Release version: ${VERSION}"
+
+      # ── Align every POM to the release version ──────────────────────────────
+      - name: Set Maven project version
+        run: |
+          mvn -B versions:set -DnewVersion="${{ steps.version.outputs.version }}" -DgenerateBackupPoms=false
+
+      # ── Sanity build + tests so we don't sign and upload a broken jar ───────
+      - name: Build and test
+        run: mvn -B -DskipTests=false verify
+
+      # ── Deploy: signs and uploads via central-publishing-maven-plugin ──────
+      - name: Deploy to Maven Central
+        env:
+          # Read by ~/.m2/settings.xml that setup-java generated for us.
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_TOKEN:    ${{ secrets.MAVEN_CENTRAL_TOKEN }}
+          # maven-gpg-plugin 3.2+ reads the passphrase from this env var when
+          # --pinentry-mode=loopback is configured (see the release profile).
+          MAVEN_GPG_PASSPHRASE:   ${{ secrets.GPG_PASSPHRASE }}
+        run: mvn -B -Prelease -DskipTests=true deploy
+
+      # ── Summary ────────────────────────────────────────────────────────────
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Maven Central release"
+            echo ""
+            echo "**Version:** ${{ steps.version.outputs.version }}"
+            echo ""
+            echo "### Consumer coordinates"
+            echo '```xml'
+            echo '<dependency>'
+            echo '  <groupId>io.github.giskardb</groupId>'
+            echo '  <artifactId>agent-engine</artifactId>'
+            echo "  <version>${{ steps.version.outputs.version }}</version>"
+            echo '</dependency>'
+            echo '```'
+            echo ""
+            echo "Once the upload finishes, the artifact appears at:"
+            echo "<https://central.sonatype.com/artifact/io.github.giskardb/agent-engine/${{ steps.version.outputs.version }}>"
+            echo ""
+            echo "JitPack continues to serve the same tag in parallel under"
+            echo "\`com.github.giskardb.gargantua:agent-engine:v${{ steps.version.outputs.version }}\`."
+          } >> "$GITHUB_STEP_SUMMARY"

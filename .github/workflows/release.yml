@@ -112,21 +112,33 @@ jobs:
           echo "" >> changelog.md
           echo "---" >> changelog.md
           echo "" >> changelog.md
-          echo "### Maven Coordinates (via JitPack)" >> changelog.md
+          echo "### Maven Coordinates" >> changelog.md
+          echo "" >> changelog.md
+          echo "**Maven Central** (recommended for production):" >> changelog.md
           echo '```xml' >> changelog.md
           echo '<dependency>' >> changelog.md
-          echo '    <groupId>com.github.giskardb.gargantua</groupId>' >> changelog.md
-          echo '    <artifactId>agent-engine</artifactId>' >> changelog.md
-          echo "    <version>${{ steps.version.outputs.version }}</version>" >> changelog.md
+          echo '  <groupId>io.github.giskardb</groupId>' >> changelog.md
+          echo '  <artifactId>agent-engine</artifactId>' >> changelog.md
+          echo "  <version>${{ steps.version.outputs.version }}</version>" >> changelog.md
           echo '</dependency>' >> changelog.md
           echo '```' >> changelog.md
           echo "" >> changelog.md
-          echo "### Quick Start" >> changelog.md
+          echo "**JitPack** (snapshots, branch builds, intermediate tags):" >> changelog.md
+          echo '```xml' >> changelog.md
+          echo '<dependency>' >> changelog.md
+          echo '  <groupId>com.github.giskardb.gargantua</groupId>' >> changelog.md
+          echo '  <artifactId>agent-engine</artifactId>' >> changelog.md
+          echo "  <version>v${{ steps.version.outputs.version }}</version>" >> changelog.md
+          echo '</dependency>' >> changelog.md
+          echo '```' >> changelog.md
+          echo "" >> changelog.md
+          echo "### Quick Start (via JitPack archetype)" >> changelog.md
           echo '```bash' >> changelog.md
           echo 'mvn archetype:generate \' >> changelog.md
           echo '  -DarchetypeGroupId=com.github.giskardb.gargantua \' >> changelog.md
           echo '  -DarchetypeArtifactId=agent-archetype \' >> changelog.md
-          echo "  -DarchetypeVersion=${{ steps.version.outputs.version }}" >> changelog.md
+          echo "  -DarchetypeVersion=v${{ steps.version.outputs.version }} \\" >> changelog.md
+          echo '  -DarchetypeRepository=https://jitpack.io' >> changelog.md
           echo '```' >> changelog.md
           cat changelog.md
 

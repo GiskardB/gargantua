@@ -258,11 +258,46 @@ That's it. The framework handles routing, memory, guardrails, streaming, and eve
 
 ## Maven coordinates
 
-Gargantua is distributed as a set of Maven libraries via **JitPack** — no authentication, no `settings.xml`, just add the repository.
+Gargantua publishes to **two channels**. Pick the one that suits your stage:
+
+| Channel | When to use | Coordinates                              | Versioning |
+|---------|-------------|------------------------------------------|------------|
+| **Maven Central** | Production — signed artifacts, immutable releases, no extra `<repository>` block. | `io.github.giskardb:agent-*` | semver, no prefix (`1.2.19`) |
+| **JitPack** | Snapshots, intermediate tags, `develop-SNAPSHOT`, branch builds — built on-demand at the consumer end. | `com.github.giskardb.gargantua:agent-*` | mirrors Git tags (`v1.2.19`) |
+
+Both serve **the same source code** for tagged releases; the choice is purely operational.
+
+### Maven Central (recommended)
 
 ```xml
 <properties>
-    <gargantua.version>v1.2.18</gargantua.version>
+    <gargantua.version>1.2.19</gargantua.version>
+</properties>
+
+<dependencies>
+    <!-- Core engine: orchestrator, guardrails, routing, memory, REST API -->
+    <dependency>
+        <groupId>io.github.giskardb</groupId>
+        <artifactId>agent-engine</artifactId>
+        <version>${gargantua.version}</version>
+    </dependency>
+
+    <!-- Optional: MCP server gateway for Claude Desktop / Cursor -->
+    <dependency>
+        <groupId>io.github.giskardb</groupId>
+        <artifactId>agent-mcp-server</artifactId>
+        <version>${gargantua.version}</version>
+    </dependency>
+</dependencies>
+```
+
+No `<repositories>` entry needed — Maven Central is queried by default.
+
+### JitPack (snapshots and intermediate builds)
+
+```xml
+<properties>
+    <gargantua.version>v1.2.19</gargantua.version>
 </properties>
 
 <repositories>
@@ -273,34 +308,28 @@ Gargantua is distributed as a set of Maven libraries via **JitPack** — no auth
 </repositories>
 
 <dependencies>
-    <!-- Core engine: orchestrator, guardrails, routing, memory, REST API -->
     <dependency>
         <groupId>com.github.giskardb.gargantua</groupId>
         <artifactId>agent-engine</artifactId>
         <version>${gargantua.version}</version>
     </dependency>
-
-    <!-- Optional: MCP server gateway for Claude Desktop / Cursor -->
-    <dependency>
-        <groupId>com.github.giskardb.gargantua</groupId>
-        <artifactId>agent-mcp-server</artifactId>
-        <version>${gargantua.version}</version>
-    </dependency>
 </dependencies>
 ```
 
+Use JitPack for `develop-SNAPSHOT` or for fix branches that have not yet been tagged.
+
 ### Available artifacts
 
-| Artifact | GroupId | Description |
-|----------|---------|-------------|
-| `agent-core` | `com.github.giskardb.gargantua` | Pure domain: records, interfaces, annotations. Zero Spring deps. |
-| `agent-memory-sdk` | `com.github.giskardb.gargantua` | Standalone 3-layer memory (Redis + MongoDB). Reusable in any project. |
-| `agent-engine` | `com.github.giskardb.gargantua` | Auto-configuration, guardrails, routing, orchestrator, tool registry, REST controllers. |
-| `agent-mcp-server` | `com.github.giskardb.gargantua` | MCP Server gateway (optional). |
-| `agent-skill-linter-maven-plugin` | `com.github.giskardb.gargantua` | Build-time SKILL.md validation. |
-| `agent-archetype` | `com.github.giskardb.gargantua` | Maven archetype to scaffold new agent projects. |
+| Artifact | Maven Central groupId | JitPack groupId | Description |
+|----------|------------------------|------------------|-------------|
+| `agent-core` | `io.github.giskardb` | `com.github.giskardb.gargantua` | Pure domain: records, interfaces, annotations. Zero Spring deps. |
+| `agent-memory-sdk` | `io.github.giskardb` | `com.github.giskardb.gargantua` | Standalone 3-layer memory (Redis + MongoDB). Reusable in any project. |
+| `agent-engine` | `io.github.giskardb` | `com.github.giskardb.gargantua` | Auto-configuration, guardrails, routing, orchestrator, tool registry, REST controllers. |
+| `agent-mcp-server` | `io.github.giskardb` | `com.github.giskardb.gargantua` | MCP Server gateway (optional). |
+| `agent-skill-linter-maven-plugin` | `io.github.giskardb` | `com.github.giskardb.gargantua` | Build-time SKILL.md validation. |
+| `agent-archetype` | `io.github.giskardb` | `com.github.giskardb.gargantua` | Maven archetype to scaffold new agent projects. |
 
-> JitPack uses the groupId `com.github.giskardb.gargantua` and versions match Git tags (e.g. `v1.2.18`). If you used the Maven archetype, the repository is **already configured** in the generated `pom.xml`.
+> The Maven archetype today is published to JitPack only (it's typically resolved through `-DarchetypeRepository=https://jitpack.io` at generation time). Use the JitPack coord for `mvn archetype:generate` and the Maven Central coord for runtime dependencies.
 
 ---
 

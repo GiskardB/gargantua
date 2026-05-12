@@ -5,12 +5,21 @@
              http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>ai.gargantua</groupId>
+  <groupId>io.github.giskardb</groupId>
   <artifactId>gargantua-parent</artifactId>
-  <version>1.2.18</version>
+  <version>1.2.19</version>
   <packaging>pom</packaging>
   <name>Gargantua AI Agent Framework</name>
+  <description>
+    Production-ready AI agent framework for Java. Built on Spring Boot 4 and LangChain4j,
+    Gargantua turns Java methods (@AgentTool) and Markdown files (SKILL.md) into a deployable
+    agent service with skills, hybrid routing, 3-layer memory, guardrails, human-in-the-loop
+    approvals, multi-provider LLM failover, RAG with a pluggable EmbeddingPort, A2A protocol,
+    MCP server gateway, cost tracking and an immutable audit trail. Ships an embedded
+    zero-infra mode for tests and demos.
+  </description>
   <url>https://github.com/GiskardB/gargantua</url>
+  <inceptionYear>2026</inceptionYear>
 
   <licenses>
     <license>
@@ -19,6 +28,30 @@
       <distribution>repo</distribution>
     </license>
   </licenses>
+
+  <developers>
+    <developer>
+      <id>giskardb</id>
+      <name>Giuseppe Brescia</name>
+      <email>giskard80@gmail.com</email>
+      <url>https://github.com/GiskardB</url>
+      <roles>
+        <role>maintainer</role>
+      </roles>
+    </developer>
+  </developers>
+
+  <scm>
+    <connection>scm:git:https://github.com/GiskardB/gargantua.git</connection>
+    <developerConnection>scm:git:git@github.com:GiskardB/gargantua.git</developerConnection>
+    <url>https://github.com/GiskardB/gargantua</url>
+    <tag>HEAD</tag>
+  </scm>
+
+  <issueManagement>
+    <system>GitHub Issues</system>
+    <url>https://github.com/GiskardB/gargantua/issues</url>
+  </issueManagement>
 
   <modules>
     <module>agent-core</module>
@@ -55,27 +88,33 @@
     <testcontainers.version>1.20.4</testcontainers.version>
     <wiremock.version>3.10.0</wiremock.version>
     <mcp-sdk.version>0.9.0</mcp-sdk.version>
+
+    <!-- Release-time plugin versions (used by the `release` profile below) -->
+    <maven-source-plugin.version>3.3.1</maven-source-plugin.version>
+    <maven-javadoc-plugin.version>3.11.2</maven-javadoc-plugin.version>
+    <maven-gpg-plugin.version>3.2.7</maven-gpg-plugin.version>
+    <central-publishing-maven-plugin.version>0.7.0</central-publishing-maven-plugin.version>
   </properties>
 
   <dependencyManagement>
     <dependencies>
       <dependency>
-        <groupId>ai.gargantua</groupId>
+        <groupId>io.github.giskardb</groupId>
         <artifactId>agent-core</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>ai.gargantua</groupId>
+        <groupId>io.github.giskardb</groupId>
         <artifactId>agent-memory-sdk</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>ai.gargantua</groupId>
+        <groupId>io.github.giskardb</groupId>
         <artifactId>agent-engine</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>ai.gargantua</groupId>
+        <groupId>io.github.giskardb</groupId>
         <artifactId>agent-mcp-server</artifactId>
         <version>${project.version}</version>
       </dependency>
@@ -144,9 +183,17 @@
     </dependencies>
   </dependencyManagement>
 
-  <!-- Distribution: artifacts are built by JitPack on demand at the
-       consumer end. No upload step is required from this build. See
-       README.md for consumer setup. -->
+  <!-- Distribution.
+       JitPack continues to serve every git tag on demand under
+       `com.github.giskardb.gargantua` (JitPack rewrites the groupId at
+       upload time, so the internal `io.github.giskardb` here doesn't
+       break anything for JitPack consumers).
+
+       The `release` profile below adds source + javadoc jars, GPG signing
+       and the Sonatype Central Publishing plugin so that tagging
+       v*.*.* on `main` (or running the release-maven-central workflow
+       manually) publishes signed artifacts to Maven Central. See
+       .github/workflows/release-maven-central.yml. -->
 
   <build>
     <pluginManagement>
@@ -169,4 +216,93 @@
       </plugins>
     </pluginManagement>
   </build>
+
+  <profiles>
+    <!--
+      Activate with `mvn -Prelease deploy` — invoked by the
+      release-maven-central GitHub Actions workflow on every v*.*.* tag.
+      Never activate locally for normal builds: the GPG-sign step requires
+      a private key + passphrase that only the CI has.
+    -->
+    <profile>
+      <id>release</id>
+      <build>
+        <plugins>
+          <!-- 1. Attach -sources.jar (required by Maven Central) -->
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-source-plugin</artifactId>
+            <version>${maven-source-plugin.version}</version>
+            <executions>
+              <execution>
+                <id>attach-sources</id>
+                <goals><goal>jar-no-fork</goal></goals>
+              </execution>
+            </executions>
+          </plugin>
+
+          <!-- 2. Attach -javadoc.jar (required by Maven Central) -->
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <version>${maven-javadoc-plugin.version}</version>
+            <executions>
+              <execution>
+                <id>attach-javadocs</id>
+                <goals><goal>jar</goal></goals>
+                <configuration>
+                  <!-- Tolerant settings: don't fail the release if a
+                       single javadoc comment is malformed. -->
+                  <doclint>none</doclint>
+                  <failOnError>false</failOnError>
+                  <quiet>true</quiet>
+                  <detectJavaApiLink>false</detectJavaApiLink>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+
+          <!-- 3. GPG-sign every artifact (jar + sources + javadoc + pom) -->
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>${maven-gpg-plugin.version}</version>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals><goal>sign</goal></goals>
+                <configuration>
+                  <!-- The CI imports the key via actions/setup-java's
+                       gpg-private-key input, which also sets GPG_TTY and
+                       configures gpg2 — we just need to tell the plugin
+                       to read the passphrase from the env var. -->
+                  <gpgArguments>
+                    <arg>--pinentry-mode</arg>
+                    <arg>loopback</arg>
+                  </gpgArguments>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+
+          <!-- 4. Upload + release to Maven Central via the Central Portal API -->
+          <plugin>
+            <groupId>org.sonatype.central</groupId>
+            <artifactId>central-publishing-maven-plugin</artifactId>
+            <version>${central-publishing-maven-plugin.version}</version>
+            <extensions>true</extensions>
+            <configuration>
+              <publishingServerId>central</publishingServerId>
+              <!-- autoPublish=true tells the portal to release immediately
+                   if validation passes. Flip to false if you want a manual
+                   "Publish" click on https://central.sonatype.com first. -->
+              <autoPublish>true</autoPublish>
+              <waitUntil>published</waitUntil>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>
