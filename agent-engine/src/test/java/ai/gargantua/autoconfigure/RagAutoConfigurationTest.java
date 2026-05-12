@@ -15,11 +15,11 @@ import static org.mockito.Mockito.mock;
 
 /**
  * Pins the auto-configuration contract added in v1.2.9: the {@link RagEnricher}
- * bean is registered whenever a {@link SkillRegistry} is present. When a
- * {@link VectorStorePort} is also wired the enricher becomes "active"; when
- * no vector store is contributed the same bean is registered as a runtime
- * no-op. This sidesteps the {@code @ConditionalOnBean} vs. profile-gated
- * producer race that bit users in embedded mode under v1.2.8.
+ * bean is registered <em>unconditionally</em>. When both a {@link VectorStorePort}
+ * and a {@link SkillRegistry} are present the enricher is "active"; when
+ * either dependency is missing the same bean is wired as a runtime no-op.
+ * This sidesteps the {@code @ConditionalOnBean} vs. profile-gated / late-
+ * registered producer race that bit users in embedded mode through v1.2.8.
  */
 class RagAutoConfigurationTest {
 
@@ -27,7 +27,7 @@ class RagAutoConfigurationTest {
             .withConfiguration(AutoConfigurations.of(RagAutoConfiguration.class));
 
     @Test
-    @DisplayName("RagEnricher is created and ACTIVE when both VectorStorePort and SkillRegistry are present")
+    @DisplayName("RagEnricher is ACTIVE when both VectorStorePort and SkillRegistry are present")
     void enricherActiveWhenDepsPresent() {
         contextRunner
                 .withUserConfiguration(SkillRegistryConfig.class, VectorStoreConfig.class)
@@ -38,7 +38,7 @@ class RagAutoConfigurationTest {
     }
 
     @Test
-    @DisplayName("RagEnricher is created but INACTIVE when no VectorStorePort is in the context")
+    @DisplayName("RagEnricher is registered but INACTIVE when no VectorStorePort is in the context")
     void enricherInactiveWhenVectorStoreMissing() {
         contextRunner
                 .withUserConfiguration(SkillRegistryConfig.class)
@@ -49,24 +49,27 @@ class RagAutoConfigurationTest {
     }
 
     @Test
-    @DisplayName("RagEnricher is NOT created without a SkillRegistry (no skills to enrich)")
-    void enricherSkippedWhenSkillRegistryMissing() {
+    @DisplayName("RagEnricher is registered but INACTIVE when no SkillRegistry is in the context")
+    void enricherInactiveWhenSkillRegistryMissing() {
         contextRunner
                 .withUserConfiguration(VectorStoreConfig.class)
-                .run(ctx -> assertThat(ctx).doesNotHaveBean(RagEnricher.class));
+                .run(ctx -> {
+                    assertThat(ctx).hasSingleBean(RagEnricher.class);
+                    assertThat(ctx.getBean(RagEnricher.class).isActive()).isFalse();
+                });
     }
 
     @Test
-    @DisplayName("VectorStorePort contributed by a separate user config is picked up at bean-creation time "
-            + "(ObjectProvider lookup, not registration-phase condition)")
-    void enricherPicksUpLateRegisteredVectorStore() {
-        // Simulates the embedded-mode scenario: a separate (potentially
-        // profile-gated) auto-config contributes the VectorStorePort. With
-        // the old @ConditionalOnBean wiring this was fragile; the
-        // ObjectProvider lookup sidesteps the race entirely.
+    @DisplayName("Late-registered VectorStorePort and SkillRegistry are still picked up "
+            + "(ObjectProvider lookup happens at bean-creation time, not at registration time)")
+    void enricherPicksUpLateRegisteredDeps() {
+        // Simulates the embedded-mode scenario where profile-gated or
+        // later-loaded auto-configurations contribute the dependencies.
+        // Both lookups must happen lazily for this to work regardless of
+        // configuration class processing order.
         new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(RagAutoConfiguration.class))
-                .withUserConfiguration(SkillRegistryConfig.class, LateVectorStoreConfig.class)
+                .withUserConfiguration(LateSkillRegistryConfig.class, LateVectorStoreConfig.class)
                 .run(ctx -> {
                     assertThat(ctx).hasSingleBean(RagEnricher.class);
                     assertThat(ctx.getBean(RagEnricher.class).isActive()).isTrue();
@@ -86,6 +89,14 @@ class RagAutoConfigurationTest {
         @Bean
         VectorStorePort vectorStore() {
             return new InMemoryVectorStore();
+        }
+    }
+
+    @Configuration
+    static class LateSkillRegistryConfig {
+        @Bean
+        SkillRegistry lateSkillRegistry() {
+            return mock(SkillRegistry.class);
         }
     }
 

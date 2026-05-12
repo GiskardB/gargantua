@@ -59,14 +59,18 @@ public class RagEnricher implements ContextEnricher {
         return null; // runs for all skills, but returns null if no RagConfig
     }
 
-    /** True when a {@link VectorStorePort} was wired and RAG is reachable. */
+    /**
+     * True when both a {@link VectorStorePort} and a {@link SkillRegistry}
+     * were wired and RAG is reachable. When either is missing, {@link #enrich}
+     * is a guaranteed no-op.
+     */
     public boolean isActive() {
-        return vectorStore != null;
+        return vectorStore != null && skillRegistry != null;
     }
 
     @Override
     public String enrich(EnricherContext ctx) {
-        if (vectorStore == null) {
+        if (vectorStore == null || skillRegistry == null) {
             return null;
         }
 
