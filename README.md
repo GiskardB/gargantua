@@ -1,7 +1,8 @@
 # Gargantua -- AI Agent Framework
 
 [![License](https://img.shields.io/github/license/GiskardB/gargantua?style=flat-square&color=blue)](LICENSE)
-[![Latest version](https://img.shields.io/github/v/tag/GiskardB/gargantua?style=flat-square&label=version&color=brightgreen)](https://github.com/GiskardB/gargantua/tags)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.giskardb/agent-engine?style=flat-square&label=Maven%20Central&color=blue&logo=apachemaven&logoColor=white)](https://central.sonatype.com/artifact/io.github.giskardb/agent-engine)
+[![Latest tag](https://img.shields.io/github/v/tag/GiskardB/gargantua?style=flat-square&label=tag&color=brightgreen)](https://github.com/GiskardB/gargantua/tags)
 [![JitPack](https://jitpack.io/v/GiskardB/gargantua.svg?style=flat-square)](https://jitpack.io/#GiskardB/gargantua)
 [![CI](https://img.shields.io/github/actions/workflow/status/GiskardB/gargantua/ci.yml?style=flat-square&label=CI)](https://github.com/GiskardB/gargantua/actions/workflows/ci.yml)
 [![Java](https://img.shields.io/badge/Java-21-007396?style=flat-square&logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/21/)
@@ -20,31 +21,47 @@ Built on Java 21, Spring Boot 4.0.4, and LangChain4j.
 
 > Requires: Java 21+, Maven, an OpenAI-compatible API key. No Docker needed.
 
-```bash
-# 0. (one-time) Tell Maven where to find JitPack — the maven-archetype-plugin
-#    ignores -DarchetypeRepository, so the repository must live in settings.xml.
-#    Append this profile to ~/.m2/settings.xml (create the file if missing):
-#
-# <settings>
-#   <profiles>
-#     <profile>
-#       <id>jitpack</id>
-#       <repositories>
-#         <repository><id>jitpack.io</id><url>https://jitpack.io</url></repository>
-#       </repositories>
-#       <pluginRepositories>
-#         <pluginRepository><id>jitpack.io</id><url>https://jitpack.io</url></pluginRepository>
-#       </pluginRepositories>
-#     </profile>
-#   </profiles>
-#   <activeProfiles><activeProfile>jitpack</activeProfile></activeProfiles>
-# </settings>
+### Option A — add Gargantua to an existing project (Maven Central)
 
+This is the recommended path. No `settings.xml` changes, no extra `<repository>` block: Maven Central is queried by default.
+
+```xml
+<dependency>
+  <groupId>io.github.giskardb</groupId>
+  <artifactId>agent-engine</artifactId>
+  <version>1.2.19</version>
+</dependency>
+```
+
+### Option B — generate a fresh project from the Maven archetype (JitPack)
+
+The Maven archetype is currently published only on JitPack. The `maven-archetype-plugin` ignores `-DarchetypeRepository` for the archetype itself, so for **this specific command** the JitPack profile must live in `~/.m2/settings.xml`. Create the file if missing:
+
+```xml
+<settings>
+  <profiles>
+    <profile>
+      <id>jitpack</id>
+      <repositories>
+        <repository><id>jitpack.io</id><url>https://jitpack.io</url></repository>
+      </repositories>
+      <pluginRepositories>
+        <pluginRepository><id>jitpack.io</id><url>https://jitpack.io</url></pluginRepository>
+      </pluginRepositories>
+    </profile>
+  </profiles>
+  <activeProfiles><activeProfile>jitpack</activeProfile></activeProfiles>
+</settings>
+```
+
+> Only the archetype command needs this. Once your project is generated it pulls the framework jars from Maven Central — no `settings.xml` needed at runtime.
+
+```bash
 # 1. Generate a new agent project
 mvn archetype:generate \
   -DarchetypeGroupId=com.github.giskardb.gargantua \
   -DarchetypeArtifactId=agent-archetype \
-  -DarchetypeVersion=v1.2.8 \
+  -DarchetypeVersion=v1.2.19 \
   -DgroupId=com.mycompany -DartifactId=my-agent \
   -Dversion=1.0.0 -DagentName=MyAgent -DinteractiveMode=false
 

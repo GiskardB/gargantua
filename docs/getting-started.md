@@ -19,9 +19,11 @@ This guide walks you through installing, running, and customizing your first age
 
 > No Docker, no MongoDB, no Redis — everything runs in-memory.
 
-### 1. Tell Maven where to find JitPack
+### 1. Tell Maven where to find JitPack (archetype generation only)
 
-The `maven-archetype-plugin` ignores `-DarchetypeRepository`, so the JitPack repository must live in `~/.m2/settings.xml`. Append this profile (create the file if missing):
+> **You only need this step if you generate a project from the Maven archetype** (Section 2 below). If you're adding Gargantua as a dependency in an existing `pom.xml`, **skip straight to Section 2's "Maven Central" block** — Central is queried by default and no `settings.xml` edit is required.
+
+The Maven archetype is currently published on JitPack. The `maven-archetype-plugin` ignores `-DarchetypeRepository` for the archetype itself, so the JitPack repository must live in `~/.m2/settings.xml`. Append this profile (create the file if missing):
 
 ```xml
 <settings>
@@ -40,13 +42,15 @@ The `maven-archetype-plugin` ignores `-DarchetypeRepository`, so the JitPack rep
 </settings>
 ```
 
+Once your project exists, the framework dependencies are resolved from Maven Central — no `settings.xml` is needed at runtime.
+
 ### 2. Generate a new agent project
 
 ```bash
 mvn archetype:generate \
   -DarchetypeGroupId=com.github.giskardb.gargantua \
   -DarchetypeArtifactId=agent-archetype \
-  -DarchetypeVersion=v1.2.18 \
+  -DarchetypeVersion=v1.2.19 \
   -DgroupId=com.mycompany -DartifactId=my-agent \
   -Dversion=1.0.0 -DagentName=MyAgent -DinteractiveMode=false
 ```
