@@ -419,23 +419,6 @@ agent:
 
 ## RAG / Vector Store
 
-> ⚠️ **Work in progress — retrieval engine is keyword-based, not embedding-based.**
-> As of v1.2.10 the framework ships **one** `VectorStorePort` implementation —
-> `InMemoryVectorStore` — and it uses **Jaccard similarity over lowercased word
-> tokens**, not vector embeddings. There is no shipped adapter for pgvector,
-> Qdrant, Milvus, Pinecone or any other production vector DB yet, and no built-in
-> embedding model is invoked on RAG ingestion or query (the ONNX
-> `all-MiniLM-L6-v2` model wired into the framework is used only for *skill
-> routing*, not for RAG retrieval).
->
-> What the wiring *does* pin today: `SKILL.md metadata.knowledge-base` →
-> `RagConfig` → `VectorStorePort.search(...)` → `RagEnricher` injects a
-> `RELEVANT_DOCUMENTS` section into the system prompt with `maxResults` /
-> `minScore` honoured. That contract is stable. For production use, implement
-> your own `VectorStorePort` against a real vector DB + embedding model as
-> shown below — your bean wins via `@ConditionalOnMissingBean`. A first-party
-> embedding port and pgvector / Qdrant adapter are on the roadmap.
-
 Skills can declare a knowledge base to enable retrieval-augmented generation. When a skill has `metadata.knowledge-base` set, the `RagEnricher` automatically queries the vector store and injects the most relevant documents into the system prompt. If a skill has no `knowledge-base`, there is zero overhead.
 
 ### Declare a knowledge base in SKILL.md
@@ -455,29 +438,84 @@ metadata:
 ---
 ```
 
-### Implement a custom VectorStorePort
+### EmbeddingPort + the in-memory vector store (v1.2.18+)
 
-The framework provides `InMemoryVectorStore` (keyword-based, demo/embedded only — see the WIP note at the top of this section). For production, implement `VectorStorePort` with your preferred vector database **and** an embedding model — the snippet below is illustrative; classes like `PineconeVectorStore` are not shipped by the framework, you write them:
+The framework now ships **two** RAG-related ports:
+
+| Port                    | Default impl                                 | Purpose                                                                                        |
+|-------------------------|----------------------------------------------|------------------------------------------------------------------------------------------------|
+| `EmbeddingPort`         | `LangChain4jEmbeddingAdapter` over the in-process ONNX `all-MiniLM-L6-v2-quantized` model | Text → 384-dim vector. Auto-registered by `RagAutoConfiguration` so embedded apps get real embeddings out of the box. |
+| `VectorStorePort`       | `EmbeddingInMemoryVectorStore` (cosine similarity) | Stores chunks + searches by embedding. Replaces the legacy keyword-based `InMemoryVectorStore` as the embedded-mode default. The keyword store is still available for tests that intentionally exclude the embedding model. |
+
+> The default setup is good enough for development, tests, demos and
+> single-node deployments with up to a few thousand chunks. For
+> production-grade scale + persistence, implement your own
+> `VectorStorePort` against a real vector DB (pgvector, Qdrant, Milvus,
+> Pinecone, …) — see below.
+
+### Swap the embedding model
+
+Override the default `EmbeddingPort` to use a production-grade model
+(OpenAI `text-embedding-3-large`, Cohere, Vertex AI, an Azure deployment,
+…). The framework ships a generic LangChain4j adapter so most providers
+need zero custom code:
 
 ```java
+import ai.gargantua.core.rag.EmbeddingPort;
+import ai.gargantua.autoconfigure.LangChain4jEmbeddingAdapter;
+import dev.langchain4j.model.openai.OpenAiEmbeddingModel;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class EmbeddingConfig {
+
+    @Bean
+    public EmbeddingPort openAiEmbeddingPort() {
+        return new LangChain4jEmbeddingAdapter(
+                OpenAiEmbeddingModel.builder()
+                        .apiKey(System.getenv("OPENAI_API_KEY"))
+                        .modelName("text-embedding-3-small")
+                        .build());
+    }
+}
+```
+
+The new bean wins over the framework's default via `@ConditionalOnMissingBean`.
+The in-memory vector store will pick it up automatically and re-embed
+chunks at the new dimension.
+
+### Implement a custom VectorStorePort (production)
+
+For a real vector database, implement `VectorStorePort` and register
+it as a bean. Take the `EmbeddingPort` as a constructor dependency so
+your adapter stays swappable across embedding providers:
+
+```java
+import ai.gargantua.core.rag.EmbeddingPort;
+import ai.gargantua.core.rag.RetrievedChunk;
 import ai.gargantua.core.rag.VectorStorePort;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import java.util.List;
 
 @Configuration
 public class VectorStoreConfig {
 
     @Bean
-    public VectorStorePort vectorStore() {
-        // Your implementation — typically: embed the query, kNN-search the
-        // vector DB, return RetrievedChunk(content, source, score).
-        return new MyPineconeVectorStore(pineconeClient, embeddingModel);
-        // The framework's InMemoryVectorStore will NOT be registered.
+    public VectorStorePort vectorStore(EmbeddingPort embeddingPort) {
+        // Your implementation: embed the query with `embeddingPort`,
+        // run a kNN search against your DB, return RetrievedChunk records.
+        return new MyPgVectorStore(jdbcTemplate, embeddingPort);
     }
 }
 ```
 
-`VectorStorePort` follows the same `@ConditionalOnMissingBean` pattern as all other adapters.
+`VectorStorePort` follows the same `@ConditionalOnMissingBean` pattern
+as all other adapters — your bean wins, the framework's default is
+not registered. The `agent-example-rag` per-feature example exercises
+the full wiring end-to-end with the in-memory cosine store.
 
 ---
 

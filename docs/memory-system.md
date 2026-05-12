@@ -13,7 +13,7 @@ The four memory layers stack like this:
 | 🔵 **Working memory** | Redis | Per session | 20 messages · 30 min sliding TTL | Every request |
 | 🟣 **Episodic memory** | MongoDB | Per user, cross-session | 5 most-recent summaries · 365 day TTL | Every request |
 | 🟢 **Knowledge memory** | MongoDB | Per user, permanent | Segment-based (key/value), no TTL | Every request |
-| 🟡 **Vector store (RAG)** | `VectorStorePort` (default: in-memory keyword, see [WIP note](extending.md#rag--vector-store)) | Per skill | Activated only when the skill's `metadata.knowledge-base` is set | Only when the active skill declares a knowledge base |
+| 🟡 **Vector store (RAG)** | `VectorStorePort` (default: in-memory `EmbeddingInMemoryVectorStore` with real cosine similarity over MiniLM embeddings, v1.2.18+) | Per skill | Activated only when the skill's `metadata.knowledge-base` is set | Only when the active skill declares a knowledge base |
 
 ```mermaid
 flowchart TB
