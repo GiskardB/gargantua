@@ -26,6 +26,9 @@ import ai.gargantua.core.orchestrator.OrchestratorEngine;
 import ai.gargantua.core.orchestrator.TokenBudgetManager;
 import ai.gargantua.core.skill.SkillRegistry;
 import ai.gargantua.memory.composer.MemoryComposer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -66,6 +69,8 @@ import java.util.List;
         AgentKitExceptionHandler.class
 })
 public class WebAutoConfiguration {
+
+    private static final Logger log = LoggerFactory.getLogger(WebAutoConfiguration.class);
 
     // ── Core controllers (always available) ─────────────────────
 
@@ -130,20 +135,28 @@ public class WebAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean(CapabilitiesController.class)
-    @ConditionalOnBean(AgentCardService.class)
     public CapabilitiesController capabilitiesController(
-            AgentCardService agentCardService,
+            ObjectProvider<AgentCardService> agentCardServiceProvider,
             @Nullable OrchestratorEngine orchestratorEngine) {
-        return new CapabilitiesController(agentCardService, orchestratorEngine);
+        AgentCardService cardService = agentCardServiceProvider.getIfAvailable();
+        if (cardService == null) {
+            log.debug("Skipping CapabilitiesController — no AgentCardService bean wired.");
+            return null; // RequestMappingHandlerMapping ignores NullBean controllers
+        }
+        return new CapabilitiesController(cardService, orchestratorEngine);
     }
 
     // ── HITL ────────────────────────────────────────────────────
 
     @Bean
     @ConditionalOnMissingBean(ApprovalController.class)
-    @ConditionalOnBean(ApprovalStore.class)
-    public ApprovalController approvalController(ApprovalStore approvalStore) {
-        return new ApprovalController(approvalStore);
+    public ApprovalController approvalController(ObjectProvider<ApprovalStore> approvalStoreProvider) {
+        ApprovalStore store = approvalStoreProvider.getIfAvailable();
+        if (store == null) {
+            log.debug("Skipping ApprovalController — no ApprovalStore bean wired.");
+            return null;
+        }
+        return new ApprovalController(store);
     }
 
     // ── MongoDB-dependent ───────────────────────────────────────
@@ -175,8 +188,12 @@ public class WebAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean(ToolCacheAdminController.class)
-    @ConditionalOnBean(ToolResultCache.class)
-    public ToolCacheAdminController toolCacheAdminController(ToolResultCache cache) {
+    public ToolCacheAdminController toolCacheAdminController(ObjectProvider<ToolResultCache> cacheProvider) {
+        ToolResultCache cache = cacheProvider.getIfAvailable();
+        if (cache == null) {
+            log.debug("Skipping ToolCacheAdminController — no ToolResultCache bean wired.");
+            return null;
+        }
         return new ToolCacheAdminController(cache);
     }
 }

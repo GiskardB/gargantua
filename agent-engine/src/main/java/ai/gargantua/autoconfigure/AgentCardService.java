@@ -8,7 +8,6 @@ import ai.gargantua.core.skill.SkillCard;
 import ai.gargantua.core.skill.SkillMeta;
 import ai.gargantua.core.skill.SkillRegistry;
 import org.springframework.lang.Nullable;
-import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,8 +15,12 @@ import java.util.List;
 /**
  * Builds the A2A {@link AgentCard} from the skill registry and agent configuration.
  * This provides the response for {@code /.well-known/agent.json}.
+ *
+ * <p>Registered via {@link CapabilitiesAutoConfiguration#agentCardService} —
+ * the {@code @Component} annotation was removed in v1.2.14 because it
+ * relied on classpath component-scanning that doesn't reach
+ * {@code ai.gargantua.autoconfigure} from user-app base packages.</p>
  */
-@Component
 public class AgentCardService {
 
     private final AgentProperties properties;
