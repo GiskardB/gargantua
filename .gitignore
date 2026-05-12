@@ -9,3 +9,4 @@ target/
 .classpath
 .env
 .DS_Store
+.claude/
