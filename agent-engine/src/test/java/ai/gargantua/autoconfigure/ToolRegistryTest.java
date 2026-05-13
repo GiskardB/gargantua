@@ -603,5 +603,75 @@ class ToolRegistryTest {
             assertThat(def.approvalShowParameters())
                     .containsExactly("from", "to", "amount");
         }
+
+        @Test
+        @DisplayName("two calls with the same args produce the same deterministic requestId")
+        void deterministicRequestIdForSameArgs() {
+            String args = "{\"from\":\"alice\",\"to\":\"bob\",\"amount\":\"100\",\"note\":\"rent\"}";
+            String first  = toolRegistry.executeTool("transfer", args);
+            String second = toolRegistry.executeTool("transfer", args);
+            assertThat(first).isEqualTo(second);
+        }
+
+        @Test
+        @DisplayName("different args yield different requestIds")
+        void differentArgsDifferentRequestId() {
+            String result1 = toolRegistry.executeTool("transfer",
+                    "{\"from\":\"alice\",\"to\":\"bob\",\"amount\":\"100\",\"note\":\"rent\"}");
+            String result2 = toolRegistry.executeTool("transfer",
+                    "{\"from\":\"alice\",\"to\":\"bob\",\"amount\":\"500\",\"note\":\"rent\"}");
+            assertThat(result1).isNotEqualTo(result2);
+        }
+
+        @Test
+        @DisplayName("after a recorded approve, a retry with same args runs the tool body and consumes the decision")
+        void consumesApproveDecisionAndProceeds() {
+            String argsJson = "{\"from\":\"alice\",\"to\":\"bob\",\"amount\":\"100\",\"note\":\"rent\"}";
+
+            // 1st call → gate produces a pending request and an awaiting_approval payload.
+            String firstResult = toolRegistry.executeTool("transfer", argsJson);
+            assertThat(firstResult).startsWith("{\"status\":\"awaiting_approval\",\"requestId\":\"");
+            assertThat(bean.transferCalls.get()).isZero();
+
+            // Human posts the decision via the REST endpoint — simulate it here.
+            String requestId = firstResult.replaceFirst(".*\"requestId\":\"", "")
+                    .replaceFirst("\".*", "");
+            approvalStore.resolve(requestId,
+                    new ai.gargantua.core.hitl.ApprovalDecision(requestId, "approve", "looks good"));
+
+            // 2nd call — same args, same deterministic id → gate consumes the decision and
+            // falls through to invoke the tool body. The framework returns the JSON-
+            // serialised String, so a return value of `transferred:100` arrives as
+            // a JSON string literal (i.e. with surrounding double quotes).
+            String secondResult = toolRegistry.executeTool("transfer", argsJson);
+            assertThat(secondResult).contains("transferred:100");
+            assertThat(bean.transferCalls.get()).isEqualTo(1);
+
+            // Decision must have been consumed — a 3rd call generates a fresh pending request.
+            String thirdResult = toolRegistry.executeTool("transfer", argsJson);
+            assertThat(thirdResult).startsWith("{\"status\":\"awaiting_approval\",\"requestId\":\"");
+            assertThat(bean.transferCalls.get())
+                    .as("the tool body must NOT have run again after the approval was consumed")
+                    .isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("after a recorded deny, a retry returns a refusal and never invokes the body")
+        void consumesDenyDecisionAndRefuses() {
+            String argsJson = "{\"from\":\"alice\",\"to\":\"bob\",\"amount\":\"100\",\"note\":\"rent\"}";
+
+            String firstResult = toolRegistry.executeTool("transfer", argsJson);
+            String requestId = firstResult.replaceFirst(".*\"requestId\":\"", "")
+                    .replaceFirst("\".*", "");
+            approvalStore.resolve(requestId,
+                    new ai.gargantua.core.hitl.ApprovalDecision(requestId, "deny", "no thanks"));
+
+            String secondResult = toolRegistry.executeTool("transfer", argsJson);
+            assertThat(secondResult)
+                    .startsWith("{\"error\":")
+                    .contains("denied by the human reviewer")
+                    .contains("no thanks");
+            assertThat(bean.transferCalls.get()).isZero();
+        }
     }
 }

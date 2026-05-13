@@ -189,6 +189,42 @@ class InMemoryApprovalStoreTest {
         assertThat(store.getPending("req-2")).isPresent();
     }
 
+    // ── getDecision / clearDecision (1.2.20 resume-after-approve) ───────────
+
+    @Test
+    @DisplayName("getDecision returns the recorded decision after resolve")
+    void getDecision_afterResolve_returnsDecision() {
+        ApprovalRequest request = createRequest("req-1", Instant.now().plusSeconds(300));
+        store.savePending("req-1", request, Duration.ofMinutes(5));
+        store.resolve("req-1", new ApprovalDecision("req-1", "approve", "ok"));
+
+        Optional<ApprovalDecision> got = store.getDecision("req-1");
+        assertThat(got).isPresent();
+        assertThat(got.get().decision()).isEqualTo("approve");
+        assertThat(got.get().reason()).isEqualTo("ok");
+    }
+
+    @Test
+    @DisplayName("getDecision returns empty for an unresolved request")
+    void getDecision_unresolved_returnsEmpty() {
+        store.savePending("req-1", createRequest("req-1", Instant.now().plusSeconds(300)),
+                Duration.ofMinutes(5));
+        assertThat(store.getDecision("req-1")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("clearDecision removes the recorded decision so the next gate firing starts fresh")
+    void clearDecision_makesItDisappear() {
+        store.savePending("req-1", createRequest("req-1", Instant.now().plusSeconds(300)),
+                Duration.ofMinutes(5));
+        store.resolve("req-1", new ApprovalDecision("req-1", "approve", null));
+        assertThat(store.getDecision("req-1")).isPresent();
+
+        store.clearDecision("req-1");
+
+        assertThat(store.getDecision("req-1")).isEmpty();
+    }
+
     // ── Helpers ──────────────────────────────────────────────
 
     private ApprovalRequest createRequest(String requestId, Instant expiresAt) {

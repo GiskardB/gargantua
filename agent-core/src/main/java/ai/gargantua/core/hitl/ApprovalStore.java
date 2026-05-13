@@ -26,4 +26,28 @@ public interface ApprovalStore {
 
     /** Checks whether the request's TTL has elapsed. */
     boolean isExpired(String requestId);
+
+    /**
+     * Returns the recorded decision for a request, if any. Used by the
+     * framework to detect that a tool gated by {@code @RequiresApproval}
+     * has already been approved and may now execute.
+     *
+     * <p>Default returns {@link Optional#empty()} so custom adapters
+     * predating v1.2.20 keep working — they simply won't support the
+     * resume-after-approve path.</p>
+     */
+    default Optional<ApprovalDecision> getDecision(String requestId) {
+        return Optional.empty();
+    }
+
+    /**
+     * Removes a previously-recorded decision so the same approval can
+     * not be replayed by a subsequent invocation. Called by the
+     * framework immediately after re-executing an approved tool.
+     *
+     * <p>Default is a no-op for backward compatibility.</p>
+     */
+    default void clearDecision(String requestId) {
+        // no-op for legacy stores
+    }
 }

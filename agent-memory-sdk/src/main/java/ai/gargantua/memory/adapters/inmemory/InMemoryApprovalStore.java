@@ -68,4 +68,14 @@ public class InMemoryApprovalStore implements ApprovalStore {
         }
         return Instant.now().isAfter(req.expiresAt());
     }
+
+    @Override
+    public Optional<ApprovalDecision> getDecision(String requestId) {
+        return Optional.ofNullable(resolved.get(requestId));
+    }
+
+    @Override
+    public void clearDecision(String requestId) {
+        resolved.remove(requestId);
+    }
 }

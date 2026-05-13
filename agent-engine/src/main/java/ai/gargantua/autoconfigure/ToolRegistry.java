@@ -1,5 +1,6 @@
 package ai.gargantua.autoconfigure;
 
+import ai.gargantua.core.hitl.ApprovalDecision;
 import ai.gargantua.core.hitl.ApprovalRequest;
 import ai.gargantua.core.hitl.ApprovalStore;
 import ai.gargantua.core.security.RequiresRole;
@@ -27,6 +28,7 @@ import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
@@ -34,7 +36,9 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
@@ -253,12 +257,19 @@ public class ToolRegistry {
 
         // 2. HITL gate via cached @RequiresApproval. Runs BEFORE the cache so an
         //    approved tool can't be served by a stale cached result that
-        //    bypassed approval. The tool body is NOT invoked here — we persist
-        //    a pending request (if an ApprovalStore is wired) and return
-        //    {"status":"awaiting_approval","requestId":"..."} for the LLM.
+        //    bypassed approval. The gate returns:
+        //      - Optional.empty()  → no pending decision matches: invocation
+        //                            short-circuited with awaiting_approval,
+        //                            or a stored deny was consumed into a refusal.
+        //      - Optional.present  → response JSON to return immediately.
+        //    When the gate finds a previously-stored "approve" decision for an
+        //    identical (tool, args, userId) tuple it consumes it (removes from
+        //    store) and returns Optional.empty() — falling through to the
+        //    normal cache/retry/invoke pipeline below so the tool body runs.
         RequiresApproval approvalAnn = invocation.requiresApproval();
         if (approvalAnn != null) {
-            return handleApprovalRequired(toolName, args, approvalAnn, ctx);
+            Optional<String> gated = tryConsumeApprovalGate(toolName, args, approvalAnn, ctx);
+            if (gated.isPresent()) return gated.get();
         }
 
         // 3. Cacheable read-through (cached @CacheableToolResult)
@@ -311,25 +322,55 @@ public class ToolRegistry {
     }
 
     /**
-     * Generate a UUID, persist a pending {@link ApprovalRequest} (if an
-     * {@link ApprovalStore} is available) and return the
-     * {@code {"status":"awaiting_approval","requestId":"..."}} JSON the LLM
-     * surfaces to the caller. Applied uniformly to every chat path that goes
-     * through {@link #executeTool} — the streaming controller, the
-     * non-streaming orchestrator, and any direct invocation.
+     * Three-way gate for {@link RequiresApproval}-annotated tools.
+     *
+     * <ul>
+     *   <li>If the store already holds an {@code approve} decision for the
+     *       (toolName, args, userId) triple, consume it (so the same
+     *       approval can't be replayed) and return {@link Optional#empty()} —
+     *       the caller falls through to the normal invoke pipeline.</li>
+     *   <li>If the store holds a non-{@code approve} decision (deny / any
+     *       other value), consume it and return a refusal JSON.</li>
+     *   <li>Otherwise create a pending request keyed by the same triple and
+     *       return {@code awaiting_approval} JSON.</li>
+     * </ul>
+     *
+     * <p>The {@code requestId} is a deterministic UUIDv3 derived from
+     * {@code (toolName | userId | sorted-args-json)} so the LLM's retry
+     * after the human posts {@code POST /api/agent/approval/{id}} hits the
+     * same key and unblocks the tool body. Applied uniformly to every chat
+     * path that goes through {@link #executeTool}.</p>
      */
-    private String handleApprovalRequired(String toolName, Map<String, String> args,
-                                          RequiresApproval ann, ToolExecutionContext ctx) {
-        String requestId = UUID.randomUUID().toString();
+    private Optional<String> tryConsumeApprovalGate(String toolName, Map<String, String> args,
+                                                    RequiresApproval ann, ToolExecutionContext ctx) {
+        String userId = ctx.securityContext() != null ? ctx.securityContext().userId() : "anonymous";
+        String requestId = deterministicRequestId(toolName, args, userId);
         ApprovalStore store = approvalStoreProvider.getIfAvailable();
+
         if (store != null) {
+            Optional<ApprovalDecision> existing = store.getDecision(requestId);
+            if (existing.isPresent()) {
+                String decision = existing.get().decision();
+                store.clearDecision(requestId);
+                if (isApprove(decision)) {
+                    log.info("[ToolRegistry] Consuming prior approval for {} (requestId={}) — proceeding",
+                            toolName, requestId);
+                    return Optional.empty();
+                }
+                log.info("[ToolRegistry] Consuming prior denial for {} (requestId={}) — refusing",
+                        toolName, requestId);
+                return Optional.of(errorJson("Tool '" + toolName + "' was denied by the human reviewer"
+                        + (existing.get().reason() != null && !existing.get().reason().isBlank()
+                            ? ": " + existing.get().reason() : ".")));
+            }
+
             try {
                 int ttl = hitlTtlMinutes();
                 Map<String, Object> parameters = filterShowParameters(args, ann.showParameters());
                 ApprovalRequest req = new ApprovalRequest(
                         requestId,
                         ctx.sessionId(),
-                        ctx.securityContext() != null ? ctx.securityContext().userId() : "anonymous",
+                        userId,
                         toolName,
                         parameters,
                         ann.message(),
@@ -345,7 +386,31 @@ public class ToolRegistry {
             log.warn("[ToolRegistry] @RequiresApproval on tool '{}' but no ApprovalStore configured — "
                     + "request {} cannot be resolved", toolName, requestId);
         }
-        return "{\"status\":\"awaiting_approval\",\"requestId\":\"" + requestId + "\"}";
+        return Optional.of("{\"status\":\"awaiting_approval\",\"requestId\":\"" + requestId + "\"}");
+    }
+
+    private static boolean isApprove(String raw) {
+        if (raw == null) return false;
+        String s = raw.trim();
+        return s.equalsIgnoreCase("approve") || s.equalsIgnoreCase("approved");
+    }
+
+    /**
+     * Build a stable UUIDv3 from {@code (toolName | userId | canonical-args-json)}.
+     * Identical inputs across two calls produce identical ids — that is what lets
+     * the gate recognise an LLM retry after the human resolved the approval.
+     */
+    private String deterministicRequestId(String toolName, Map<String, String> args, String userId) {
+        try {
+            TreeMap<String, String> sorted = new TreeMap<>(args == null ? Map.of() : args);
+            String json = objectMapper.writeValueAsString(sorted);
+            String seed = toolName + "|" + userId + "|" + json;
+            return UUID.nameUUIDFromBytes(seed.getBytes(StandardCharsets.UTF_8)).toString();
+        } catch (Exception e) {
+            // Fallback to a random id — gate still works for the first call, just
+            // forfeits the resume-after-approve path for this one.
+            return UUID.randomUUID().toString();
+        }
     }
 
     /**
