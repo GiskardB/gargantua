@@ -29,7 +29,7 @@ public class InMemoryAuditStore implements AuditStore {
     public List<AuditEvent> findByUser(String userId, Instant from, Instant to, int limit) {
         return events.stream()
                 .filter(e -> userId.equals(e.userId()))
-                .filter(e -> !e.timestamp().isBefore(from) && !e.timestamp().isAfter(to))
+                .filter(e -> inRange(e, from, to))
                 .sorted(Comparator.comparing(AuditEvent::timestamp).reversed())
                 .limit(limit)
                 .toList();
@@ -39,7 +39,7 @@ public class InMemoryAuditStore implements AuditStore {
     public List<AuditEvent> findByTenant(String tenantId, Instant from, Instant to, int limit) {
         return events.stream()
                 .filter(e -> tenantId.equals(e.tenantId()))
-                .filter(e -> !e.timestamp().isBefore(from) && !e.timestamp().isAfter(to))
+                .filter(e -> inRange(e, from, to))
                 .sorted(Comparator.comparing(AuditEvent::timestamp).reversed())
                 .limit(limit)
                 .toList();
@@ -63,7 +63,12 @@ public class InMemoryAuditStore implements AuditStore {
     @Override
     public long countByTimeRange(Instant from, Instant to) {
         return events.stream()
-                .filter(e -> !e.timestamp().isBefore(from) && !e.timestamp().isAfter(to))
+                .filter(e -> inRange(e, from, to))
                 .count();
+    }
+
+    /** Inclusive [from, to] timestamp range check shared by the query methods. */
+    private static boolean inRange(AuditEvent e, Instant from, Instant to) {
+        return !e.timestamp().isBefore(from) && !e.timestamp().isAfter(to);
     }
 }

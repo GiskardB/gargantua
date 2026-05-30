@@ -6,11 +6,12 @@ import org.slf4j.LoggerFactory;
 
 import java.time.LocalTime;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -102,9 +103,9 @@ public class RoutingRuleEvaluator {
             List<Object> values = coerceList(map.get("values"));
             return switch (op) {
                 case "EQ" -> value != null && value.toString().equals(actual);
-                case "IN" -> values.stream().map(Object::toString).anyMatch(s -> s.equals(actual));
+                case "IN" -> actual != null && toStringSet(values).contains(actual);
                 case "NOT_IN" -> !values.isEmpty()
-                        && values.stream().map(Object::toString).noneMatch(s -> s.equals(actual));
+                        && (actual == null || !toStringSet(values).contains(actual));
                 default -> {
                     log.warn("Unknown string operator '{}', falling back to EQ", op);
                     yield value != null && value.toString().equals(actual);
@@ -193,12 +194,8 @@ public class RoutingRuleEvaluator {
             case "EQ" -> value.toString().equals(actual);
             case "CONTAINS" -> actual.contains(value.toString());
             case "REGEX" -> {
-                try {
-                    yield Pattern.compile(value.toString()).matcher(actual).matches();
-                } catch (PatternSyntaxException e) {
-                    log.warn("Invalid REGEX in attribute-match: {}", e.getMessage());
-                    yield false;
-                }
+                Pattern pattern = compilePattern(value.toString());
+                yield pattern != null && pattern.matcher(actual).matches();
             }
             default -> {
                 log.warn("Unknown attribute operator '{}', falling back to EQ", op);
@@ -283,8 +280,31 @@ public class RoutingRuleEvaluator {
         catch (NumberFormatException e) { return defaultValue; }
     }
 
-    // Comparator is imported for potential future use by callers that need
-    // to sort condition entries deterministically; not currently used here.
-    @SuppressWarnings("unused")
-    private static final Comparator<Object> NULL_LAST = Comparator.nullsLast(Comparator.comparing(Object::toString));
+    /** Coerce a list of arbitrary values into a {@code Set<String>} (nulls skipped). */
+    private static Set<String> toStringSet(List<Object> values) {
+        var set = new java.util.HashSet<String>(values.size() * 2);
+        for (Object v : values) {
+            if (v != null) set.add(v.toString());
+        }
+        return set;
+    }
+
+    // Compiled-regex cache for attribute-match REGEX operators: routing rules are
+    // evaluated on every request, so re-compiling the same pattern each time is
+    // wasteful. Invalid patterns are not cached — they warn once per evaluation
+    // (a misconfiguration that should be fixed anyway).
+    private static final ConcurrentHashMap<String, Pattern> PATTERN_CACHE = new ConcurrentHashMap<>();
+
+    private static Pattern compilePattern(String regex) {
+        Pattern cached = PATTERN_CACHE.get(regex);
+        if (cached != null) return cached;
+        try {
+            Pattern compiled = Pattern.compile(regex);
+            PATTERN_CACHE.put(regex, compiled);
+            return compiled;
+        } catch (PatternSyntaxException e) {
+            log.warn("Invalid REGEX in attribute-match: {}", e.getMessage());
+            return null;
+        }
+    }
 }

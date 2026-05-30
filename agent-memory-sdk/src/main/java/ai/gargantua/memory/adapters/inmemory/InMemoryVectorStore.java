@@ -85,12 +85,14 @@ public class InMemoryVectorStore implements VectorStorePort {
         if (a.isEmpty() || b.isEmpty()) {
             return 0.0;
         }
-        var intersection = new HashSet<>(a);
-        intersection.retainAll(b);
-
-        var union = new HashSet<>(a);
-        union.addAll(b);
-
-        return (double) intersection.size() / union.size();
+        // Single pass over the smaller set, no temporary set allocations:
+        // union = |a| + |b| - intersection.
+        Set<String> smaller = a.size() <= b.size() ? a : b;
+        Set<String> larger = smaller == a ? b : a;
+        int intersection = 0;
+        for (String token : smaller) {
+            if (larger.contains(token)) intersection++;
+        }
+        return (double) intersection / (a.size() + b.size() - intersection);
     }
 }
