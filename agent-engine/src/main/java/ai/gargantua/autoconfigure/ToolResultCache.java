@@ -3,8 +3,13 @@ package ai.gargantua.autoconfigure;
 import ai.gargantua.core.security.SecurityContext;
 import ai.gargantua.core.tool.CacheScope;
 import ai.gargantua.core.tool.CacheableToolResult;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.Expiry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.redis.core.Cursor;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.lang.Nullable;
 
@@ -17,13 +22,12 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -36,10 +40,12 @@ import java.util.concurrent.TimeUnit;
  *       by {@link ToolCacheAutoConfiguration} when a {@code StringRedisTemplate}
  *       bean is present.</li>
  *   <li><b>In-memory</b> — constructed via {@link #ToolResultCache()}. A
- *       process-local {@link ConcurrentHashMap} with per-entry TTL.
- *       Wired in embedded mode by {@code EmbeddedProfileAutoConfiguration}
- *       so {@code @CacheableToolResult} also works without Redis. Data is
- *       lost when the process restarts and is NOT shared across replicas.</li>
+ *       process-local Caffeine cache with per-entry TTL, active expiry and a
+ *       bounded {@link #MAX_IN_MEMORY_ENTRIES maximum size} (so a high churn of
+ *       distinct keys can never grow the heap without bound). Wired in embedded
+ *       mode by {@code EmbeddedProfileAutoConfiguration} so
+ *       {@code @CacheableToolResult} also works without Redis. Data is lost when
+ *       the process restarts and is NOT shared across replicas.</li>
  * </ul>
  *
  * <p>Cache keys live under the {@code tool-cache:} prefix so the existing
@@ -55,8 +61,11 @@ public class ToolResultCache {
     private static final Logger log = LoggerFactory.getLogger(ToolResultCache.class);
     private static final String KEY_PREFIX = "tool-cache:";
 
+    /** Upper bound on entries held by the in-memory backend (LRU-evicted by Caffeine). */
+    static final long MAX_IN_MEMORY_ENTRIES = 10_000;
+
     private final @Nullable StringRedisTemplate redis;
-    private final @Nullable ConcurrentMap<String, Entry> inMemory;
+    private final @Nullable Cache<String, Entry> inMemory;
 
     /** Redis-backed constructor (production default when Redis is available). */
     public ToolResultCache(StringRedisTemplate redis) {
@@ -65,18 +74,30 @@ public class ToolResultCache {
     }
 
     /**
-     * In-memory constructor — process-local cache with per-entry TTL.
-     * Used in embedded mode and tests. Data does not survive restart.
+     * In-memory constructor — process-local Caffeine cache with per-entry TTL,
+     * active expiry and a bounded size. Used in embedded mode and tests.
+     * Data does not survive restart.
      */
     public ToolResultCache() {
         this.redis = null;
-        this.inMemory = new ConcurrentHashMap<>();
+        this.inMemory = Caffeine.newBuilder()
+                .maximumSize(MAX_IN_MEMORY_ENTRIES)
+                .expireAfter(new Expiry<String, Entry>() {
+                    @Override public long expireAfterCreate(String key, Entry e, long now) {
+                        return e.ttlNanos();
+                    }
+                    @Override public long expireAfterUpdate(String key, Entry e, long now, long currentDuration) {
+                        return e.ttlNanos();
+                    }
+                    @Override public long expireAfterRead(String key, Entry e, long now, long currentDuration) {
+                        return currentDuration; // reads do not extend the TTL
+                    }
+                })
+                .build();
     }
 
-    /** Backing entry for the in-memory backend. */
-    private record Entry(String value, long expiresAtNanos) {
-        boolean isExpired() { return System.nanoTime() > expiresAtNanos; }
-    }
+    /** Backing entry for the in-memory backend (carries its own TTL for variable expiry). */
+    private record Entry(String value, long ttlNanos) {}
 
     /**
      * Build the cache key for a specific tool invocation, or return {@code null}
@@ -115,15 +136,8 @@ public class ToolResultCache {
                 return null;
             }
         }
-        Entry e = inMemory.get(key);
-        if (e == null) {
-            return null;
-        }
-        if (e.isExpired()) {
-            inMemory.remove(key, e);
-            return null;
-        }
-        return e.value();
+        Entry e = inMemory.getIfPresent(key);
+        return e == null ? null : e.value();
     }
 
     public void put(String key, String value, int ttlSeconds) {
@@ -136,8 +150,7 @@ public class ToolResultCache {
             }
             return;
         }
-        long expiresAt = System.nanoTime() + TimeUnit.SECONDS.toNanos(ttl);
-        inMemory.put(key, new Entry(value, expiresAt));
+        inMemory.put(key, new Entry(value, TimeUnit.SECONDS.toNanos(ttl)));
     }
 
     private String hashArgs(Method method, Map<String, String> args, String[] keyParams) {
@@ -187,29 +200,36 @@ public class ToolResultCache {
     /** Total number of entries currently held (in-memory) or visible (Redis). */
     public int size() {
         if (redis != null) {
-            try {
-                Set<String> keys = redis.keys(KEY_PREFIX + "*");
-                return keys == null ? 0 : keys.size();
-            } catch (Exception e) {
-                log.warn("[ToolCache] Redis KEYS failed: {}", e.getMessage());
-                return 0;
-            }
+            return scanKeys().size();
         }
-        return inMemory.size();
+        return inMemory.asMap().size();
     }
 
     /** All cache keys held by this instance (always under the {@code tool-cache:} prefix). */
     public Collection<String> keys() {
         if (redis != null) {
-            try {
-                Set<String> keys = redis.keys(KEY_PREFIX + "*");
-                return keys == null ? List.of() : Collections.unmodifiableSet(keys);
-            } catch (Exception e) {
-                log.warn("[ToolCache] Redis KEYS failed: {}", e.getMessage());
-                return List.of();
-            }
+            return Collections.unmodifiableSet(scanKeys());
         }
-        return List.copyOf(inMemory.keySet());
+        return List.copyOf(inMemory.asMap().keySet());
+    }
+
+    /**
+     * Enumerate every {@code tool-cache:*} key using a non-blocking {@code SCAN}
+     * cursor. Unlike {@code KEYS}, {@code SCAN} does not stall the Redis event
+     * loop on large keyspaces, so the admin endpoints stay safe in production.
+     * Returns an empty set on any Redis error.
+     */
+    private Set<String> scanKeys() {
+        Set<String> keys = new HashSet<>();
+        ScanOptions options = ScanOptions.scanOptions().match(KEY_PREFIX + "*").count(500).build();
+        try (Cursor<String> cursor = redis.scan(options)) {
+            while (cursor.hasNext()) {
+                keys.add(cursor.next());
+            }
+        } catch (Exception e) {
+            log.warn("[ToolCache] Redis SCAN failed: {}", e.getMessage());
+        }
+        return keys;
     }
 
     /** All cache keys for a specific tool name. */
@@ -228,8 +248,8 @@ public class ToolResultCache {
     public int clear() {
         if (redis != null) {
             try {
-                Set<String> keys = redis.keys(KEY_PREFIX + "*");
-                if (keys == null || keys.isEmpty()) return 0;
+                Set<String> keys = scanKeys();
+                if (keys.isEmpty()) return 0;
                 Long deleted = redis.delete(keys);
                 return deleted == null ? 0 : deleted.intValue();
             } catch (Exception e) {
@@ -237,8 +257,9 @@ public class ToolResultCache {
                 return 0;
             }
         }
-        int removed = inMemory.size();
-        inMemory.clear();
+        var map = inMemory.asMap();
+        int removed = map.size();
+        inMemory.invalidateAll();
         return removed;
     }
 
@@ -256,9 +277,10 @@ public class ToolResultCache {
                 return 0;
             }
         }
-        int before = inMemory.size();
-        inMemory.keySet().removeIf(k -> isKeyForTool(k, toolName));
-        return before - inMemory.size();
+        var map = inMemory.asMap();
+        int before = map.size();
+        map.keySet().removeIf(k -> isKeyForTool(k, toolName));
+        return before - map.size();
     }
 
     /**
