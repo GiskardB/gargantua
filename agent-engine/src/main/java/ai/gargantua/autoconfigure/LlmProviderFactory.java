@@ -408,23 +408,11 @@ public class LlmProviderFactory {
     @Nullable
     private ChatModel lookupChatModelBean(String alias, String provider) {
         if (applicationContext == null) return null;
-        if (alias != null && !alias.isBlank() && applicationContext.containsBean(alias)) {
-            try {
-                Object bean = applicationContext.getBean(alias);
-                if (bean instanceof ChatModel cm) return cm;
-            } catch (Exception ignored) {
-                // bean exists with that name but is a different type — fall through to provider lookup
-            }
-        }
-        if (provider != null && !provider.isBlank()
-                && !"openai".equals(provider) && !"anthropic".equals(provider)
-                && applicationContext.containsBean(provider)) {
-            try {
-                Object bean = applicationContext.getBean(provider);
-                if (bean instanceof ChatModel cm) return cm;
-            } catch (Exception ignored) {
-                // not the type we want
-            }
+        // alias bean wins over a provider-named bean
+        ChatModel byAlias = lookupBean(alias, ChatModel.class);
+        if (byAlias != null) return byAlias;
+        if (isCustomProvider(provider)) {
+            return lookupBean(provider, ChatModel.class);
         }
         return null;
     }
@@ -458,24 +446,41 @@ public class LlmProviderFactory {
     @Nullable
     private StreamingChatModel lookupStreamingChatModelBean(String alias, String provider) {
         if (applicationContext == null) return null;
-        if (alias != null && !alias.isBlank()) {
-            String streamingBeanName = alias + "Streaming";
-            if (applicationContext.containsBean(streamingBeanName)) {
-                try {
-                    Object bean = applicationContext.getBean(streamingBeanName);
-                    if (bean instanceof StreamingChatModel scm) return scm;
-                } catch (Exception ignored) {}
-            }
+        // streaming beans are registered under the "<name>Streaming" convention
+        StreamingChatModel byAlias = lookupBean(streamingBeanName(alias), StreamingChatModel.class);
+        if (byAlias != null) return byAlias;
+        if (isCustomProvider(provider)) {
+            return lookupBean(streamingBeanName(provider), StreamingChatModel.class);
         }
-        if (provider != null && !provider.isBlank()
-                && !"openai".equals(provider) && !"anthropic".equals(provider)) {
-            String streamingBeanName = provider + "Streaming";
-            if (applicationContext.containsBean(streamingBeanName)) {
-                try {
-                    Object bean = applicationContext.getBean(streamingBeanName);
-                    if (bean instanceof StreamingChatModel scm) return scm;
-                } catch (Exception ignored) {}
-            }
+        return null;
+    }
+
+    /** {@code true} for providers that may have a user-registered bean (i.e. not the built-in ones). */
+    private static boolean isCustomProvider(String provider) {
+        return provider != null && !provider.isBlank()
+                && !"openai".equals(provider) && !"anthropic".equals(provider);
+    }
+
+    @Nullable
+    private static String streamingBeanName(String name) {
+        return (name != null && !name.isBlank()) ? name + "Streaming" : null;
+    }
+
+    /**
+     * Look up a bean by name and return it only if it is assignable to {@code type}.
+     * {@code null} when the name is blank, no such bean exists, or it has a
+     * different type (a name clash with an unrelated bean falls through silently).
+     */
+    @Nullable
+    private <T> T lookupBean(@Nullable String name, Class<T> type) {
+        if (name == null || name.isBlank() || !applicationContext.containsBean(name)) {
+            return null;
+        }
+        try {
+            Object bean = applicationContext.getBean(name);
+            if (type.isInstance(bean)) return type.cast(bean);
+        } catch (Exception ignored) {
+            // bean exists under that name but isn't the type we want — ignore
         }
         return null;
     }
