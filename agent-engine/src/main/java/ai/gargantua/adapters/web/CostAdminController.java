@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -37,24 +38,24 @@ public class CostAdminController {
     @GetMapping("/summary")
     @Operation(summary = "Get cost summary", description = "Returns aggregated cost summary by skill and provider.")
     @ApiResponse(responseCode = "200", description = "Cost summary")
-    public ResponseEntity<List<Map>> getSummary(
+    public ResponseEntity<List<Map<String, Object>>> getSummary(
             @Parameter(description = "Start date (ISO-8601)")
             @RequestParam(required = false) String from,
             @Parameter(description = "End date (ISO-8601)")
             @RequestParam(required = false) String to) {
-        Instant fromInstant = from != null ? Instant.parse(from) : Instant.now().minus(30, ChronoUnit.DAYS);
-        Instant toInstant = to != null ? Instant.parse(to) : Instant.now();
+        Instant fromInstant = parseFrom(from);
+        Instant toInstant = parseTo(to);
         return ResponseEntity.ok(costRepository.findSummary(fromInstant, toInstant));
     }
 
     @GetMapping("/by-skill")
     @Operation(summary = "Get costs by skill", description = "Returns cost breakdown aggregated by skill.")
     @ApiResponse(responseCode = "200", description = "Costs by skill")
-    public ResponseEntity<List<Map>> getBySkill(
+    public ResponseEntity<List<Map<String, Object>>> getBySkill(
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to) {
-        Instant fromInstant = from != null ? Instant.parse(from) : Instant.now().minus(30, ChronoUnit.DAYS);
-        Instant toInstant = to != null ? Instant.parse(to) : Instant.now();
+        Instant fromInstant = parseFrom(from);
+        Instant toInstant = parseTo(to);
         return ResponseEntity.ok(costRepository.findBySkill(fromInstant, toInstant));
     }
 
@@ -65,19 +66,19 @@ public class CostAdminController {
             @PathVariable String userId,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to) {
-        Instant fromInstant = from != null ? Instant.parse(from) : Instant.now().minus(30, ChronoUnit.DAYS);
-        Instant toInstant = to != null ? Instant.parse(to) : Instant.now();
+        Instant fromInstant = parseFrom(from);
+        Instant toInstant = parseTo(to);
         return ResponseEntity.ok(costRepository.findByUser(userId, fromInstant, toInstant));
     }
 
     @GetMapping("/by-provider")
     @Operation(summary = "Get costs by provider", description = "Returns cost breakdown aggregated by provider.")
     @ApiResponse(responseCode = "200", description = "Costs by provider")
-    public ResponseEntity<List<Map>> getByProvider(
+    public ResponseEntity<List<Map<String, Object>>> getByProvider(
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to) {
-        Instant fromInstant = from != null ? Instant.parse(from) : Instant.now().minus(30, ChronoUnit.DAYS);
-        Instant toInstant = to != null ? Instant.parse(to) : Instant.now();
+        Instant fromInstant = parseFrom(from);
+        Instant toInstant = parseTo(to);
         // Reuse summary which groups by skill+provider
         return ResponseEntity.ok(costRepository.findSummary(fromInstant, toInstant));
     }
@@ -85,11 +86,29 @@ public class CostAdminController {
     @GetMapping("/daily")
     @Operation(summary = "Get daily costs", description = "Returns cost breakdown aggregated by day.")
     @ApiResponse(responseCode = "200", description = "Daily costs")
-    public ResponseEntity<List<Map>> getDaily(
+    public ResponseEntity<List<Map<String, Object>>> getDaily(
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to) {
-        Instant fromInstant = from != null ? Instant.parse(from) : Instant.now().minus(30, ChronoUnit.DAYS);
-        Instant toInstant = to != null ? Instant.parse(to) : Instant.now();
+        Instant fromInstant = parseFrom(from);
+        Instant toInstant = parseTo(to);
         return ResponseEntity.ok(costRepository.findDaily(fromInstant, toInstant));
+    }
+
+    private static Instant parseFrom(String value) {
+        if (value == null) return Instant.now().minus(30, ChronoUnit.DAYS);
+        try {
+            return Instant.parse(value);
+        } catch (DateTimeException e) {
+            throw new IllegalArgumentException("Invalid 'from' date (expected ISO-8601): " + value);
+        }
+    }
+
+    private static Instant parseTo(String value) {
+        if (value == null) return Instant.now();
+        try {
+            return Instant.parse(value);
+        } catch (DateTimeException e) {
+            throw new IllegalArgumentException("Invalid 'to' date (expected ISO-8601): " + value);
+        }
     }
 }

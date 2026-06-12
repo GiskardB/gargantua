@@ -32,7 +32,7 @@ public class MongoCostTrackingRepository {
         mongoTemplate.insert(document, COLLECTION);
     }
 
-    public List<Map> findSummary(Instant from, Instant to) {
+    public List<Map<String, Object>> findSummary(Instant from, Instant to) {
         var aggregation = Aggregation.newAggregation(
                 Aggregation.match(Criteria.where("timestamp").gte(from).lte(to)),
                 Aggregation.group("skillName", "provider")
@@ -53,7 +53,7 @@ public class MongoCostTrackingRepository {
         return mongoTemplate.find(query, TokenUsageDocument.class, COLLECTION);
     }
 
-    public List<Map> findBySkill(Instant from, Instant to) {
+    public List<Map<String, Object>> findBySkill(Instant from, Instant to) {
         var aggregation = Aggregation.newAggregation(
                 Aggregation.match(Criteria.where("timestamp").gte(from).lte(to)),
                 Aggregation.group("skillName")
@@ -67,7 +67,7 @@ public class MongoCostTrackingRepository {
         return results.getMappedResults();
     }
 
-    public List<Map> findDaily(Instant from, Instant to) {
+    public List<Map<String, Object>> findDaily(Instant from, Instant to) {
         var aggregation = Aggregation.newAggregation(
                 Aggregation.match(Criteria.where("timestamp").gte(from).lte(to)),
                 Aggregation.project()

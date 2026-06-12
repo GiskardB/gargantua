@@ -19,7 +19,9 @@ import org.springframework.lang.Nullable;
 import java.util.List;
 
 /**
- * Core auto-configuration that registers the main agent beans.
+ * Core auto-configuration that registers the main agent beans:
+ * orchestrator engine, prompt builder, tool registry, token budget manager,
+ * and flow DSL components.
  *
  * <p>Note: although the {@code @Component} stereotypes on
  * {@link DefaultOrchestratorEngine}, {@link ToolRegistry} etc. read like they
@@ -27,6 +29,7 @@ import java.util.List;
  * framework's package. The {@code @Bean} methods below are the actual
  * registration mechanism — keep them.</p>
  */
+
 @AutoConfiguration(afterName = {
         "org.springframework.boot.data.mongodb.autoconfigure.DataMongoAutoConfiguration",
         "ai.gargantua.memory.autoconfigure.AgentMemoryAutoConfiguration"
@@ -70,5 +73,27 @@ public class AgentAutoConfiguration {
                                      ObjectProvider<ToolResultCache> toolResultCacheProvider,
                                      ObjectProvider<MeterRegistry> meterRegistryProvider) {
         return new ToolRegistry(applicationContext, toolResultCacheProvider, meterRegistryProvider);
+    }
+
+    // ── Token Budget (merged from TokenBudgetAutoConfiguration) ────
+
+    @Bean
+    @ConditionalOnMissingBean(TokenBudgetManager.class)
+    public DefaultTokenBudgetManager defaultTokenBudgetManager() {
+        return new DefaultTokenBudgetManager();
+    }
+
+    // ── Flow DSL (merged from FlowAutoConfiguration) ───────────────
+
+    @Bean
+    @ConditionalOnMissingBean(FlowRegistry.class)
+    public FlowRegistry flowRegistry(ApplicationContext applicationContext) {
+        return new FlowRegistry(applicationContext);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(FlowExecutor.class)
+    public FlowExecutor flowExecutor(OrchestratorEngine orchestrator) {
+        return new FlowExecutor(orchestrator);
     }
 }

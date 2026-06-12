@@ -367,7 +367,7 @@ curl -X POST http://localhost:8080/api/agent/chat \
 # See what skills are available
 curl http://localhost:8080/.well-known/agent.json
 
-# Chat web UI (dark theme, SSE streaming, agent intro)
+# Chat web UI (SSE streaming, agent intro)
 open http://localhost:8080/chat
 
 # Interactive docs
