@@ -1,5 +1,6 @@
 package ai.gargantua.adapters.web;
 
+import ai.gargantua.autoconfigure.GuardrailPipeline;
 import ai.gargantua.core.guardrail.InputGuardrail;
 import ai.gargantua.core.guardrail.OutputGuardrail;
 import io.swagger.v3.oas.annotations.Operation;
@@ -16,8 +17,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Admin REST endpoint for inspecting and toggling guardrails at runtime.
@@ -30,13 +29,15 @@ public class GuardrailAdminController {
 
     private final List<InputGuardrail> inputGuardrails;
     private final List<OutputGuardrail> outputGuardrails;
-    private final Set<String> disabledGuardrails = ConcurrentHashMap.newKeySet();
+    private final GuardrailPipeline guardrailPipeline;
 
     public GuardrailAdminController(
             List<InputGuardrail> inputGuardrails,
-            List<OutputGuardrail> outputGuardrails) {
+            List<OutputGuardrail> outputGuardrails,
+            GuardrailPipeline guardrailPipeline) {
         this.inputGuardrails = inputGuardrails;
         this.outputGuardrails = outputGuardrails;
+        this.guardrailPipeline = guardrailPipeline;
     }
 
     @GetMapping
@@ -48,7 +49,7 @@ public class GuardrailAdminController {
             Map<String, Object> entry = new HashMap<>();
             entry.put("name", g.name());
             entry.put("type", "INPUT");
-            entry.put("enabled", !disabledGuardrails.contains(g.name()));
+            entry.put("enabled", guardrailPipeline.isRuntimeEnabled(g.name()));
             input.add(entry);
         }
 
@@ -57,7 +58,7 @@ public class GuardrailAdminController {
             Map<String, Object> entry = new HashMap<>();
             entry.put("name", g.name());
             entry.put("type", "OUTPUT");
-            entry.put("enabled", !disabledGuardrails.contains(g.name()));
+            entry.put("enabled", guardrailPipeline.isRuntimeEnabled(g.name()));
             output.add(entry);
         }
 
@@ -71,16 +72,11 @@ public class GuardrailAdminController {
     @Operation(summary = "Toggle guardrail", description = "Enables or disables a specific guardrail.")
     @ApiResponse(responseCode = "200", description = "Guardrail toggled")
     public ResponseEntity<Map<String, Object>> toggleGuardrail(@PathVariable String guardrailName) {
-        boolean wasDisabled = disabledGuardrails.contains(guardrailName);
-        if (wasDisabled) {
-            disabledGuardrails.remove(guardrailName);
-        } else {
-            disabledGuardrails.add(guardrailName);
-        }
+        boolean nowEnabled = guardrailPipeline.toggleRuntime(guardrailName);
 
         Map<String, Object> result = new HashMap<>();
         result.put("name", guardrailName);
-        result.put("enabled", wasDisabled);
+        result.put("enabled", nowEnabled);
         return ResponseEntity.ok(result);
     }
 }

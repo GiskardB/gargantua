@@ -239,15 +239,6 @@ curl -X POST http://localhost:8080/api/agent/chat \
   -d '{"message": "What is the weather in Rome?"}'
 ```
 
-### Provide fake tool responses
-
-```bash
-curl -X POST http://localhost:8080/api/agent/chat \
-  -H "X-Dry-Run: true" \
-  -H 'X-Dry-Run-Tool-Stubs: {"getWeather": {"temperature": 20, "conditions": "sunny"}}' \
-  -d '{"message": "What is the weather in Rome?"}'
-```
-
 ### Configuration
 
 ```yaml

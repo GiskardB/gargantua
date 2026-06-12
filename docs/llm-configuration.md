@@ -416,7 +416,7 @@ Manage routing rules at runtime without restarting the agent:
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/admin/llm/rules` | List all rules with enabled status and match counts |
+| `GET` | `/api/admin/llm/rules` | List all rules with enabled status, priority, and target model |
 | `POST` | `/api/admin/llm/rules/{name}/toggle` | Enable or disable a rule at runtime (e.g. activate an A/B test) |
 | `POST` | `/api/admin/llm/simulate` | **Simulate** which model would be selected for a given context — without making an LLM call |
 

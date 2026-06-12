@@ -210,9 +210,20 @@ public class AgentProperties {
         }
 
         public static class Fallback extends LlmModelConfig {
+            {
+                setProvider("anthropic");
+                setModel("claude-sonnet-4-20250514");
+                setMaxTokens(1000);
+            }
         }
 
         public static class RoutingModel extends LlmModelConfig {
+            {
+                setProvider("ollama");
+                setModel("phi4-mini");
+                setEndpoint("http://localhost:11434");
+                setMaxTokens(1000);
+            }
         }
     }
 
@@ -222,7 +233,7 @@ public class AgentProperties {
         private String apiKey = "";
         private String endpoint = "";
         private double temperature = 0.7;
-        private int maxTokens = 4096;
+        private int maxTokens = 1000;
 
         public String getProvider() { return provider; }
         public void setProvider(String provider) { this.provider = provider; }

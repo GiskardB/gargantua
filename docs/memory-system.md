@@ -117,7 +117,7 @@ The scheduler is conditional on `MongoTemplate` being available — embedded-mod
 | `sessionDate` | Instant | When the session started |
 | `expiresAt` | Instant | Optional TTL for the summary itself (null = never expires) |
 
-**Retrieval:** Summaries are sorted by `sessionDate` descending. The composer currently fetches up to 10 summaries per request (hardcoded) and then applies token budget truncation.
+**Retrieval:** Summaries are sorted by `sessionDate` descending. The composer fetches up to `agent.memory.episodic.max-summaries` summaries per request (default: 5) and then applies token budget truncation.
 
 **Configuration:**
 ```yaml

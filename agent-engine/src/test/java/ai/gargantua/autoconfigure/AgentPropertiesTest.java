@@ -85,9 +85,9 @@ class AgentPropertiesTest {
         }
 
         @Test
-        @DisplayName("default max tokens is 4096")
+        @DisplayName("default max tokens is 1000")
         void defaultMaxTokens() {
-            assertThat(new AgentProperties().getLlm().getPrimary().getMaxTokens()).isEqualTo(4096);
+            assertThat(new AgentProperties().getLlm().getPrimary().getMaxTokens()).isEqualTo(1000);
         }
 
         @Test
@@ -106,6 +106,36 @@ class AgentPropertiesTest {
         @DisplayName("routing rules list is empty by default")
         void routingRulesEmpty() {
             assertThat(new AgentProperties().getLlm().getRoutingRules()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("fallback defaults to anthropic provider")
+        void fallbackDefaultProvider() {
+            assertThat(new AgentProperties().getLlm().getFallback().getProvider()).isEqualTo("anthropic");
+        }
+
+        @Test
+        @DisplayName("fallback defaults to claude-sonnet model")
+        void fallbackDefaultModel() {
+            assertThat(new AgentProperties().getLlm().getFallback().getModel()).isEqualTo("claude-sonnet-4-20250514");
+        }
+
+        @Test
+        @DisplayName("routing model defaults to ollama provider")
+        void routingDefaultProvider() {
+            assertThat(new AgentProperties().getLlm().getRoutingModel().getProvider()).isEqualTo("ollama");
+        }
+
+        @Test
+        @DisplayName("routing model defaults to phi4-mini")
+        void routingDefaultModel() {
+            assertThat(new AgentProperties().getLlm().getRoutingModel().getModel()).isEqualTo("phi4-mini");
+        }
+
+        @Test
+        @DisplayName("routing model defaults to localhost:11434 endpoint")
+        void routingDefaultEndpoint() {
+            assertThat(new AgentProperties().getLlm().getRoutingModel().getEndpoint()).isEqualTo("http://localhost:11434");
         }
     }
 

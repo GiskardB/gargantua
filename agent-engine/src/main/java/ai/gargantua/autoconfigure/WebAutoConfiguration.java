@@ -114,8 +114,9 @@ public class WebAutoConfiguration {
     @ConditionalOnMissingBean(GuardrailAdminController.class)
     public GuardrailAdminController guardrailAdminController(
             List<InputGuardrail> inputGuardrails,
-            List<OutputGuardrail> outputGuardrails) {
-        return new GuardrailAdminController(inputGuardrails, outputGuardrails);
+            List<OutputGuardrail> outputGuardrails,
+            GuardrailPipeline guardrailPipeline) {
+        return new GuardrailAdminController(inputGuardrails, outputGuardrails, guardrailPipeline);
     }
 
     @Bean

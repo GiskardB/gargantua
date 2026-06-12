@@ -13,6 +13,8 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Executes input and output guardrails in a Chain of Responsibility pattern.
@@ -31,6 +33,7 @@ public class GuardrailPipeline {
     private final List<InputGuardrail> inputGuardrails;
     private final List<OutputGuardrail> outputGuardrails;
     private final AgentProperties properties;
+    private final Set<String> runtimeDisabled = ConcurrentHashMap.newKeySet();
 
     public GuardrailPipeline(List<InputGuardrail> inputGuardrails,
                              List<OutputGuardrail> outputGuardrails,
@@ -47,7 +50,7 @@ public class GuardrailPipeline {
         var results = new ArrayList<GuardrailResult>();
 
         for (var guardrail : inputGuardrails) {
-            if (!guardrail.isEnabled(properties)) {
+            if (!guardrail.isEnabled(properties) || runtimeDisabled.contains(guardrail.name())) {
                 log.debug("Skipping disabled input guardrail: {}", guardrail.name());
                 continue;
             }
@@ -84,7 +87,7 @@ public class GuardrailPipeline {
         var current = ctx;
 
         for (var guardrail : outputGuardrails) {
-            if (!guardrail.isEnabled(properties)) {
+            if (!guardrail.isEnabled(properties) || runtimeDisabled.contains(guardrail.name())) {
                 log.debug("Skipping disabled output guardrail: {}", guardrail.name());
                 continue;
             }
@@ -116,6 +119,20 @@ public class GuardrailPipeline {
      * @param blockedReason  human-readable reason emitted by the blocking guardrail,
      *                       or {@code null}
      */
+    public boolean toggleRuntime(String guardrailName) {
+        if (runtimeDisabled.contains(guardrailName)) {
+            runtimeDisabled.remove(guardrailName);
+            return true;
+        } else {
+            runtimeDisabled.add(guardrailName);
+            return false;
+        }
+    }
+
+    public boolean isRuntimeEnabled(String guardrailName) {
+        return !runtimeDisabled.contains(guardrailName);
+    }
+
     public record OutputProcessingResult(String processedText, String blockedBy, String blockedReason) {
         public boolean blocked() { return blockedBy != null; }
     }

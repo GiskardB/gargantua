@@ -217,7 +217,7 @@ These endpoints are available under the admin API for cache management.
 
 ## Tool Discovery
 
-At application startup, the `ToolRegistry` scans all Spring-managed beans for methods annotated with `@AgentTool`. Each discovered method is registered as an available tool with its name, description, parameter types, and return type.
+At application startup, the `ToolRegistry` scans all Spring-managed beans for methods annotated with `@AgentTool`. Each discovered method is registered as an available tool with its name and description. Parameters are exposed to the LLM as string properties; the registry handles type conversion at invocation time.
 
 However, a tool being registered does not mean it is available to every skill. Each skill's `allowed-tools` list in its SKILL.md frontmatter controls which tools the LLM can see when that skill is active. If a tool is not in the list, it is invisible to the LLM for that skill -- it will not appear in the tool definitions sent with the prompt.
 

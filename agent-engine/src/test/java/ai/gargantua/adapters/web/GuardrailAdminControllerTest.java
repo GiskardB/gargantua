@@ -1,5 +1,7 @@
 package ai.gargantua.adapters.web;
 
+import ai.gargantua.autoconfigure.AgentProperties;
+import ai.gargantua.autoconfigure.GuardrailPipeline;
 import ai.gargantua.core.guardrail.GuardrailInputContext;
 import ai.gargantua.core.guardrail.GuardrailOutputContext;
 import ai.gargantua.core.guardrail.GuardrailOutputResult;
@@ -41,10 +43,10 @@ class GuardrailAdminControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new GuardrailAdminController(
-                List.of(inputGuardrail1, inputGuardrail2),
-                List.of(outputGuardrail1)
-        );
+        var inputs = List.of(inputGuardrail1, inputGuardrail2);
+        var outputs = List.<OutputGuardrail>of(outputGuardrail1);
+        var pipeline = new GuardrailPipeline(inputs, outputs, new AgentProperties());
+        controller = new GuardrailAdminController(inputs, outputs, pipeline);
     }
 
     @Nested
@@ -178,7 +180,8 @@ class GuardrailAdminControllerTest {
         @Test
         @DisplayName("handles empty input and output guardrail lists")
         void handlesEmptyLists() {
-            var emptyController = new GuardrailAdminController(List.of(), List.of());
+            var emptyPipeline = new GuardrailPipeline(List.of(), List.of(), new AgentProperties());
+            var emptyController = new GuardrailAdminController(List.of(), List.of(), emptyPipeline);
             var response = emptyController.listGuardrails();
 
             assertThat(response.getStatusCode().value()).isEqualTo(200);

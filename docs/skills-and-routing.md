@@ -51,6 +51,7 @@ Do NOT answer questions unrelated to weather. Politely redirect the user.
 | `metadata.rag-min-score` | float | No | Minimum similarity score for RAG results. Default `0.3`. |
 | `metadata.allowed-roles` | list of strings | No | Roles permitted to use this skill (e.g. `[financial-advisor, super-admin]`). If set, `RbacGuardrail` blocks users without a matching role. The `super-admin` role bypasses all restrictions. |
 | `metadata.memory-layers` | list of strings | No | Subset of memory layers to fetch for this skill: `working`, `episodic`, `knowledge` (case-insensitive). When set, layers not listed are skipped — their port (Redis or MongoDB) is not queried. Defaults to all three layers. Use it for stateless skills (greetings, simple Q&A) to save a Redis/MongoDB round-trip. See [Memory System](memory-system.md). |
+| `examples` | list of strings | No | Example prompts surfaced via the A2A Agent Card for client discovery (e.g. `["What's the weather in Berlin?"]`). |
 
 ### Folder Structure
 
@@ -82,9 +83,9 @@ skills/
 
 ### Default Skill
 
-The skill named `default-skill` acts as the fallback. When the router cannot match any skill above the confidence threshold, the request is handled by `default-skill`. It should contain a general-purpose system prompt and a broad set of allowed tools suitable for open-ended conversations.
+When the router cannot match any skill above the confidence threshold, the request is handled by the fallback skill. The default name is `default` (configurable via `agent.routing.fallback-skill`). The archetype generates a `default-skill/SKILL.md` and sets `fallback-skill: default-skill` in `application.yml`. It should contain a general-purpose system prompt and a broad set of allowed tools suitable for open-ended conversations.
 
-Every project should include a fallback skill (the framework default name is `default`, configurable via `agent.routing.fallback-skill`). If neither a matching skill nor the configured fallback skill exists, unmatched requests will fail.
+If neither a matching skill nor the configured fallback skill exists, unmatched requests will fail.
 
 ---
 
@@ -175,24 +176,11 @@ agent:
 
 ### Force a Specific Skill
 
-There are three ways to bypass routing and force a particular skill.
+Use the `X-Force-Skill` HTTP header to bypass routing and force a particular skill.
 
 **Via HTTP header:**
 ```
 X-Force-Skill: weather-skill
-```
-
-**Via CLI:**
-```
-\skill weather-skill
-```
-
-**Via API request body:**
-```json
-{
-  "message": "What is the temperature in Berlin?",
-  "forceSkill": "weather-skill"
-}
 ```
 
 Forced routing skips both semantic and LLM matching. If the specified skill does not exist or is inactive, the request fails with a `SkillNotFoundException`.

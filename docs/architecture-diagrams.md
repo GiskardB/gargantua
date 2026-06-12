@@ -91,9 +91,9 @@ sequenceDiagram
 
     Note over Semantic: Compare with pre-computed<br/>skill description embeddings
 
-    alt Cosine similarity >= 0.82
+    alt Cosine similarity >= threshold (default 0.6)
         Semantic-->>Engine: RoutingResult(SEMANTIC, skillName, confidence)
-    else Cosine similarity < 0.82
+    else Cosine similarity < threshold
         Semantic->>LLM_Route: "Which skill handles this?" [temperature=0.0]
         LLM_Route-->>Semantic: "weather-skill" or "none"
         alt LLM returns skill name
