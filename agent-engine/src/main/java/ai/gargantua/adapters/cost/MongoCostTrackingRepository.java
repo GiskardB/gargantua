@@ -22,6 +22,16 @@ public class MongoCostTrackingRepository {
 
     private static final String COLLECTION = "token_usage";
 
+    /**
+     * Type token for aggregation results. {@code Map.class} is a {@code Class<Map>},
+     * so it can only produce a raw {@code List<Map>}; parameterising it here confines
+     * the unavoidable unchecked cast to a single place instead of leaking raw types
+     * into every aggregation signature.
+     */
+    @SuppressWarnings("unchecked")
+    private static final Class<Map<String, Object>> DOCUMENT_TYPE =
+            (Class<Map<String, Object>>) (Class<?>) Map.class;
+
     private final MongoTemplate mongoTemplate;
 
     public MongoCostTrackingRepository(MongoTemplate mongoTemplate) {
@@ -41,7 +51,7 @@ public class MongoCostTrackingRepository {
                         .sum("estimatedCostUsd").as("totalCostUsd")
                         .count().as("requestCount")
         );
-        var results = mongoTemplate.aggregate(aggregation, COLLECTION, Map.class);
+        var results = mongoTemplate.aggregate(aggregation, COLLECTION, DOCUMENT_TYPE);
         return results.getMappedResults();
     }
 
@@ -63,7 +73,7 @@ public class MongoCostTrackingRepository {
                         .count().as("requestCount")
                         .avg("durationMs").as("avgDurationMs")
         );
-        var results = mongoTemplate.aggregate(aggregation, COLLECTION, Map.class);
+        var results = mongoTemplate.aggregate(aggregation, COLLECTION, DOCUMENT_TYPE);
         return results.getMappedResults();
     }
 
@@ -82,7 +92,7 @@ public class MongoCostTrackingRepository {
                         .count().as("requestCount"),
                 Aggregation.sort(org.springframework.data.domain.Sort.Direction.ASC, "_id")
         );
-        var results = mongoTemplate.aggregate(aggregation, COLLECTION, Map.class);
+        var results = mongoTemplate.aggregate(aggregation, COLLECTION, DOCUMENT_TYPE);
         return results.getMappedResults();
     }
 
