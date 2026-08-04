@@ -111,10 +111,14 @@ spec:
 | Field | Required | Description |
 |---|---|---|
 | `image` | no | Container image required; omit for the platform default |
-| `minVersion` | no | Minimum runtime version |
+| `minVersion` | no | Minimum runtime version — recorded, not verified by the runtime |
 
 Bundle and image version independently. See
 [ADR-003](runtime-decisions.md#adr-003--bundles-are-declarative-and-contain-no-executable-code).
+
+`minVersion` is intended for the Deployment Manager to honour when scheduling. The runtime
+itself does not refuse to start on a version mismatch; it reports the declaration at
+startup so the gap is visible rather than silent.
 
 ## `spec.capabilities[]`
 
@@ -127,11 +131,17 @@ decides to behave, a **capability** is what it promises to others.
 | `description` | yes | Used by the Gateway for intent matching |
 | `version` | yes | Semver of the capability contract itself |
 | `implementedBy` | no | Skill handling this capability; omit to use normal routing |
-| `inputSchema` | no | JSON Schema for accepted input |
-| `outputSchema` | no | JSON Schema for produced output |
+| `inputSchema` | no | Accepted-input contract — see the note below |
+| `outputSchema` | no | Produced-output contract — see the note below |
 | `tags` | no | Catalog filtering labels |
 
 Capability names must be unique within a manifest.
+
+> **Schemas are carried, not yet resolved.** `inputSchema` and `outputSchema` are stored
+> verbatim and surfaced for discovery. The runtime does not currently load a referenced
+> file, nor validate a capability invocation against the schema — per-skill
+> `metadata.output-schema` is the mechanism that is actually enforced today. Write either
+> a bundle-relative path or an inline schema; both round-trip unchanged.
 
 ## `spec.model`
 
@@ -165,11 +175,52 @@ server without a `url`, rejects the manifest rather than failing on first tool c
 
 Subset of `WORKING`, `EPISODIC`, `KNOWLEDGE`. Omit or leave empty for all three.
 
+> **Not enforced at workload level yet.** Memory-layer selection is currently a per-skill
+> decision, made through `metadata.memory-layers` in `SKILL.md`. A manifest-level
+> declaration is accepted and reported at startup, but does not restrict anything.
+
+## `spec.allowedRoles`
+
+Roles permitted to invoke the workload.
+
+> **Not enforced at workload level yet.** RBAC is currently applied per skill, through
+> `metadata.allowed-roles` in `SKILL.md`. As above, a manifest-level declaration is
+> reported rather than applied.
+
 ## `spec.guardrails`
 
 Raw overrides keyed by guardrail name, applied on top of runtime configuration.
 Deliberately untyped, because guardrail settings vary per implementation and the runtime
-binds them onto its own configuration objects.
+binds them onto its own configuration objects. Keys are converted to kebab-case, so
+`maxLengthChars` and `max-length-chars` both bind.
+
+---
+
+## Enforcement status
+
+Everything in a manifest parses and validates. Not all of it changes runtime behaviour
+yet. `gargantua validate` prints the gaps for a specific bundle; this is the general
+picture.
+
+| Field | Status |
+|---|---|
+| `metadata.*` | Applied — becomes the agent identity and A2A card |
+| `spec.capabilities` | Applied — advertised on the A2A Agent Card |
+| `spec.capabilities[].inputSchema` / `outputSchema` | Carried for discovery; not resolved or validated |
+| `spec.runtime.image` | Recorded; honoured by the Deployment Manager, not the runtime |
+| `spec.runtime.minVersion` | Recorded; not verified |
+| `spec.model.*` | Applied — binds onto `agent.llm.*` |
+| `spec.mcp.servers` | Applied — connected at startup, tools discovered |
+| `spec.defaultSkill` | Applied — binds onto `agent.routing.fallback-skill` |
+| `spec.guardrails` | Applied — binds onto `agent.guardrail.*` |
+| `spec.memoryLayers` | Reported, not applied — use per-skill declaration |
+| `spec.allowedRoles` | Reported, not applied — use per-skill declaration |
+| `metadata.json` checksum | Applied — a mismatch refuses to load |
+| `metadata.json` signature | Recorded; not verified (needs key distribution) |
+
+A declaration that is accepted but ignored is reported at startup rather than dropped
+silently, because an operator who believes a constraint is in force when it is not is
+worse off than one who sees it is missing.
 
 ---
 

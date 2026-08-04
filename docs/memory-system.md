@@ -36,7 +36,7 @@ sequenceDiagram
     Agent->>MC: compose(userId, sessionId, maxTokens)
     par Parallel fetch
         MC->>WM: getMessages(sessionId)
-        MC->>EM: getRecentSummaries(userId, 10)
+        MC->>EM: getRecentSummaries(userId, maxSummaries)
         MC->>KM: getSegments(userId)
     end
     WM-->>MC: List<ChatMessage>
@@ -280,9 +280,9 @@ The memory layer is published as a separate Maven artifact (`ai.gargantua:agent-
 
 ```xml
 <dependency>
-    <groupId>ai.gargantua</groupId>
+    <groupId>com.github.giskardb.gargantua</groupId>
     <artifactId>agent-memory-sdk</artifactId>
-    <version>1.0.0</version>
+    <version>v1.2.2</version>
 </dependency>
 ```
 

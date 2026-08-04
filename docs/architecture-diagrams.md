@@ -46,13 +46,13 @@ sequenceDiagram
     loop Tool Calling
         LLM-->>Controller: SSE tool_call event
         Controller-->>Client: SSE tool_call
-        LLM->>Tools: invoke(toolName, args)
+        LLM->>Tools: executeTool(name, args)
+        Note over Tools: ToolRegistry routes by name to the owning<br/>ToolProvider: AnnotationToolProvider (Java)<br/>or McpToolProvider (remote). First provider<br/>claiming a name wins.
 
-        alt @RequiresApproval
+        alt @RequiresApproval (streaming endpoint only)
             Tools-->>Controller: approval_required
             Controller-->>Client: SSE approval_required
-            Client->>Controller: POST /approval/{id} → APPROVED
-            Controller->>Tools: resume
+            Note over Controller: Result substituted with<br/>{"status":"awaiting_approval"}<br/>and the loop CONTINUES — no pause, no resume
         end
 
         Tools-->>LLM: tool result
@@ -113,6 +113,8 @@ sequenceDiagram
     participant Redis as Working Memory<br/>(Redis)
     participant Mongo_E as Episodic Memory<br/>(MongoDB)
     participant Mongo_K as Knowledge Memory<br/>(MongoDB)
+    participant Scheduler as SessionExpiry<br/>SummarizationScheduler
+    participant Mongo_S as chat_sessions<br/>(MongoDB)
     participant Summarizer as SessionSummarizer
 
     Engine->>Composer: compose(userId, sessionId)
@@ -137,13 +139,16 @@ sequenceDiagram
     Engine->>Redis: appendMessage(sessionId, userMsg + assistantMsg)
     Note over Redis: TTL reset on each append (default: 30 min)
 
-    alt TTL expired (session idle > 30 min)
-        Redis-->>Summarizer: trigger
-        Summarizer->>Redis: getMessages(sessionId)
-        Summarizer->>Summarizer: LLM summarize (routing model)
-        Summarizer->>Mongo_E: saveSummary(SessionSummary)
-        Summarizer->>Redis: clear(sessionId)
-    end
+    Note over Scheduler: Every agent.summarization.scan-interval-minutes (default 5)
+
+    Scheduler->>Mongo_S: find chat_sessions where lastMessageAt < now - (ttl + grace)<br/>and summarized != true
+    Mongo_S-->>Scheduler: expired sessions
+    Scheduler->>Summarizer: summarize(messages)
+    Summarizer->>Summarizer: LLM summarize (routing model)
+    Summarizer-->>Scheduler: SessionSummary
+    Scheduler->>Mongo_E: saveSummary(SessionSummary)
+
+    Note over Redis: Redis pushes nothing — its key simply expires.<br/>The trigger is a scheduled Mongo scan.
 ```
 
 ## 4. Human-in-the-Loop (HITL) Approval Flow
@@ -151,37 +156,38 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant LLM
-    participant Engine as OrchestratorEngine
-    participant Tool as @RequiresApproval Tool
+    participant Controller as ChatStreamController
+    participant Registry as ToolRegistry
     participant Store as ApprovalStore<br/>(Redis)
     participant Client
-    participant Controller as ApprovalController
+    participant Approval as ApprovalController
 
-    LLM->>Engine: tool_call(sendWeatherAlert, args)
-    Engine->>Engine: detect @RequiresApproval
+    LLM->>Controller: tool_call(sendWeatherAlert, args)
+    Controller->>Registry: look up ToolDefinition
+    Registry-->>Controller: requiresApproval = true
 
-    Engine->>Store: savePending(requestId, ApprovalRequest, TTL=5min)
-    Engine-->>Client: SSE approval_required event
+    Controller->>Store: savePending(requestId, ApprovalRequest, TTL=5min)
+    Controller-->>Client: SSE approval_required
 
-    Note over Client: UI shows approval dialog:<br/>"The agent wants to send a weather alert"<br/>Parameters: alertType=storm, message=...
+    Note over Controller: The tool is NOT executed. The synthetic result<br/>{"status":"awaiting_approval","requestId":...}<br/>is fed back and the stream CONTINUES.
 
-    alt User approves
-        Client->>Controller: POST /approval/{requestId} {decision: APPROVED}
-        Controller->>Store: resolve(requestId, APPROVED)
-        Controller->>Tool: invoke(sendWeatherAlert, args)
-        Tool-->>Engine: result
-        Engine-->>Client: SSE tool_result
-        Engine->>LLM: continue with tool result
-    else User denies
-        Client->>Controller: POST /approval/{requestId} {decision: DENIED}
-        Controller->>Store: resolve(requestId, DENIED)
-        Controller->>LLM: "Tool was denied by user"
-        LLM-->>Client: "I understand, I won't send the alert."
-    else TTL expires (5 min)
-        Store-->>Engine: auto-deny
-        Engine->>LLM: "Tool was auto-denied (timeout)"
-    end
+    Controller->>LLM: tool result = awaiting_approval
+    LLM-->>Client: SSE tokens ("I need confirmation before...")
+
+    Note over Client,Approval: Out of band, on a separate request
+
+    Client->>Approval: POST /api/agent/approval/{requestId} {decision}
+    Approval->>Store: resolve(requestId, decision)
+    Approval-->>Client: 200 OK
+
+    Note over Approval: Recording the decision is where it ends today.<br/>Nothing re-invokes the tool and nothing resumes<br/>the original stream — re-issuing the request is<br/>the client's responsibility.
 ```
+
+> **Known gap.** `@RequiresApproval` currently means "do not run this tool, and raise a
+> request", not "run it once approved". There is no resume path: `ApprovalController` holds
+> no reference to the tool registry or the SSE sink. The gate is also enforced **only** on
+> `/api/agent/chat/stream` — the synchronous `/api/agent/chat` executes approval-gated
+> tools without checking.
 
 ## 5. LLM Rule-Based Routing
 
@@ -276,35 +282,56 @@ sequenceDiagram
 
 ```mermaid
 graph TD
-    CORE[agent-core<br/><i>Pure domain: records, interfaces, annotations</i>]
+    CORE[agent-core<br/><i>Pure domain: records, interfaces, annotations<br/>workload, capability, bundle, mcp, secret, tool SPI</i>]
 
     MEMORY[agent-memory-sdk<br/><i>Redis + MongoDB memory adapters</i>]
 
+    MCPCLIENT[agent-mcp-client<br/><i>Consumes external MCP servers<br/>as ToolProviders — Spring-free</i>]
+
+    BUNDLE[agent-bundle<br/><i>Manifest parsing, bundle loading,<br/>integrity verification — Spring-free</i>]
+
     ENGINE[agent-engine<br/><i>Auto-config, orchestrator, guardrails,<br/>routing, RBAC, RAG, A2A, audit,<br/>REST controllers, skill registries</i>]
 
-    MCP[agent-mcp-server<br/><i>MCP protocol gateway</i>]
+    RUNTIME[agent-runtime<br/><i>Standalone executor: loads a bundle,<br/>projects the manifest, CLI + container image</i>]
+
+    MCP[agent-mcp-server<br/><i>Exposes this agent via MCP</i>]
 
     LINTER[agent-skill-linter-maven-plugin<br/><i>Build-time SKILL.md validation</i>]
 
     ARCHETYPE[agent-archetype<br/><i>Maven archetype for new projects</i>]
 
-    EXAMPLES[agent-example-*<br/><i>Reference agents — sibling repo:<br/>GiskardB/gargantua-examples</i>]
+    APP[Your application<br/><i>library mode</i>]
 
     MEMORY --> CORE
+    MCPCLIENT --> CORE
+    BUNDLE --> CORE
     ENGINE --> CORE
     ENGINE --> MEMORY
+    ENGINE --> MCPCLIENT
+    RUNTIME --> ENGINE
+    RUNTIME --> BUNDLE
     MCP --> ENGINE
     LINTER --> CORE
 
-    EXAMPLES -.->|uses as dependency| ENGINE
-    EXAMPLES -.->|uses as dependency| MCP
+    APP -.->|uses as dependency| ENGINE
+    ARCHETYPE -.->|scaffolds| APP
 
     style CORE fill:#e1f5fe
     style MEMORY fill:#e8f5e9
+    style MCPCLIENT fill:#e8f5e9
+    style BUNDLE fill:#e8f5e9
     style ENGINE fill:#fff3e0
-    style EXAMPLES fill:#f3e5f5,stroke-dasharray: 5 5
+    style RUNTIME fill:#fff3e0
+    style APP fill:#f3e5f5,stroke-dasharray: 5 5
     style ARCHETYPE fill:#f3e5f5,stroke-dasharray: 5 5
 ```
+
+`agent-core`, `agent-bundle` and `agent-mcp-client` carry no Spring dependency — the first
+because it is the pure domain, the other two because both `agent-engine` (library mode) and
+`agent-runtime` consume them and neither may be assumed. CI enforces this.
+
+The two delivery modes are the two orange boxes: **your application** depends on
+`agent-engine`, or **`agent-runtime`** loads a bundle. Both drive the same engine.
 
 ## 8. A2A Protocol — Agent-to-Agent Interaction
 

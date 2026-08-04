@@ -7,12 +7,14 @@ All endpoints accept and return JSON (`application/json`) unless stated otherwis
 
 ## Headers
 
-All chat endpoints accept the following headers. Headers marked required will produce a `400` error if missing.
+All chat endpoints accept the following headers. **None of them are strictly required** —
+the API never returns `400` for a missing header. They are listed as "expected" where
+omitting them degrades behaviour rather than failing the call.
 
-| Header | Required | Description |
+| Header | Expected | Description |
 |--------|----------|-------------|
-| `X-User-Id` | Yes | Identifies the user. Propagated from your API gateway or set by the client. |
-| `X-Session-Id` | Yes (for chat) | Identifies the conversation session. Generate a UUID or call `POST /api/agent/session/new`. |
+| `X-User-Id` | Yes | Identifies the user. Defaults to `anonymous` when absent, which collapses all callers into one memory and audit identity. |
+| `X-Session-Id` | Yes (for chat) | Identifies the conversation session. Absent means no session scoping — working memory cannot be associated. Generate a UUID or call `POST /api/agent/session/new`. |
 | `X-Dry-Run` | No | Set to `true` for dry-run mode (no persistence, no real tool calls). |
 | `X-Context-*` | No | Arbitrary per-request context. Headers prefixed `X-Context-` are extracted by both `ChatController` and `ChatStreamController`, the prefix is stripped, the remainder is lowercased and the pair is forwarded into `EnricherContext.attributes()` and the input-guardrail attribute map. Example: `X-Context-Language: it` → `attributes.get("language") == "it"`. |
 | `X-Tenant-Id` | No | Tenant identifier for multi-tenancy. Enables automatic data isolation by tenantId prefix on all storage keys. |
@@ -50,13 +52,17 @@ curl -X POST http://localhost:8080/api/agent/chat \
   "skillUsed": "weather-skill",
   "routingMethod": "SEMANTIC",
   "toolsCalled": ["getWeather"],
+  "routingConfidence": 0.91,
+  "inputTokens": 42,
+  "outputTokens": 45,
   "totalTokens": 87,
   "estimatedCostUsd": 0.0013,
-  "durationMs": 1240
+  "durationMs": 1240,
+  "dryRun": false
 }
 ```
 
-Response fields: `text` (the answer), `sessionId`, `skillUsed` (which skill handled it), `routingMethod` (`SEMANTIC` | `LLM` | `FORCED`), `toolsCalled` (list of tool names), `totalTokens` (prompt + completion), `estimatedCostUsd`, `durationMs` (end-to-end latency).
+Response fields: `text` (the answer), `sessionId`, `skillUsed` (which skill handled it), `routingMethod` (`SEMANTIC` | `LLM` | `FORCED`), `routingConfidence`, `toolsCalled` (list of tool names), `inputTokens`, `outputTokens`, `totalTokens` (their sum), `estimatedCostUsd`, `durationMs` (end-to-end latency), `dryRun`.
 
 ---
 
@@ -80,9 +86,9 @@ The response is a stream of SSE frames. Each frame has an `event` type and a JSO
 
 | Event | Description |
 |-------|-------------|
-| `token` | Real-time token delivery. Concatenate values to build the full answer. |
-| `tool_call` | Agent dispatched a tool invocation. Show a "calling tool..." indicator. |
-| `tool_result` | Tool execution completed. Agent may continue generating tokens. |
+| `token` | Real-time token delivery. Payload is `{"token": "..."}` — there is no index field; concatenate in arrival order. |
+| `tool_call` | Agent dispatched a tool invocation. Payload is `{"tool": "...", "arguments": {...}}` with the raw model-supplied arguments. |
+| `tool_result` | Tool execution completed. Payload is `{"tool": "...", "result": "..."}`; the result is truncated to 500 characters followed by `...`. |
 | `done` | Final metadata. Always the last event before the stream closes. |
 | `error` | Guardrail block, schema failure, or server error. Stream closes after this. |
 | `approval_required` | Emitted before a tool annotated with `@RequiresApproval` would run. Carries `requestId`, `tool`, `arguments`, `message`, `dangerous`, `ttlMinutes`. The pending request is also persisted via `ApprovalStore` (when configured) so a reviewer can resolve it via `POST /api/agent/approval/{requestId}`. The tool result returned to the LLM is `{"status":"awaiting_approval","requestId":"..."}`. |
@@ -91,16 +97,16 @@ The response is a stream of SSE frames. Each frame has an `event` type and a JSO
 **Example stream** (abbreviated):
 ```
 event: token
-data: {"token": "The", "index": 0}
+data: {"token": "The"}
 
 event: tool_call
-data: {"tool": "getWeather", "status": "started"}
+data: {"tool": "getWeather", "arguments": {"city": "Rome"}}
 
 event: tool_result
-data: {"tool": "getWeather", "status": "completed", "durationMs": 142}
+data: {"tool": "getWeather", "result": "{\"tempC\":22,\"sky\":\"sunny\"}"}
 
 event: token
-data: {"token": "The current weather in Rome is 22 C and sunny.", "index": 1}
+data: {"token": " current weather in Rome is 22 C and sunny."}
 
 event: done
 data: {"sessionId": "sess_abc123", "skillUsed": "weather-skill", "routingMethod": "SEMANTIC", "totalTokens": 87, "estimatedCostUsd": 0.0013, "durationMs": 1240, "toolsCalled": ["getWeather"]}
@@ -150,7 +156,12 @@ curl -X POST http://localhost:8080/api/agent/session/new
 
 Resolves a pending human-in-the-loop approval request.
 
-**Flow:** The streaming endpoint emits an `approval_required` event with a `requestId` when a sensitive tool needs human sign-off. The stream pauses until this endpoint is called. If approved, the tool executes and the stream resumes. If denied, the agent responds without the tool. Requests expire after a configurable timeout (default 5 min); calling after expiry returns `410 Gone`.
+**Flow:** The streaming endpoint emits an `approval_required` event with a `requestId` when a sensitive tool needs human sign-off, substitutes `{"status":"awaiting_approval","requestId":"..."}` as the tool result and **continues** the stream. This endpoint records the reviewer's decision in the `ApprovalStore`. Requests expire after a configurable timeout (default 5 min); calling after expiry returns `410 Gone`.
+
+> **Recording a decision does not run the tool.** There is no resume path: approving does
+> not execute the tool and does not reopen the original stream. Re-invoking the approved
+> action is currently the client's responsibility. See
+> [Approval Flow](tools-and-annotations.md#approval-flow).
 
 **Request body**
 
@@ -198,7 +209,9 @@ curl http://localhost:8080/.well-known/agent.json
   "capabilities": { "streaming": false, "pushNotifications": false },
   "defaultInputModes": ["text/plain"],
   "defaultOutputModes": ["text/plain"],
-  "skills": [{ "id": "weather-skill", "name": "weather-skill", "description": "..." }],
+  "skills": [
+    // When the workload declares capabilities, this array lists CAPABILITIES,
+    // not internal skills. See the note below.{ "id": "weather-skill", "name": "weather-skill", "description": "..." }],
   "authSchemes": [{ "scheme": "none", "description": "No authentication required" }]
 }
 ```
@@ -334,7 +347,24 @@ All cost endpoints default to the last 30 days when `from`/`to` are omitted. Dat
 
 **Simulate request:** `{"message": "What is the weather?", "skillName": "weather-skill", "userId": "user-42"}`
 
-**Simulate response:** `{"selectedModel": "gpt-4o", "selectedProvider": "openai", "matchedRule": "domain-specialization", "confidence": 0.95}`
+**Simulate request:** `{"message", "skillName", "skillDomain", "userTier", "inputLength", "attributes"}` — all optional.
+
+**Simulate response:**
+```json
+{
+  "selectedModel": "gpt-4o",
+  "selectedAlias": "primary",
+  "selectedProvider": "openai",
+  "matchedRule": "domain-specialization",
+  "skillName": "finance-skill",
+  "skillDomain": "finance",
+  "userTier": "premium",
+  "inputLengthChars": 42,
+  "estimatedTokens": 11,
+  "evaluatedRules": [ { "name": "domain-specialization", "matched": true } ]
+}
+```
+There is no `confidence` field — rule matching is deterministic, not scored.
 
 ### Audit Admin
 
@@ -369,7 +399,7 @@ Storage: `MongoAuditStore` writes to an append-only `audit_trail` MongoDB collec
 
 ---
 
-## Error Responses (RFC 9457)
+## Error Responses (RFC 7807 / 9457)
 
 All errors use the [Problem Details for HTTP APIs](https://www.rfc-editor.org/rfc/rfc9457) format (`application/problem+json`). This provides a consistent, machine-readable error structure across every endpoint.
 
@@ -378,7 +408,7 @@ All errors use the [Problem Details for HTTP APIs](https://www.rfc-editor.org/rf
 {
   "type": "https://agentkit.io/errors/guardrail-blocked",
   "title": "Request blocked by guardrail",
-  "status": 400,
+  "status": 403,
   "detail": "Potential prompt injection detected in user message",
   "instance": "/api/agent/chat",
   "guardrailName": "prompt-injection",
@@ -397,7 +427,11 @@ Standard fields: `type` (stable URI for programmatic matching), `title` (human-r
 | `approval-expired` | 410 | A HITL approval request was resolved after its timeout window. |
 | `schema-validation` | 400 | The request body or a tool argument failed JSON Schema validation. |
 | `token-budget-exceeded` | 413 | The request would exceed the configured per-request token budget. |
-| `rate-limit-exceeded` | 429 | The user or client has exceeded the configured rate limit. Includes a `Retry-After` header. |
+| `rate-limit-exceeded` | 429 | The user or client has exceeded the configured rate limit. No `Retry-After` header is currently set. |
+| `dry-run-not-allowed` | 403 | Dry-run was requested but is disabled for the active profile. |
+| `bad-request` | 400 | Malformed input, such as a non-ISO-8601 date on an admin query. |
+| `not-found` | 404 | No handler or static resource matches the path. |
+| `internal` | 500 | Unhandled server error. The detail is deliberately generic. |
 
 ---
 

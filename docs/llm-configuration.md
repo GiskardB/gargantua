@@ -126,8 +126,9 @@ agent:
       provider: ${LLM_ROUTING_PROVIDER:ollama}
       model: ${LLM_ROUTING_MODEL:phi4-mini}
       endpoint: ${LLM_ROUTING_ENDPOINT:http://localhost:11434}
-      temperature: 0.0
-      max-tokens: 50
+      # temperature/max-tokens are inherited (0.7 / 1000) unless you set them.
+      # Archetype-generated projects override them to 0.0 / 50 for cheap routing;
+      # the standalone runtime image does not.
 ```
 
 ### What each role does

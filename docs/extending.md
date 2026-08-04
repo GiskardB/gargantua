@@ -3,6 +3,15 @@
 This guide shows how to customize and extend Gargantua beyond the default behavior.
 Each section is independent — pick what you need.
 
+> **Which delivery mode do these apply to?** Everything here is Java: `@Component`
+> guardrails, enrichers, replacement `@Bean`s. That makes it **library mode** territory —
+> your classes have to be on the classpath and in a package Spring scans.
+>
+> They apply to runtime mode too, but only by building a custom runtime image that
+> includes them, which the manifest then pins via `spec.runtime.image`. A stock runtime
+> image never scans your code, because bundles contain no code. See
+> [Delivery Modes](delivery-modes.md).
+
 ---
 
 ## Prerequisites
@@ -203,14 +212,49 @@ public class CustomMemoryConfig {
 
 ### Replaceable ports
 
-| Port interface | Default implementation | Storage |
-|---------------|----------------------|---------|
+Every one of these is registered with `@ConditionalOnMissingBean`, so declaring your own
+bean of the same type replaces the default.
+
+| Port / interface | Default implementation | Notes |
+|---|---|---|
 | `WorkingMemoryPort` | `RedisWorkingMemoryAdapter` | Redis |
 | `EpisodicMemoryPort` | `MongoEpisodicMemoryAdapter` | MongoDB |
 | `KnowledgeMemoryPort` | `MongoKnowledgeMemoryAdapter` | MongoDB |
+| `VectorStorePort` | none (RAG inactive) / `InMemoryVectorStore` in embedded mode | Supply one to enable RAG |
 | `ApprovalStore` | `RedisApprovalStore` | Redis |
-| `OrchestratorEngine` | `DefaultOrchestratorEngine` | — |
+| `AuditStore` | `MongoAuditStore` | MongoDB |
+| `SessionSummarizer` | `RoutingModelSessionSummarizer` | Uses the routing model |
+| `OrchestratorEngine` | `DefaultOrchestratorEngine` | The whole pipeline |
 | `TokenBudgetManager` | `DefaultTokenBudgetManager` | — |
+| `SecretResolver` | `EnvironmentSecretResolver` | Resolves `${secrets.*}` — see below |
+| `CapabilityRegistry` | empty | Populated from the manifest in runtime mode |
+| `ToolProvider` | `AnnotationToolProvider` + one per MCP server | See [Tools & Annotations](tools-and-annotations.md#writing-a-custom-tool-source) |
+
+---
+
+## Resolving secrets from a vault
+
+Manifests and configuration reference secrets by name — `${secrets.github-token}` — and the
+runtime resolves them at startup through `SecretResolver`. The default reads the process
+environment, trying the literal name and then `UPPER_SNAKE_CASE`.
+
+Replace the bean to read from somewhere else; nothing else changes, because the bundle
+format only ever carries the reference:
+
+```java
+@Bean
+SecretResolver vaultSecretResolver(VaultTemplate vault) {
+    return name -> Optional.ofNullable(vault.read("secret/agent/" + name))
+                           .map(response -> (String) response.getData().get("value"));
+}
+```
+
+An unknown secret must return `Optional.empty()` rather than throwing — callers decide
+whether absence is fatal. Unresolved references are left verbatim as `${secrets.x}` so a
+misconfiguration is visible instead of silently becoming an empty credential.
+
+`${env.NAME}` is the non-confidential sibling, read straight from the environment and
+intended for deployment wiring such as hostnames.
 
 ---
 
@@ -218,7 +262,7 @@ public class CustomMemoryConfig {
 
 > 🚧 **Planned — not yet wired.** A first-class `AgentAsToolPort` for in-process multi-agent delegation is on the roadmap. Today, two paths cover the same use case:
 >
-> 1. **A2A (cross-process or cross-host).** Wrap the call to another agent as an `@AgentTool` method using `HttpA2AClient` — see the [A2A section](#a2a-protocol--call-other-agents) below. This is the recommended path even for co-located agents.
+> 1. **A2A (cross-process or cross-host).** Wrap the call to another agent as an `@AgentTool` method using `HttpA2AClient` — see the [A2A section](#a2a-protocol-agent-to-agent) below. This is the recommended path even for co-located agents.
 > 2. **`@AgentsFlow` (in-process, sequential)**. Chain skills with the DSL — see [Agent DSL](agent-dsl.md). This handles the most common "agent A then agent B" pattern.
 
 When the dedicated `AgentAsToolPort` ships, it will let one orchestrator engine delegate to another agent's full pipeline (its own routing, memory, guardrails, audit) within a single JVM, returning the response as a tool result.
@@ -265,7 +309,7 @@ Expose your agent as an [MCP](https://modelcontextprotocol.io/) server so that C
 agent:
   mcp:
     enabled: true
-    mode: gateway            # gateway (recommended) | transparent
+    mode: standalone         # recorded and reported; does not change behaviour today
     server:
       name: my-agent
       version: 1.0.0
@@ -340,7 +384,7 @@ When enabled, the client must send `Authorization: Bearer <key>` on the SSE conn
 
 The agent can simultaneously:
 - **Be an MCP server** (this feature) — invoked by Claude Desktop, other agents
-- **Be an MCP client** (`langchain4j-mcp` in the engine) — calling external MCP servers as tools
+- **Be an MCP client** (`agent-mcp-client`, wired into the engine) — calling external MCP servers as tools, configured under `agent.mcp-client.*`; see [Tools & Annotations](tools-and-annotations.md#consuming-mcp-servers)
 
 Both directions work at the same time.
 

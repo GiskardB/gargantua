@@ -6,7 +6,7 @@ Guardrails are filters that protect your agent from bad input and bad output. Th
 
 ## How the pipeline works
 
-Guardrails follow the Chain of Responsibility pattern. Every built-in guardrail is registered as a Spring bean with `@Order` (most via `@Component`, a few via auto-config). The framework collects them automatically and runs them in order.
+Guardrails follow the Chain of Responsibility pattern. Every built-in guardrail is registered by an explicit `@Bean` factory in `GuardrailAutoConfiguration` (and `SecurityAutoConfiguration` for `RbacGuardrail`). The `@Component` stereotypes some of them carry are for clarity only — a consuming Spring Boot application does not scan the framework's packages, so the `@Bean` factories are the real registration mechanism. Your own guardrails, which live in *your* package, are picked up by component scanning as usual.
 
 **Input guardrails** run sequentially. If any guardrail returns `BLOCK`, the pipeline short-circuits immediately -- no further guardrails run and the request never reaches the LLM. If a guardrail returns `PASS` or `WARN`, the next guardrail in the chain executes.
 
@@ -29,6 +29,11 @@ Guardrails follow the Chain of Responsibility pattern. Every built-in guardrail 
 
 Each input guardrail receives a `GuardrailInputContext` containing the user message, userId, sessionId, activated skill, and a mutable `attributes` map for inter-guardrail communication (e.g., PII maps). Each output guardrail receives a `GuardrailOutputContext` with the current response text and an `inputAttributes()` map carrying the values the input phase put into context.
 
+> **The streaming endpoint does not propagate input attributes.** `ChatStreamController`
+> builds the output context with an empty map, so anything the input phase stashed —
+> notably the PII map — is unavailable on `/api/agent/chat/stream`. See the note under
+> [PiiOutput](#piioutput-order-10).
+
 ## Built-in Input Guardrails
 
 ### RbacGuardrail (@Order 5)
@@ -39,11 +44,16 @@ Each input guardrail receives a `GuardrailInputContext` containing the user mess
 
 **How roles are provided.** The `SecurityContext` is constructed from HTTP headers: `X-User-Id`, `X-Tenant-Id`, and `X-User-Roles` (comma-separated list).
 
-**Config key:** `agent.guardrail.input.rbac-enabled` (default `true`). Setting it to `false` disables the guardrail at startup; the runtime toggle endpoint (`POST /api/admin/guardrails/rbac/toggle`) flips the same flag without a restart.
+**Config key:** `agent.guardrail.input.rbac-enabled` (default `true`). Setting it to `false` disables the guardrail at startup. The runtime toggle endpoint (`POST /api/admin/guardrails/rbac/toggle`) is a separate, additional switch — see [runtime toggling](#post-apiadminguardrailsnametoggle).
 
 **Example.** Skill declares `allowed-roles: [financial-advisor, super-admin]` and user has roles `[viewer]`:
 ```
-BLOCK: "User does not have required role for skill 'finance-skill'. Required: [financial-advisor, super-admin]"
+BLOCK: "Access denied: user 'u-123' lacks required role(s) [financial-advisor, super-admin] for skill 'finance-skill'"
+```
+
+A second block path fires when the skill restricts roles but no `SecurityContext` is present at all — it fails closed:
+```
+BLOCK: "Access denied: no security context available for role-restricted skill 'finance-skill'"
 ```
 
 ### MaxLength (@Order 10)
@@ -156,6 +166,11 @@ PASS (pii_detected=true, pii_count=2)
 
 When the input phase has stashed a `pii_map` (placeholder → original) in context attributes, this guardrail restores the originals before returning the response — longer placeholders are replaced first to avoid partial substitution. When no `pii_map` is present (input masking was off), the guardrail falls back to regex-based redaction of email/IBAN/phone patterns it sees in the LLM output.
 
+> **On the streaming endpoint the fallback is always what runs.** `/api/agent/chat/stream`
+> passes an empty attribute map to the output phase, so de-anonymisation never has a
+> `pii_map` to work from and silently degrades to regex redaction. If you rely on
+> placeholder restoration, use the synchronous `/api/agent/chat` endpoint.
+
 **Config key:**
 - `agent.guardrail.output.pii-masking-enabled` -- boolean, default `false`
 
@@ -235,7 +250,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 @Component
-@Order(60)  // runs after all built-in input guardrails (10-50)
+@Order(60)  // runs after all built-in input guardrails (5-50)
 public class ProfanityGuardrail implements InputGuardrail {
 
     private static final List<String> PROFANITY_LIST = List.of("badword1", "badword2");
@@ -269,7 +284,7 @@ public class ProfanityGuardrail implements InputGuardrail {
 
 **How Spring discovers it.** The `@Component` annotation causes Spring's component scan to register the bean. The framework injects all `InputGuardrail` beans (sorted by `@Order`) into the pipeline. No changes to framework code are needed.
 
-**Choosing an @Order value.** Built-in input guardrails use 10-50 (in steps of 10). Built-in output guardrails use 10-40. Pick a value that places your guardrail at the right point in the chain. Lower numbers run first.
+**Choosing an @Order value.** Built-in input guardrails use 5-50 (`RbacGuardrail` is 5, the rest step by 10). Built-in output guardrails use 10-40. Pick a value that places your guardrail at the right point in the chain. Lower numbers run first.
 
 **Runtime toggle.** Once registered, your custom guardrail appears in the admin API and can be enabled/disabled at runtime via `POST /api/admin/guardrails/profanity-filter/toggle`.
 
@@ -328,31 +343,53 @@ agent:
 
 ### GET /api/admin/guardrails
 
-Returns the full guardrail pipeline with each guardrail's name, type (INPUT or OUTPUT), and current enabled state.
+Returns every registered guardrail with its name and type.
 
-**Example response:**
+> **`enabled` reflects the runtime toggle only, not configuration.** On a fresh boot every
+> guardrail reports `enabled: true`, including ones disabled through
+> `agent.guardrail.*`. To know whether a guardrail will actually run, check both this
+> endpoint and your configuration.
+
+**Example response** (fresh boot, nothing toggled):
 ```json
 {
   "inputGuardrails": [
-    { "name": "rbac",               "type": "INPUT",  "enabled": true  },
-    { "name": "max-length",        "type": "INPUT",  "enabled": true  },
-    { "name": "prompt-injection",   "type": "INPUT",  "enabled": true  },
-    { "name": "topic-scope",        "type": "INPUT",  "enabled": false },
-    { "name": "pii-input-masking",  "type": "INPUT",  "enabled": true  },
-    { "name": "rate-limit",         "type": "INPUT",  "enabled": false }
+    { "name": "rbac",               "type": "INPUT",  "enabled": true },
+    { "name": "max-length",         "type": "INPUT",  "enabled": true },
+    { "name": "prompt-injection",   "type": "INPUT",  "enabled": true },
+    { "name": "topic-scope",        "type": "INPUT",  "enabled": true },
+    { "name": "pii-input-masking",  "type": "INPUT",  "enabled": true },
+    { "name": "rate-limit",         "type": "INPUT",  "enabled": true }
   ],
   "outputGuardrails": [
-    { "name": "pii-output-masking", "type": "OUTPUT", "enabled": true  },
-    { "name": "disclaimer-injector","type": "OUTPUT", "enabled": false },
-    { "name": "scope-validator",    "type": "OUTPUT", "enabled": false },
-    { "name": "schema-validator",   "type": "OUTPUT", "enabled": true  }
+    { "name": "pii-output-masking", "type": "OUTPUT", "enabled": true },
+    { "name": "disclaimer-injector","type": "OUTPUT", "enabled": true },
+    { "name": "scope-validator",    "type": "OUTPUT", "enabled": true },
+    { "name": "schema-validator",   "type": "OUTPUT", "enabled": true }
   ]
 }
 ```
 
 ### POST /api/admin/guardrails/{name}/toggle
 
-Toggles a guardrail on or off at runtime without restarting the application. The toggle state is held in memory (resets on restart). The `{name}` path variable matches the value returned by the guardrail's `name()` method.
+Flips a guardrail's runtime switch. The `{name}` path variable matches the value returned by the guardrail's `name()` method.
+
+The pipeline runs a guardrail only when **both** switches allow it:
+
+```java
+if (!guardrail.isEnabled(properties) || runtimeDisabled.contains(guardrail.name()))
+    continue;   // skipped
+```
+
+Three consequences worth knowing before relying on this endpoint:
+
+- **The toggle can only disable, never enable.** Toggling a guardrail that is disabled in
+  configuration has no effect — the config check still fails. Use it as a kill switch.
+- **State is per-instance and in memory.** It resets on restart and is *not* shared across
+  replicas: the toggle affects only the pod that served the request. Behind a load
+  balancer you must call it on every instance, or change configuration instead.
+- **Unknown names are accepted.** Posting a typo returns `200` and quietly adds the typo
+  to the disabled set. Nothing validates the name against registered guardrails.
 
 **Example request:**
 ```

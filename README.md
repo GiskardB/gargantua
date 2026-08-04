@@ -589,18 +589,30 @@ Reference agents (weather, cookbook, fitcoach) live in a sibling repo:
 
 ## Documentation
 
+**Getting started**
+
 | Topic | Link |
 |-------|------|
+| Delivery Modes (library vs runtime) | [docs/delivery-modes.md](docs/delivery-modes.md) |
 | Skills & Routing | [docs/skills-and-routing.md](docs/skills-and-routing.md) |
-| Tools & Annotations | [docs/tools-and-annotations.md](docs/tools-and-annotations.md) |
+| Tools & Annotations (`@AgentTool`, MCP tool sources) | [docs/tools-and-annotations.md](docs/tools-and-annotations.md) |
 | Memory System | [docs/memory-system.md](docs/memory-system.md) |
 | Guardrails | [docs/guardrails.md](docs/guardrails.md) |
 | LLM Configuration & Routing | [docs/llm-configuration.md](docs/llm-configuration.md) |
 | Agent DSL (@AgentSkill, @AgentsFlow) | [docs/agent-dsl.md](docs/agent-dsl.md) |
 | API Reference | [docs/api-reference.md](docs/api-reference.md) |
-| Extending (MCP, Dry-Run, Cost, History, Custom Providers) | [docs/extending.md](docs/extending.md) |
+| Extending (MCP, Secrets, Tool Providers, Cost, History) | [docs/extending.md](docs/extending.md) |
 | Deployment (Docker, K8s, GraalVM) | [docs/deployment.md](docs/deployment.md) |
 | Architecture Diagrams | [docs/architecture-diagrams.md](docs/architecture-diagrams.md) |
+
+**Architecture & platform direction**
+
+| Topic | Link |
+|-------|------|
+| AI Operating System — vision | [docs/architecture/ai-operating-system.md](docs/architecture/ai-operating-system.md) |
+| Agent Manifest — bundle schema | [docs/architecture/agent-manifest.md](docs/architecture/agent-manifest.md) |
+| Runtime Decisions — ADR log | [docs/architecture/runtime-decisions.md](docs/architecture/runtime-decisions.md) |
+| Runtime Observability — requirements | [docs/runtime-observability-requirements.md](docs/runtime-observability-requirements.md) |
 
 ---
 
@@ -685,7 +697,7 @@ All storage uses in-memory ConcurrentHashMaps. Data is lost on restart.
 | `REDIS_URL` | Redis connection URL | `redis://localhost:6379` |
 | `SERVER_PORT` | HTTP server port | `8080` |
 | **Primary LLM** | Choose a provider, a model, and set the API key — all three are needed | |
-| `LLM_PRIMARY_PROVIDER` | LLM provider: `openai`, `azure-openai`, `ollama`, or any OpenAI-compatible endpoint | `openai` |
+| `LLM_PRIMARY_PROVIDER` | LLM provider: `openai`, `anthropic`, `azure-openai`, `ollama`, or any OpenAI-compatible endpoint | `openai` |
 | `LLM_PRIMARY_MODEL` | Which model from that provider (e.g. `gpt-4o`, `gpt-4o-mini`) | `gpt-4o` |
 | `LLM_PRIMARY_API_KEY` | API key for the chosen provider (e.g. OpenAI: `sk-...`) | **(required)** |
 | `LLM_PRIMARY_ENDPOINT` | Provider API endpoint (must be OpenAI-compatible). Required for `azure-openai`. Default: `https://api.openai.com/v1` | `https://api.openai.com/v1` |
@@ -702,11 +714,10 @@ All storage uses in-memory ConcurrentHashMaps. Data is lost on restart.
 | `LLM_ROUTING_ENDPOINT` | Routing model endpoint (Ollama URL when running locally) | `http://localhost:11434` |
 | `LLM_ROUTING_API_KEY` | Routing model API key (not needed for Ollama) | *(optional)* |
 | **Routing** | | |
-| `ROUTING_STRATEGY` | Skill routing: `hybrid`, `semantic`, `llm` | `hybrid` |
-| `ROUTING_THRESHOLD` | Semantic similarity threshold (0.0 -- 1.0) | `0.82` |
+| `ROUTING_STRATEGY` | Skill routing: `hybrid`, `semantic`, `llm`. Read by the runtime image; archetype projects set `agent.routing.strategy` directly. | `hybrid` |
 | **Audit** | | |
-| `AGENT_AUDIT_ENABLED` | Enable immutable audit trail | `true` |
-| `AGENT_AUDIT_RETENTION_DAYS` | How long to retain audit events | `365` |
+| `AGENT_AUDIT_ENABLED` | Enable immutable audit trail. Read by the runtime image; archetype projects set `agent.audit.enabled` directly. | `true` |
+| *(no env var)* | Audit retention is set with `agent.audit.retention-days` | `365` |
 | **Chat UI** | | |
 | `agent.chat-ui.enabled` | Enable built-in chat web interface at `/chat` | `true` |
 

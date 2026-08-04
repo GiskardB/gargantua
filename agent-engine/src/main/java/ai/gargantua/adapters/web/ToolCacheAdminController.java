@@ -41,13 +41,16 @@ public class ToolCacheAdminController {
         stats.put("totalEntries", keys != null ? keys.size() : 0);
         stats.put("keyPrefix", CACHE_KEY_PREFIX);
 
-        // Group by tool name
+        // Keys are tool-cache:<scope>:<tool>:<argsHash>, and <scope> is itself
+        // "global", "user:<id>" or "session:<id>" — so the tool name is the
+        // second-to-last segment, not the first one after the prefix.
         Map<String, Integer> byTool = new HashMap<>();
         if (keys != null) {
             for (String key : keys) {
-                String toolPart = key.substring(CACHE_KEY_PREFIX.length());
-                String toolName = toolPart.contains(":") ? toolPart.substring(0, toolPart.indexOf(':')) : toolPart;
-                byTool.merge(toolName, 1, Integer::sum);
+                String toolName = toolNameOf(key);
+                if (toolName != null) {
+                    byTool.merge(toolName, 1, Integer::sum);
+                }
             }
         }
         stats.put("byTool", byTool);
@@ -58,7 +61,10 @@ public class ToolCacheAdminController {
     @Operation(summary = "Clear tool cache", description = "Clears cached results for a specific tool.")
     @ApiResponse(responseCode = "200", description = "Tool cache cleared")
     public ResponseEntity<Map<String, Object>> clearToolCache(@PathVariable String toolName) {
-        Set<String> keys = redisTemplate.keys(CACHE_KEY_PREFIX + toolName + ":*");
+        // The scope segment sits between the prefix and the tool name, and may itself
+        // contain a colon ("user:<id>"). A Redis glob '*' spans colons, so one pattern
+        // covers global, user and session scopes.
+        Set<String> keys = redisTemplate.keys(CACHE_KEY_PREFIX + "*:" + toolName + ":*");
         long deleted = 0;
         if (keys != null && !keys.isEmpty()) {
             deleted = redisTemplate.delete(keys);
@@ -67,6 +73,16 @@ public class ToolCacheAdminController {
         result.put("toolName", toolName);
         result.put("entriesDeleted", deleted);
         return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Extracts the tool name from a cache key of the form
+     * {@code tool-cache:<scope>:<tool>:<argsHash>}. Returns {@code null} for a key
+     * that does not have that shape.
+     */
+    private static String toolNameOf(String key) {
+        String[] parts = key.split(":");
+        return parts.length >= 4 ? parts[parts.length - 2] : null;
     }
 
     @DeleteMapping

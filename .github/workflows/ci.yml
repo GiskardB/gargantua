@@ -65,10 +65,14 @@ jobs:
           retention-days: 7
 
   # ────────────────────────────────────────────────────────────────────────────
-  # Verify agent-core compiles as pure Java (no Spring deps)
+  # Architectural constraints that are easy to violate accidentally.
+  #
+  # agent-core, agent-bundle and agent-mcp-client are Spring-free by design: the
+  # first is the pure domain, the other two are consumed by both the engine
+  # (library mode) and the standalone runtime, and must not assume either.
   # ────────────────────────────────────────────────────────────────────────────
   verify-core-purity:
-    name: Verify agent-core has zero Spring deps
+    name: Verify Spring-free modules stay Spring-free
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -78,19 +82,24 @@ jobs:
           java-version: 21
           cache: maven
 
-      - name: Build agent-core only
+      - name: Build Spring-free modules
         run: >
           mvn clean compile
           --batch-mode --no-transfer-progress
-          -pl agent-core
+          -pl agent-core,agent-bundle,agent-mcp-client -am
 
-      - name: Check no Spring imports in agent-core
+      - name: Check no Spring imports in Spring-free modules
         run: |
-          if grep -r "import org.springframework" agent-core/src/main/java/; then
-            echo "ERROR: agent-core must not depend on Spring!"
-            exit 1
-          fi
-          echo "OK: agent-core is Spring-free"
+          status=0
+          for module in agent-core agent-bundle agent-mcp-client; do
+            if grep -rn "import org.springframework" "$module/src/main/java/"; then
+              echo "ERROR: $module must not depend on Spring!"
+              status=1
+            else
+              echo "OK: $module is Spring-free"
+            fi
+          done
+          exit $status
 
       - name: Check no javax imports anywhere
         run: |

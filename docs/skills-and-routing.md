@@ -91,11 +91,25 @@ If neither a matching skill nor the configured fallback skill exists, unmatched 
 
 ## Skill Registry
 
-The skill registry is responsible for discovering, loading, and serving skill definitions. Three implementations are provided, and they can be composed together.
+The skill registry discovers, loads and serves skill definitions. Five implementations exist and are composed into a chain by `SkillRegistryAutoConfiguration`:
+
+```
+FilesystemSkillRegistry + ClasspathSkillsJarRegistry
+        → CompositeSkillRegistry
+        → CachedSkillRegistry
+        → HotReloadSkillRegistry   (only when agent.skill.hot-reload=true)
+```
+
+The first two are sources; the rest are decorators. You rarely instantiate any of them
+directly.
 
 ### FilesystemSkillRegistry
 
-The baseline implementation. At startup it scans `classpath:skills/` for directories containing a `SKILL.md` file and parses each one into a `SkillCard`.
+The baseline source. At startup it scans `agent.skill.path` (default `skills`) for
+directories containing a `SKILL.md` file and parses each one into a `SkillCard`. The path
+is a Spring resource pattern, so `classpath:skills/` and `file:/opt/agent/skills` both
+work — archetype projects use the former, the standalone runtime points it at the loaded
+bundle.
 
 ### CachedSkillRegistry
 
@@ -160,11 +174,21 @@ Input → Embedding (all-MiniLM-L6-v2-quantized, in-process, ~2-5ms)
 
 ```yaml
 agent:
+  skill:
+    path: skills              # Where SKILL.md folders are read from; the archetype
+                              # sets classpath:skills/, the runtime points it at the bundle
   routing:
     strategy: hybrid          # semantic | llm | hybrid
     fallback-skill: default   # Skill name to route to when no match meets threshold
-    threshold: 0.6            # Minimum cosine similarity for semantic match
+    semantic:
+      threshold: 0.6          # Minimum cosine similarity for semantic match
+      model: all-minilm-l6-v2
 ```
+
+> The threshold is nested under `semantic`. `agent.routing.threshold` is **not** a
+> property — Spring ignores unknown keys, so getting this wrong silently leaves the
+> default in place. Archetype-generated projects ship `0.82`; the framework default is
+> `0.6`.
 
 `SemanticRoutingService.route()` branches on `strategy` (default `hybrid`). Unknown values fall back to `hybrid` with a warning log.
 
@@ -183,7 +207,12 @@ Use the `X-Force-Skill` HTTP header to bypass routing and force a particular ski
 X-Force-Skill: weather-skill
 ```
 
-Forced routing skips both semantic and LLM matching. If the specified skill does not exist or is inactive, the request fails with a `SkillNotFoundException`.
+Forced routing skips both semantic and LLM matching. If the named skill does not exist the
+request fails with a `SkillNotFoundException`.
+
+> Forcing bypasses the `active` flag: a skill with `metadata.active: false` still runs when
+> named explicitly, because the registry resolves it by path rather than through the active
+> list. Deactivating a skill hides it from routing, it does not disable it.
 
 ---
 
