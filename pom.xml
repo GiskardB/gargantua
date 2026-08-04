@@ -23,6 +23,7 @@
   <modules>
     <module>agent-core</module>
     <module>agent-memory-sdk</module>
+    <module>agent-mcp-client</module>
     <module>agent-engine</module>
     <module>agent-mcp-server</module>
     <module>agent-skill-linter-maven-plugin</module>
@@ -67,6 +68,11 @@
       <dependency>
         <groupId>ai.gargantua</groupId>
         <artifactId>agent-memory-sdk</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>ai.gargantua</groupId>
+        <artifactId>agent-mcp-client</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>

@@ -4,6 +4,7 @@ import ai.gargantua.core.memory.WorkingMemoryPort;
 import ai.gargantua.core.orchestrator.ContextEnricher;
 import ai.gargantua.core.orchestrator.OrchestratorEngine;
 import ai.gargantua.core.orchestrator.TokenBudgetManager;
+import ai.gargantua.core.secret.SecretResolver;
 import ai.gargantua.core.skill.SkillRegistry;
 import ai.gargantua.memory.composer.MemoryComposer;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -67,12 +68,30 @@ public class AgentAutoConfiguration {
         return new PromptBuilder();
     }
 
+    /**
+     * Resolves {@code ${secrets.*}} references from the process environment. Replace this
+     * bean to source them from a vault instead; nothing else changes, because manifests
+     * and configuration only ever carry the reference.
+     */
+    @Bean
+    @ConditionalOnMissingBean(SecretResolver.class)
+    public SecretResolver secretResolver() {
+        return new EnvironmentSecretResolver();
+    }
+
+    /**
+     * Composes the tool surface: compiled {@code @AgentTool} methods plus one provider per
+     * reachable MCP server declared under {@code agent.mcp-client.servers}.
+     */
     @Bean
     @ConditionalOnMissingBean(ToolRegistry.class)
     public ToolRegistry toolRegistry(ApplicationContext applicationContext,
                                      ObjectProvider<ToolResultCache> toolResultCacheProvider,
-                                     ObjectProvider<MeterRegistry> meterRegistryProvider) {
-        return new ToolRegistry(applicationContext, toolResultCacheProvider, meterRegistryProvider);
+                                     ObjectProvider<MeterRegistry> meterRegistryProvider,
+                                     AgentProperties properties,
+                                     SecretResolver secretResolver) {
+        return new ToolRegistry(applicationContext, toolResultCacheProvider, meterRegistryProvider,
+                McpToolProviderFactory.fromProperties(properties, secretResolver));
     }
 
     // ── Token Budget (merged from TokenBudgetAutoConfiguration) ────

@@ -25,6 +25,10 @@
       <groupId>ai.gargantua</groupId>
       <artifactId>agent-memory-sdk</artifactId>
     </dependency>
+    <dependency>
+      <groupId>ai.gargantua</groupId>
+      <artifactId>agent-mcp-client</artifactId>
+    </dependency>
 
     <!-- Spring -->
     <dependency>

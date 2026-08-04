@@ -228,6 +228,69 @@ This means:
 
 ---
 
+## Tool Sources
+
+`@AgentTool` methods are one of two tool sources. The `ToolRegistry` composes several
+`ToolProvider`s and merges them into a single surface, so the orchestrator, the prompt
+builder and the tool-calling loop cannot tell where a tool came from.
+
+| Source | Provider | Where tools are defined |
+|---|---|---|
+| Compiled Java | `AnnotationToolProvider` | `@AgentTool` methods in the Spring context |
+| MCP servers | `McpToolProvider` | An external MCP server, one provider per server |
+
+Providers are consulted in order and the first to claim a name wins, so a compiled Java
+tool deliberately shadows a remote tool of the same name. Collisions are logged.
+
+### Consuming MCP servers
+
+Declare the servers under `agent.mcp-client`. Each one is connected at startup, its tools
+are discovered, and they become available exactly like local tools:
+
+```yaml
+agent:
+  mcp-client:
+    enabled: true                # default
+    request-timeout-seconds: 30  # default
+    fail-fast: false             # default: skip unreachable servers rather than abort
+    servers:
+      - name: github
+        transport: stdio
+        command: npx
+        args: ["-y", "@modelcontextprotocol/server-github"]
+        env:
+          GITHUB_TOKEN: ${secrets.github-token}
+
+      - name: payments
+        transport: http
+        url: https://mcp.internal/payments
+        auth:
+          type: bearer
+          value: ${secrets.payments-token}
+        allowed-tools: [getPayment, refundPayment]   # allow-list; omit to expose all
+```
+
+Notes:
+
+- **Transports.** `stdio` runs the server as a child process; `http` and `sse` connect to a
+  remote one. MCP SDK 0.9.0 has a single SSE-based HTTP client, so `http` and `sse` behave
+  identically today.
+- **Secrets.** `${secrets.NAME}` is resolved at startup by the `SecretResolver` bean —
+  by default from environment variables, trying `NAME` then `NAME_IN_UPPER_SNAKE_CASE`.
+  Replace the bean to read from a vault. An unresolved reference fails the connection
+  rather than being sent as a literal credential.
+- **Failure handling.** By default an unreachable server is logged and skipped so the agent
+  still starts. Set `fail-fast: true` when a server is essential.
+- **Allow-lists.** `allowed-tools` filters what the server advertises, applied both at
+  discovery and at invocation.
+- **Skill visibility still applies.** MCP tools are subject to the same `allowed-tools`
+  frontmatter as Java tools; being connected does not make a tool visible to a skill.
+
+Unlike reflection-based discovery, MCP tools carry a real JSON Schema, so their parameter
+types and required flags are passed through to the model rather than flattened to strings.
+
+---
+
 ## Complete Example
 
 The following class demonstrates all four annotations working together on a single tool. `@AgentTool` and `@RequiresApproval` are fully wired today; `@ToolRetry` and `@CacheableToolResult` are still in development (see the planned banners on each section above) — the example showcases the intended API surface.

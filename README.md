@@ -442,6 +442,7 @@ Gargantua is distributed as a set of Maven libraries. You don't clone this repo 
 |----------|---------|-------------|
 | `agent-core` | `ai.gargantua` | Pure domain: records, interfaces, annotations. Zero Spring deps. |
 | `agent-memory-sdk` | `ai.gargantua` | Standalone 3-layer memory (Redis + MongoDB). Reusable in any project. |
+| `agent-mcp-client` | `ai.gargantua` | Consumes external MCP servers and exposes their tools as agent tools. Zero Spring deps. |
 | `agent-engine` | `ai.gargantua` | Auto-configuration, guardrails, routing, orchestrator, tool registry, REST controllers, skill registries, admin endpoints. |
 | `agent-mcp-server` | `ai.gargantua` | MCP Server gateway (optional). |
 | `agent-skill-linter-maven-plugin` | `ai.gargantua` | Build-time SKILL.md validation. |
@@ -529,6 +530,7 @@ Gargantua is published via **JitPack** — no authentication, no `settings.xml`,
 gargantua/
 ├── agent-core/                      -- Pure domain: records, interfaces, annotations
 ├── agent-memory-sdk/                -- Standalone memory library (Redis + MongoDB)
+├── agent-mcp-client/                -- MCP client: consumes external MCP servers as tool sources
 ├── agent-engine/                    -- Core engine: auto-configuration, orchestrator, guardrails, routing, REST controllers, skill registries
 ├── agent-mcp-server/                -- MCP Server gateway (optional)
 ├── agent-skill-linter-maven-plugin/ -- Build-time SKILL.md validation

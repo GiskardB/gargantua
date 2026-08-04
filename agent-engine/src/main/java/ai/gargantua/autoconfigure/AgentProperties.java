@@ -30,6 +30,7 @@ public class AgentProperties {
     private Observability observability = new Observability();
     private Enrichers enrichers = new Enrichers();
     private Mcp mcp = new Mcp();
+    private McpClient mcpClient = new McpClient();
     private Skillsjars skillsjars = new Skillsjars();
     private Audit audit = new Audit();
     private ChatUi chatUi = new ChatUi();
@@ -79,6 +80,9 @@ public class AgentProperties {
 
     public Mcp getMcp() { return mcp; }
     public void setMcp(Mcp mcp) { this.mcp = mcp; }
+
+    public McpClient getMcpClient() { return mcpClient; }
+    public void setMcpClient(McpClient mcpClient) { this.mcpClient = mcpClient; }
 
     public Skillsjars getSkillsjars() { return skillsjars; }
     public void setSkillsjars(Skillsjars skillsjars) { this.skillsjars = skillsjars; }
@@ -547,6 +551,89 @@ public class AgentProperties {
 
         public boolean isEnabled() { return enabled; }
         public void setEnabled(boolean enabled) { this.enabled = enabled; }
+    }
+
+    /**
+     * External MCP servers this agent consumes for tools, bound to
+     * {@code agent.mcp-client.*}. Distinct from {@link Mcp}, which controls exposing
+     * <em>this</em> agent as an MCP server.
+     *
+     * <p>Declaring servers here is the library-mode equivalent of the {@code spec.mcp}
+     * block in a bundle manifest; both end up as
+     * {@link ai.gargantua.core.mcp.McpServerSpec} instances.</p>
+     */
+    public static class McpClient {
+        private boolean enabled = true;
+        private int requestTimeoutSeconds = 30;
+        private boolean failFast = false;
+        private List<Server> servers = new ArrayList<>();
+
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
+
+        public int getRequestTimeoutSeconds() { return requestTimeoutSeconds; }
+        public void setRequestTimeoutSeconds(int requestTimeoutSeconds) { this.requestTimeoutSeconds = requestTimeoutSeconds; }
+
+        /** When true, a server that fails to connect aborts startup instead of being skipped. */
+        public boolean isFailFast() { return failFast; }
+        public void setFailFast(boolean failFast) { this.failFast = failFast; }
+
+        public List<Server> getServers() { return servers; }
+        public void setServers(List<Server> servers) { this.servers = servers; }
+
+        public static class Server {
+            private String name = "";
+            private String transport = "stdio";
+            private String command = "";
+            private List<String> args = new ArrayList<>();
+            private Map<String, String> env = new HashMap<>();
+            private String url = "";
+            private Auth auth = new Auth();
+            private List<String> allowedTools = new ArrayList<>();
+            private boolean enabled = true;
+
+            public String getName() { return name; }
+            public void setName(String name) { this.name = name; }
+
+            public String getTransport() { return transport; }
+            public void setTransport(String transport) { this.transport = transport; }
+
+            public String getCommand() { return command; }
+            public void setCommand(String command) { this.command = command; }
+
+            public List<String> getArgs() { return args; }
+            public void setArgs(List<String> args) { this.args = args; }
+
+            public Map<String, String> getEnv() { return env; }
+            public void setEnv(Map<String, String> env) { this.env = env; }
+
+            public String getUrl() { return url; }
+            public void setUrl(String url) { this.url = url; }
+
+            public Auth getAuth() { return auth; }
+            public void setAuth(Auth auth) { this.auth = auth; }
+
+            public List<String> getAllowedTools() { return allowedTools; }
+            public void setAllowedTools(List<String> allowedTools) { this.allowedTools = allowedTools; }
+
+            public boolean isEnabled() { return enabled; }
+            public void setEnabled(boolean enabled) { this.enabled = enabled; }
+        }
+
+        public static class Auth {
+            private String type = "none";
+            private String value = "";
+            private String headerName = "";
+
+            public String getType() { return type; }
+            public void setType(String type) { this.type = type; }
+
+            public String getValue() { return value; }
+            public void setValue(String value) { this.value = value; }
+
+            public String getHeaderName() { return headerName; }
+            public void setHeaderName(String headerName) { this.headerName = headerName; }
+        }
     }
 
     public static class Skillsjars {

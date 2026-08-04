@@ -118,3 +118,35 @@ credential.
 
 **Open.** Where the Control Plane stores secret *values*, and how the Studio presents
 secret *references*, is not decided here — it is a cross-repository concern.
+
+---
+
+## ADR-006 — Tools are supplied by composable providers
+
+**Status:** Accepted
+
+**Decision.** `ToolRegistry` no longer discovers tools itself. It composes a list of
+`ToolProvider`s and owns only name-to-provider routing. `AnnotationToolProvider` supplies
+compiled `@AgentTool` methods; one `McpToolProvider` is created per declared MCP server.
+
+**Rationale.** This is the seam that makes ADR-002 and ADR-003 hold at the same time.
+Library mode and runtime mode differ solely in where tools come from, so isolating that
+difference behind one interface means the orchestrator, prompt builder and tool-calling
+loop stay identical for both.
+
+The annotation-driven cross-cutting concerns — `@RequiresRole`, `@CacheableToolResult`,
+`@ToolRetry` — moved into `AnnotationToolProvider` rather than staying in the registry,
+because they read configuration from Java annotations that no external source has.
+
+**Consequences.**
+
+- Providers are consulted in order and the first to claim a name wins, so a local Java
+  tool shadows a remote one of the same name. Collisions are logged, not rejected.
+- A provider that fails discovery is logged and skipped: one unreachable MCP server does
+  not stop the agent from starting. `fail-fast` opts into the stricter behaviour.
+- `ToolDefinition` gained a provider-neutral `parameters` list so that agent-core can
+  describe schemas without depending on any LLM SDK. Reflection-based discovery emits
+  untyped string parameters, preserving previous model-visible behaviour exactly, while
+  MCP tools pass their declared JSON Schema types through.
+- The registry closes its providers on shutdown, which is what stops stdio MCP child
+  processes from outliving the agent.
