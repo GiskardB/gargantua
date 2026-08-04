@@ -1,0 +1,29 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# Embedded mode — execute a bundle with no MongoDB and no Redis.
+#
+#   java -jar runtime.jar run my-agent.gbundle --spring.profiles.active=embedded
+#
+# Everything is held in memory and lost on exit. This is what makes runtime mode
+# demonstrable and CI-testable without standing up infrastructure; it is not for
+# production, where the agent must be stateless and the state external.
+# ══════════════════════════════════════════════════════════════════════════════
+
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.mongodb.autoconfigure.MongoAutoConfiguration
+      - org.springframework.boot.data.mongodb.autoconfigure.DataMongoAutoConfiguration
+      - org.springframework.boot.data.mongodb.autoconfigure.DataMongoRepositoriesAutoConfiguration
+      - org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration
+      - org.springframework.boot.data.redis.autoconfigure.DataRedisRepositoriesAutoConfiguration
+
+management:
+  health:
+    mongo:
+      enabled: false
+    redis:
+      enabled: false
+
+logging:
+  level:
+    ai.gargantua: ${LOG_LEVEL:INFO}
