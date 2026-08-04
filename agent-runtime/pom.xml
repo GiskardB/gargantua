@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>ai.gargantua</groupId>
+    <artifactId>gargantua-parent</artifactId>
+    <version>1.2.2</version>
+  </parent>
+
+  <artifactId>agent-runtime</artifactId>
+  <name>Agent Runtime</name>
+  <description>Standalone runtime that executes an agent bundle</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>ai.gargantua</groupId>
+      <artifactId>agent-engine</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>ai.gargantua</groupId>
+      <artifactId>agent-bundle</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-webmvc</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <!-- Produces the executable jar that the runtime container image runs. -->
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+        <configuration>
+          <mainClass>ai.gargantua.runtime.GargantuaRuntime</mainClass>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>repackage</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

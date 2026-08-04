@@ -434,6 +434,46 @@ That's it. The framework handles routing, memory, guardrails, streaming, and eve
 
 ---
 
+## Two ways to ship an agent
+
+Gargantua runs the same engine in two delivery modes. They differ only in who writes the
+agent and where its tools come from.
+
+| | **Library mode** | **Runtime mode** |
+|---|---|---|
+| You write | Java, in your own Spring Boot app | A declarative bundle |
+| Tools come from | Compiled `@AgentTool` methods | MCP servers named in the manifest |
+| Artifact | Your application | A signed, versioned `.gbundle` |
+| Start with | `mvn archetype:generate` (above) | `gargantua run my-agent.gbundle` |
+
+**Library mode** is the original experience and is unchanged — add the dependency, write
+tools in Java, run your app.
+
+**Runtime mode** separates the executor from the payload. A generic runtime image loads a
+bundle at startup:
+
+```bash
+docker run -v ./customer-agent.gbundle:/bundle:ro \
+           -e LLM_PRIMARY_API_KEY=sk-... \
+           ghcr.io/giskardb/gargantua-runtime:1.0
+```
+
+Image and bundle version independently: roll a bundle forward without rebuilding the
+image, patch the image without republishing bundles. Bundles never contain executable
+code, which is what makes signing them meaningful — teams needing bespoke Java tools build
+a custom runtime image in library mode and name it in the manifest.
+
+```bash
+gargantua validate my-agent.gbundle   # parse, verify integrity, report unapplied fields
+gargantua run       my-agent.gbundle   # execute
+```
+
+See [AI Operating System](docs/architecture/ai-operating-system.md) for where this is
+heading, [Agent Manifest](docs/architecture/agent-manifest.md) for the bundle schema, and
+[Runtime Decisions](docs/architecture/runtime-decisions.md) for why it is built this way.
+
+---
+
 ## Framework Libraries (Maven coordinates)
 
 Gargantua is distributed as a set of Maven libraries. You don't clone this repo -- you add dependencies.
@@ -443,7 +483,9 @@ Gargantua is distributed as a set of Maven libraries. You don't clone this repo 
 | `agent-core` | `ai.gargantua` | Pure domain: records, interfaces, annotations. Zero Spring deps. |
 | `agent-memory-sdk` | `ai.gargantua` | Standalone 3-layer memory (Redis + MongoDB). Reusable in any project. |
 | `agent-mcp-client` | `ai.gargantua` | Consumes external MCP servers and exposes their tools as agent tools. Zero Spring deps. |
+| `agent-bundle` | `ai.gargantua` | Agent bundle format: manifest parsing, loading, integrity verification. Zero Spring deps. |
 | `agent-engine` | `ai.gargantua` | Auto-configuration, guardrails, routing, orchestrator, tool registry, REST controllers, skill registries, admin endpoints. |
+| `agent-runtime` | `ai.gargantua` | Standalone runtime that loads and executes an agent bundle. Shipped as a container image. |
 | `agent-mcp-server` | `ai.gargantua` | MCP Server gateway (optional). |
 | `agent-skill-linter-maven-plugin` | `ai.gargantua` | Build-time SKILL.md validation. |
 | `agent-archetype` | `ai.gargantua` | Maven archetype to scaffold new agent projects. |
@@ -531,7 +573,9 @@ gargantua/
 ├── agent-core/                      -- Pure domain: records, interfaces, annotations
 ├── agent-memory-sdk/                -- Standalone memory library (Redis + MongoDB)
 ├── agent-mcp-client/                -- MCP client: consumes external MCP servers as tool sources
+├── agent-bundle/                    -- Bundle format: manifest parsing, loading, integrity verification
 ├── agent-engine/                    -- Core engine: auto-configuration, orchestrator, guardrails, routing, REST controllers, skill registries
+├── agent-runtime/                   -- Standalone runtime that executes a bundle (container image)
 ├── agent-mcp-server/                -- MCP Server gateway (optional)
 ├── agent-skill-linter-maven-plugin/ -- Build-time SKILL.md validation
 ├── agent-archetype/                 -- Maven archetype for scaffolding new projects

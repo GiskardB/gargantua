@@ -17,11 +17,23 @@ import org.springframework.lang.Nullable;
 @EnableConfigurationProperties(AgentProperties.class)
 public class CapabilitiesAutoConfiguration {
 
+    /**
+     * Empty by default: a library-mode agent advertises no capabilities and is reached
+     * directly. The runtime replaces this bean with the capabilities declared in the
+     * bundle manifest.
+     */
+    @Bean
+    @ConditionalOnMissingBean(CapabilityRegistry.class)
+    public CapabilityRegistry capabilityRegistry() {
+        return CapabilityRegistry.empty();
+    }
+
     @Bean
     @ConditionalOnMissingBean(AgentCardService.class)
     public AgentCardService agentCardService(AgentProperties properties,
-                                              @Nullable SkillRegistry skillRegistry) {
-        return new AgentCardService(properties, skillRegistry);
+                                              @Nullable SkillRegistry skillRegistry,
+                                              @Nullable CapabilityRegistry capabilityRegistry) {
+        return new AgentCardService(properties, skillRegistry, capabilityRegistry);
     }
 
     @Bean

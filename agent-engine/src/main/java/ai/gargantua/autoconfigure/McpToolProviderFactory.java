@@ -90,7 +90,7 @@ public final class McpToolProviderFactory {
     }
 
     /** Translates a configuration entry into the neutral spec shared with the manifest. */
-    static McpServerSpec toSpec(AgentProperties.McpClient.Server server) {
+    public static McpServerSpec toSpec(AgentProperties.McpClient.Server server) {
         McpTransport transport;
         try {
             transport = McpTransport.valueOf(
