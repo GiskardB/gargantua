@@ -115,16 +115,13 @@ agent:
 
   guardrail:
     input:
-      max-chars: 2000
-      injection-guard:
-        enabled: true
-      pii-masking:
-        enabled: true
+      max-length-enabled: true
+      max-length-chars: 2000
+      prompt-injection-enabled: true
+      pii-masking-enabled: true
     output:
-      pii-redaction:
-        enabled: true
-      schema-validator:
-        enabled: true
+      pii-masking-enabled: true
+      schema-validation-enabled: true
 
   hitl:
     enabled: true

@@ -68,7 +68,7 @@ sequenceDiagram
     Agent->>MC: compose(userId, sessionId, maxTokens)
     par Parallel fetch
         MC->>WM: getMessages(sessionId)
-        MC->>EM: getRecentSummaries(userId, 10)
+        MC->>EM: getRecentSummaries(userId, maxSummaries)
         MC->>KM: getSegments(userId)
     end
     WM-->>MC: List<ChatMessage>
@@ -149,7 +149,7 @@ The scheduler is conditional on `MongoTemplate` being available — embedded-mod
 | `sessionDate` | Instant | When the session started |
 | `expiresAt` | Instant | Optional TTL for the summary itself (null = never expires) |
 
-**Retrieval:** Summaries are sorted by `sessionDate` descending. The composer currently fetches up to 10 summaries per request (hardcoded) and then applies token budget truncation.
+**Retrieval:** Summaries are sorted by `sessionDate` descending. The composer fetches up to `agent.memory.episodic.max-summaries` summaries per request (default: 5) and then applies token budget truncation.
 
 **Configuration:**
 ```yaml
@@ -312,9 +312,9 @@ The memory layer is published as a separate Maven artifact (`ai.gargantua:agent-
 
 ```xml
 <dependency>
-    <groupId>ai.gargantua</groupId>
+    <groupId>com.github.giskardb.gargantua</groupId>
     <artifactId>agent-memory-sdk</artifactId>
-    <version>1.0.0</version>
+    <version>v1.2.2</version>
 </dependency>
 ```
 

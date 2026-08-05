@@ -164,8 +164,10 @@ public class HttpA2AClient implements A2AClient {
             }
         }
 
-        Instant createdAt = Instant.parse((String) result.get("createdAt"));
-        Instant updatedAt = Instant.parse((String) result.get("updatedAt"));
+        String createdAtStr = (String) result.get("createdAt");
+        Instant createdAt = createdAtStr != null ? Instant.parse(createdAtStr) : Instant.now();
+        String updatedAtStr = (String) result.get("updatedAt");
+        Instant updatedAt = updatedAtStr != null ? Instant.parse(updatedAtStr) : createdAt;
         Map<String, Object> metadata = (Map<String, Object>) result.get("metadata");
 
         return new A2ATask(id, kind, contextId, status, artifacts, createdAt, updatedAt, metadata);

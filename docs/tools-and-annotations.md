@@ -2,7 +2,7 @@
 
 ## @AgentTool
 
-The `@AgentTool` annotation marks a method as a tool that can be called by the LLM. Annotated methods are discovered at boot time and registered in the `ToolRegistry`.
+The `@AgentTool` annotation marks a method as a tool that can be called by the LLM. Annotated methods are discovered at boot time by `AnnotationToolProvider`, which contributes them to the `ToolRegistry` alongside any other tool source.
 
 ```java
 @AgentTool(
@@ -34,7 +34,7 @@ The `description` is the single most important factor in whether the LLM calls t
 
 ## @ToolRetry -- Automatic Retry with Exponential Backoff
 
-Wraps the tool invocation in a retry policy backed by [Resilience4j Retry](https://resilience4j.readme.io/docs/retry). Honored by `ToolRegistry.executeTool` whenever the tool method carries `@ToolRetry`. Use it for tools that call external services prone to transient failures.
+Wraps the tool invocation in a retry policy backed by [Resilience4j Retry](https://resilience4j.readme.io/docs/retry). Honored by `AnnotationToolProvider` whenever the tool method carries `@ToolRetry`. Use it for tools that call external services prone to transient failures.
 
 ```java
 @ToolRetry(
@@ -65,8 +65,12 @@ With the defaults above, the retry timing looks like this:
 ```
 Attempt 1 → fails → wait 500ms
 Attempt 2 → fails → wait 1000ms
-Attempt 3 → fails → exception propagated to agent
+Attempt 3 → fails → {"error":"Tool execution failed: ..."} returned to the LLM
 ```
+
+The exhausted retry does not propagate an exception. The failure is returned as a JSON
+error payload so the model can see it and decide what to do — apologise, try a different
+tool, or ask the user. This is the same convention every tool error follows.
 
 ### Metrics
 
@@ -105,8 +109,9 @@ When the agent attempts to call a tool annotated with `@RequiresApproval`, the f
 
 1. The agent runtime suspends and persists an approval request keyed by a unique `requestId` (via `ApprovalStore` — Redis in standard mode, in-memory in embedded mode).
    > On the streaming endpoint (`/api/agent/chat/stream`), `ChatStreamController` emits an `approval_required` SSE event before the tool would run, with `requestId`, `tool`, `arguments`, `message`, `dangerous`, `ttlMinutes`. The pending request is also persisted via `ApprovalStore` (when configured) so a reviewer can resolve it via `POST /api/agent/approval/{requestId}`. The synthetic tool result fed back to the LLM is `{"status":"awaiting_approval","requestId":"..."}`.
-2. The agent **pauses** execution. No further tool calls or LLM requests are made.
-3. The client (web UI, CLI, or external system) presents the approval prompt to a human reviewer.
+2. The stream **continues**. The synthetic result above is fed back to the LLM, which
+   typically tells the user that confirmation is pending.
+3. The client presents the approval prompt to a human reviewer.
 4. The reviewer calls the approval endpoint:
    ```
    POST /api/agent/approval/{requestId}
@@ -116,8 +121,18 @@ When the agent attempts to call a tool annotated with `@RequiresApproval`, the f
      "decision": "APPROVED"   // or "DENIED"
    }
    ```
-5. If **approved**, the tool executes normally and the agent resumes.
-6. If **denied**, the agent receives a denial notification and can inform the user or choose an alternative action.
+5. The decision is written to the `ApprovalStore`.
+
+> **What is not implemented yet.** Resolving an approval records the decision; it does not
+> execute the tool and does not resume the original stream. There is no resume path in the
+> codebase today — `ApprovalController` holds no reference to the tool registry or the SSE
+> sink. Treat `@RequiresApproval` as "stop this tool from running and tell someone",
+> not as "run it later once approved". Re-invoking the approved action is currently the
+> client's responsibility.
+>
+> **Only the streaming endpoint enforces it.** `POST /api/agent/chat` runs approval-gated
+> tools without any gate, because the check lives in `ChatStreamController`. Use
+> `/api/agent/chat/stream` when `@RequiresApproval` matters.
 
 ### Configuration
 
@@ -213,7 +228,7 @@ These endpoints are available under the admin API for cache management.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/admin/tool-cache/stats` | Returns hit/miss counts and entry counts per tool. |
+| `GET` | `/api/admin/tool-cache/stats` | Returns `totalEntries`, `keyPrefix` and `byTool` entry counts. Hit/miss rates are Micrometer counters, not part of this payload. |
 | `DELETE` | `/api/admin/tool-cache/{toolName}` | Evicts all cached entries for a specific tool. |
 | `DELETE` | `/api/admin/tool-cache` | Evicts the entire tool cache. |
 
@@ -221,7 +236,7 @@ These endpoints are available under the admin API for cache management.
 
 ## Tool Discovery
 
-At application startup, the `ToolRegistry` scans all Spring-managed beans for methods annotated with `@AgentTool`. Each discovered method is registered as an available tool with its name, description, parameter types, and return type.
+At application startup, the `ToolRegistry` scans all Spring-managed beans for methods annotated with `@AgentTool`. Each discovered method is registered as an available tool with its name and description. Parameters are exposed to the LLM as string properties; the registry handles type conversion at invocation time.
 
 However, a tool being registered does not mean it is available to every skill. Each skill's `allowed-tools` list in its SKILL.md frontmatter controls which tools the LLM can see when that skill is active. If a tool is not in the list, it is invisible to the LLM for that skill -- it will not appear in the tool definitions sent with the prompt.
 
@@ -232,9 +247,154 @@ This means:
 
 ---
 
+## Tool Sources
+
+`@AgentTool` methods are one of two tool sources. The `ToolRegistry` composes several
+`ToolProvider`s and merges them into a single surface, so the orchestrator, the prompt
+builder and the tool-calling loop cannot tell where a tool came from.
+
+| Source | Provider | Where tools are defined |
+|---|---|---|
+| Compiled Java | `AnnotationToolProvider` | `@AgentTool` methods in the Spring context |
+| MCP servers | `McpToolProvider` | An external MCP server, one provider per server |
+
+Providers are consulted in order and the first to claim a name wins, so a compiled Java
+tool deliberately shadows a remote tool of the same name. Collisions are logged.
+
+### Consuming MCP servers
+
+Declare the servers under `agent.mcp-client`. Each one is connected at startup, its tools
+are discovered, and they become available exactly like local tools:
+
+```yaml
+agent:
+  mcp-client:
+    enabled: true                # default
+    request-timeout-seconds: 30  # default
+    fail-fast: false             # default: skip unreachable servers rather than abort
+    servers:
+      - name: github
+        transport: stdio
+        command: npx
+        args: ["-y", "@modelcontextprotocol/server-github"]
+        env:
+          GITHUB_TOKEN: ${secrets.github-token}
+
+      - name: payments
+        transport: http
+        url: https://mcp.internal/payments
+        auth:
+          type: bearer
+          value: ${secrets.payments-token}
+        allowed-tools: [getPayment, refundPayment]   # allow-list; omit to expose all
+```
+
+Notes:
+
+- **Transports.** `stdio` runs the server as a child process; `http` and `sse` connect to a
+  remote one. MCP SDK 0.9.0 has a single SSE-based HTTP client, so `http` and `sse` behave
+  identically today.
+- **Secrets.** `${secrets.NAME}` is resolved at startup by the `SecretResolver` bean
+  (`EnvironmentSecretResolver` by default, trying `NAME` then `NAME_IN_UPPER_SNAKE_CASE`).
+  `${env.NAME}` reads the process environment directly and is for non-confidential wiring.
+  Replace the `SecretResolver` bean — it is `@ConditionalOnMissingBean` — to read from a
+  vault instead.
+  An unresolved reference in `auth.value` **aborts the connection**. Elsewhere
+  (`command`, `args`, `env`) the placeholder is passed through verbatim, so a mistyped
+  secret name reaches the child process as the literal string `${secrets.x}` rather than
+  as an empty value. Both behaviours are deliberate: visible over silently blank.
+- **Auth types.** `none` (default), `bearer`, `basic`, and `header` — the last requires
+  `header-name`. `basic` expects an already-encoded credential.
+- **Per-server switch.** `enabled: false` keeps a declaration in place without connecting
+  to it.
+- **Failure handling.** By default an unreachable server is logged and skipped so the agent
+  still starts. Set `fail-fast: true` when a server is essential.
+- **Allow-lists.** `allowed-tools` filters what the server advertises, applied both at
+  discovery and at invocation.
+- **Skill visibility still applies.** MCP tools are subject to the same `allowed-tools`
+  frontmatter as Java tools; being connected does not make a tool visible to a skill.
+
+### What the model is told about parameters
+
+`ToolDefinition.parameters` is a list of `ToolParameter(name, type, description, required)`
+using JSON Schema type names. The two sources populate it differently:
+
+| Source | Types | Required flags | Descriptions |
+|---|---|---|---|
+| `@AgentTool` methods | Always `string`; converted at invocation time | Never set | Not available |
+| MCP servers | Passed through from the server's schema | Passed through | Passed through |
+
+So an MCP tool taking an integer is advertised as an integer, while a Java tool taking an
+`int` is advertised as a string and parsed on the way in. Structural types (`object`,
+`array`) currently degrade to `string` in the specification sent to the model.
+
+### Which annotations apply to which source
+
+This asymmetry matters for security, because the annotations are properties of a Java
+method and have no equivalent on a remote tool:
+
+| Control | `@AgentTool` methods | MCP tools |
+|---|---|---|
+| `@RequiresRole` (RBAC) | Enforced | **Not applied** |
+| `@RequiresApproval` (HITL) | Enforced on the streaming endpoint | **Not applied** |
+| `@CacheableToolResult` | Enforced | **Not applied** |
+| `@ToolRetry` | Enforced | **Not applied** |
+| Skill `allowed-tools` | Enforced | Enforced |
+| Server `allowed-tools` allow-list | — | Enforced |
+
+A remote tool is gated only by the skill's `allowed-tools` and the server's own allow-list.
+If an MCP tool performs a destructive action, restrict it with `allowed-tools` on both
+sides, or wrap it in a Java `@AgentTool` that applies the controls you need — a local tool
+of the same name shadows the remote one.
+
+Input and output guardrails run identically regardless of tool source, since they operate
+on the message rather than on the tool call.
+
+---
+
+## Writing a custom tool source
+
+`ToolProvider` (in `agent-core`, so it carries no Spring or LLM-SDK dependency) is the
+extension point for supplying tools from anywhere — a database, a plugin directory, a
+remote registry:
+
+```java
+public interface ToolProvider extends AutoCloseable {
+    String name();                       // "annotation", "mcp:github", ...
+    List<ToolDefinition> discover();     // called once at startup
+    String execute(String toolName, String argumentsJson, ToolExecutionContext context);
+    default void close() {}              // release child processes, connections
+}
+```
+
+Contract notes worth honouring:
+
+- `discover()` should return an empty list rather than throw when the backing source is
+  unreachable, so one broken provider does not stop the agent from starting.
+- `execute` reports failures as a JSON object with an `error` field instead of throwing,
+  so the model can react.
+- Implementations must be thread-safe; `execute` is called concurrently from virtual
+  threads.
+
+Register providers by declaring your own `ToolRegistry` bean:
+
+```java
+@Bean
+ToolRegistry toolRegistry(ApplicationContext ctx,
+                          ObjectProvider<ToolResultCache> cache,
+                          ObjectProvider<MeterRegistry> meters) {
+    return new ToolRegistry(ctx, cache, meters, List.of(new MyToolProvider()));
+}
+```
+
+The annotation provider is always placed first, so compiled Java tools win a name
+collision. `ToolRegistry` closes every provider on shutdown.
+
+---
+
 ## Complete Example
 
-The following class demonstrates all four annotations working together on a single tool. `@AgentTool` and `@RequiresApproval` are fully wired today; `@ToolRetry` and `@CacheableToolResult` are still in development (see the planned banners on each section above) — the example showcases the intended API surface.
+The following class demonstrates the annotations working together on a single tool. `@AgentTool`, `@ToolRetry`, `@CacheableToolResult` and `@RequiresRole` are fully wired. `@RequiresApproval` blocks the tool and raises an approval request, but resolving that request does not yet re-run the tool — see [Approval Flow](#approval-flow).
 
 ```java
 import ai.gargantua.core.tool.AgentTool;

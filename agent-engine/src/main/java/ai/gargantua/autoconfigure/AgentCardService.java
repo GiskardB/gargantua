@@ -28,9 +28,18 @@ public class AgentCardService {
     @Nullable
     private final SkillRegistry skillRegistry;
 
+    private final CapabilityRegistry capabilityRegistry;
+
     public AgentCardService(AgentProperties properties, @Nullable SkillRegistry skillRegistry) {
+        this(properties, skillRegistry, CapabilityRegistry.empty());
+    }
+
+    public AgentCardService(AgentProperties properties,
+                            @Nullable SkillRegistry skillRegistry,
+                            @Nullable CapabilityRegistry capabilityRegistry) {
         this.properties = properties;
         this.skillRegistry = skillRegistry;
+        this.capabilityRegistry = capabilityRegistry != null ? capabilityRegistry : CapabilityRegistry.empty();
     }
 
     /**
@@ -61,7 +70,18 @@ public class AgentCardService {
         );
     }
 
+    /**
+     * Builds the card's advertised entries.
+     *
+     * <p>When the workload declares capabilities they are what gets advertised: the card
+     * is the discovery surface the Catalog and Gateway consume, and capabilities are the
+     * contract callers bind to. Skills are internal and only surface when no capability
+     * has been declared, which keeps library-mode agents behaving as before.</p>
+     */
     private List<AgentSkill> buildSkills() {
+        if (!capabilityRegistry.isEmpty()) {
+            return buildFromCapabilities();
+        }
         if (skillRegistry == null) {
             return List.of();
         }
@@ -93,5 +113,25 @@ public class AgentCardService {
             ));
         }
         return skills;
+    }
+
+    private List<AgentSkill> buildFromCapabilities() {
+        List<AgentSkill> advertised = new ArrayList<>();
+        for (var capability : capabilityRegistry.all()) {
+            List<String> tags = new ArrayList<>(capability.tags());
+            if (capability.version() != null && !capability.version().isBlank()) {
+                // Version travels as a tag so consumers can pin without a schema change.
+                tags.add("v" + capability.version());
+            }
+            advertised.add(new AgentSkill(
+                    capability.name(),
+                    capability.name(),
+                    capability.description() != null ? capability.description() : "",
+                    capability.implementedBy(),
+                    tags,
+                    List.of()
+            ));
+        }
+        return advertised;
     }
 }

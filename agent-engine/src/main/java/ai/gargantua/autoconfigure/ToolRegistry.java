@@ -10,6 +10,8 @@ import ai.gargantua.core.tool.CacheableToolResult;
 import ai.gargantua.core.tool.RequiresApproval;
 import ai.gargantua.core.tool.ToolDefinition;
 import ai.gargantua.core.tool.ToolExecutionContext;
+import ai.gargantua.core.tool.ToolParameter;
+import ai.gargantua.core.tool.ToolProvider;
 import ai.gargantua.core.tool.ToolRetry;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -20,6 +22,7 @@ import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.retry.RetryConfig;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -31,6 +34,7 @@ import java.lang.reflect.Parameter;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -78,6 +82,13 @@ public class ToolRegistry {
     private final ObjectProvider<AgentProperties> agentPropertiesProvider;
     private final Map<String, ToolDefinition> tools = new HashMap<>();
     private final Map<String, ToolInvocation> toolInvocations = new HashMap<>();
+    /**
+     * Tool sources other than annotation scanning — one per MCP server. Compiled
+     * {@code @AgentTool} methods always win a name collision, so a local tool can
+     * deliberately shadow a remote one.
+     */
+    private final List<ToolProvider> additionalProviders;
+    private final Map<String, ToolProvider> providerRouting = new LinkedHashMap<>();
     private final Map<List<String>, List<ToolSpecification>> specCache = new ConcurrentHashMap<>();
 
     /**
@@ -100,12 +111,27 @@ public class ToolRegistry {
                         ObjectProvider<MeterRegistry> meterRegistryProvider,
                         ObjectProvider<ApprovalStore> approvalStoreProvider,
                         ObjectProvider<AgentProperties> agentPropertiesProvider) {
+        this(applicationContext, toolResultCacheProvider, meterRegistryProvider,
+                approvalStoreProvider, agentPropertiesProvider, List.of());
+    }
+
+    /**
+     * Registry combining annotation-scanned tools with additional providers, typically
+     * one per MCP server declared in configuration or in a bundle manifest.
+     */
+    public ToolRegistry(ApplicationContext applicationContext,
+                        ObjectProvider<ToolResultCache> toolResultCacheProvider,
+                        ObjectProvider<MeterRegistry> meterRegistryProvider,
+                        ObjectProvider<ApprovalStore> approvalStoreProvider,
+                        ObjectProvider<AgentProperties> agentPropertiesProvider,
+                        List<ToolProvider> additionalProviders) {
         this.applicationContext = applicationContext;
         this.objectMapper = new ObjectMapper();
         this.toolResultCacheProvider = toolResultCacheProvider;
         this.meterRegistryProvider = meterRegistryProvider;
         this.approvalStoreProvider = approvalStoreProvider;
         this.agentPropertiesProvider = agentPropertiesProvider;
+        this.additionalProviders = additionalProviders == null ? List.of() : List.copyOf(additionalProviders);
     }
 
     @PostConstruct
@@ -156,7 +182,50 @@ public class ToolRegistry {
             }
         }
 
-        log.info("ToolRegistry: scanned {} tool(s)", count);
+        registerProviderTools();
+        log.info("ToolRegistry: {} tool(s) — {} from annotations, {} from {} provider(s)",
+                tools.size(), count, providerRouting.size(), additionalProviders.size());
+    }
+
+    /**
+     * Adds tools contributed by non-annotation sources. Discovery failures are logged and
+     * skipped so one unreachable MCP server cannot stop the agent from starting, and a
+     * name already claimed by a compiled tool is left alone.
+     */
+    private void registerProviderTools() {
+        for (ToolProvider provider : additionalProviders) {
+            List<ToolDefinition> definitions;
+            try {
+                definitions = provider.discover();
+            } catch (Exception e) {
+                log.error("Tool provider '{}' failed during discovery, skipping: {}",
+                        provider.name(), e.getMessage());
+                continue;
+            }
+            if (definitions == null) continue;
+            for (ToolDefinition definition : definitions) {
+                if (definition == null || definition.name() == null) continue;
+                if (tools.containsKey(definition.name())) {
+                    log.warn("Tool '{}' from provider '{}' ignored — already provided locally",
+                            definition.name(), provider.name());
+                    continue;
+                }
+                tools.put(definition.name(), definition);
+                providerRouting.put(definition.name(), provider);
+            }
+        }
+    }
+
+    /** Releases provider resources — child processes and connections for MCP servers. */
+    @PreDestroy
+    public void shutdown() {
+        for (ToolProvider provider : additionalProviders) {
+            try {
+                provider.close();
+            } catch (Exception e) {
+                log.warn("Tool provider '{}' failed to close: {}", provider.name(), e.getMessage());
+            }
+        }
     }
 
     public Collection<ToolDefinition> getToolDefinitions() {
@@ -214,10 +283,50 @@ public class ToolRegistry {
                     schemaBuilder.addStringProperty(param.getName());
                 }
                 builder.parameters(schemaBuilder.build());
+            } else if (invocation == null && td.hasParameters()) {
+                // Provider-supplied tool: it declares its own schema, so types and
+                // required flags are passed through rather than flattened to strings.
+                var schemaBuilder = JsonObjectSchema.builder();
+                List<String> required = new ArrayList<>();
+                for (ToolParameter parameter : td.parameters()) {
+                    addProperty(schemaBuilder, parameter);
+                    if (parameter.required()) required.add(parameter.name());
+                }
+                if (!required.isEmpty()) schemaBuilder.required(required);
+                builder.parameters(schemaBuilder.build());
             }
 
             return builder.build();
         }).toList();
+    }
+
+    /**
+     * Maps a provider-neutral parameter onto the schema builder. Structural types
+     * (object, array) degrade to string rather than failing, since the tool can still
+     * parse them.
+     */
+    private static void addProperty(JsonObjectSchema.Builder builder, ToolParameter parameter) {
+        String name = parameter.name();
+        String description = parameter.description();
+        boolean described = !description.isBlank();
+        switch (parameter.type()) {
+            case ToolParameter.TYPE_INTEGER -> {
+                if (described) builder.addIntegerProperty(name, description);
+                else builder.addIntegerProperty(name);
+            }
+            case ToolParameter.TYPE_NUMBER -> {
+                if (described) builder.addNumberProperty(name, description);
+                else builder.addNumberProperty(name);
+            }
+            case ToolParameter.TYPE_BOOLEAN -> {
+                if (described) builder.addBooleanProperty(name, description);
+                else builder.addBooleanProperty(name);
+            }
+            default -> {
+                if (described) builder.addStringProperty(name, description);
+                else builder.addStringProperty(name);
+            }
+        }
     }
 
     /**
@@ -237,6 +346,14 @@ public class ToolRegistry {
     public String executeTool(String toolName, String jsonArguments, ToolExecutionContext context) {
         var invocation = toolInvocations.get(toolName);
         if (invocation == null) {
+            ToolProvider provider = providerRouting.get(toolName);
+            if (provider != null) {
+                // Remote tools carry no method annotations, so the RBAC / approval /
+                // cache / retry gates below do not apply to them; the provider's own
+                // allow-list and the skill's allowed-tools are what constrain them.
+                return provider.execute(toolName, jsonArguments,
+                        context != null ? context : ToolExecutionContext.empty());
+            }
             return errorJson("Tool not found: " + toolName);
         }
         ToolExecutionContext ctx = context != null ? context : ToolExecutionContext.empty();

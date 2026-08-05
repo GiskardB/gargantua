@@ -25,6 +25,10 @@
       <groupId>io.github.giskardb</groupId>
       <artifactId>agent-memory-sdk</artifactId>
     </dependency>
+    <dependency>
+      <groupId>io.github.giskardb</groupId>
+      <artifactId>agent-mcp-client</artifactId>
+    </dependency>
 
     <!-- Spring -->
     <dependency>

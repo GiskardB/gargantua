@@ -52,6 +52,7 @@ Do NOT answer questions unrelated to weather. Politely redirect the user.
 | `metadata.rag-min-score` | float | No | Minimum similarity score for RAG results. Default `0.3`. |
 | `metadata.allowed-roles` | list of strings | No | Roles permitted to use this skill (e.g. `[financial-advisor, super-admin]`). If set, `RbacGuardrail` blocks users without a matching role. The `super-admin` role bypasses all restrictions. **Tested** by `agent-example-tool-rbac` (tool-level RBAC, same store). |
 | `metadata.memory-layers` | list of strings | No | Subset of memory layers to fetch for this skill: `working`, `episodic`, `knowledge` (case-insensitive). When set, layers not listed are skipped — their port (Redis or MongoDB) is not queried. Defaults to all three layers. Use it for stateless skills (greetings, simple Q&A) to save a Redis/MongoDB round-trip. See [Memory System](memory-system.md). |
+| `examples` | list of strings | No | Example prompts surfaced via the A2A Agent Card for client discovery (e.g. `["What's the weather in Berlin?"]`). |
 
 ### Folder Structure
 
@@ -90,19 +91,33 @@ skills/
 
 ### Default Skill
 
-The skill named `default-skill` acts as the fallback. When the router cannot match any skill above the confidence threshold, the request is handled by `default-skill`. It should contain a general-purpose system prompt and a broad set of allowed tools suitable for open-ended conversations.
+When the router cannot match any skill above the confidence threshold, the request is handled by the fallback skill. The default name is `default` (configurable via `agent.routing.fallback-skill`). The archetype generates a `default-skill/SKILL.md` and sets `fallback-skill: default-skill` in `application.yml`. It should contain a general-purpose system prompt and a broad set of allowed tools suitable for open-ended conversations.
 
-Every project should include a fallback skill (the framework default name is `default`, configurable via `agent.routing.fallback-skill`). If neither a matching skill nor the configured fallback skill exists, unmatched requests will fail.
+If neither a matching skill nor the configured fallback skill exists, unmatched requests will fail.
 
 ---
 
 ## Skill Registry
 
-The skill registry is responsible for discovering, loading, and serving skill definitions. Three implementations are provided, and they can be composed together.
+The skill registry discovers, loads and serves skill definitions. Five implementations exist and are composed into a chain by `SkillRegistryAutoConfiguration`:
+
+```
+FilesystemSkillRegistry + ClasspathSkillsJarRegistry
+        → CompositeSkillRegistry
+        → CachedSkillRegistry
+        → HotReloadSkillRegistry   (only when agent.skill.hot-reload=true)
+```
+
+The first two are sources; the rest are decorators. You rarely instantiate any of them
+directly.
 
 ### FilesystemSkillRegistry
 
-The baseline implementation. At startup it scans `classpath:skills/` for directories containing a `SKILL.md` file and parses each one into a `SkillCard`.
+The baseline source. At startup it scans `agent.skill.path` (default `skills`) for
+directories containing a `SKILL.md` file and parses each one into a `SkillCard`. The path
+is a Spring resource pattern, so `classpath:skills/` and `file:/opt/agent/skills` both
+work — archetype projects use the former, the standalone runtime points it at the loaded
+bundle.
 
 ### CachedSkillRegistry
 
@@ -177,11 +192,21 @@ Input → Embedding (all-MiniLM-L6-v2-quantized, in-process, ~2-5ms)
 
 ```yaml
 agent:
+  skill:
+    path: skills              # Where SKILL.md folders are read from; the archetype
+                              # sets classpath:skills/, the runtime points it at the bundle
   routing:
     strategy: hybrid          # semantic | llm | hybrid
     fallback-skill: default   # Skill name to route to when no match meets threshold
-    threshold: 0.6            # Minimum cosine similarity for semantic match
+    semantic:
+      threshold: 0.6          # Minimum cosine similarity for semantic match
+      model: all-minilm-l6-v2
 ```
+
+> The threshold is nested under `semantic`. `agent.routing.threshold` is **not** a
+> property — Spring ignores unknown keys, so getting this wrong silently leaves the
+> default in place. Archetype-generated projects ship `0.82`; the framework default is
+> `0.6`.
 
 `SemanticRoutingService.route()` branches on `strategy` (default `hybrid`). Unknown values fall back to `hybrid` with a warning log.
 
@@ -193,22 +218,23 @@ agent:
 
 ### Force a Specific Skill
 
-Two ways to bypass routing and force a particular skill:
+Use the `X-Force-Skill` HTTP header to bypass routing and force a particular skill.
 
 **Via HTTP header** — passed by the API gateway / your client, e.g. `curl -H "X-Force-Skill: weather-skill"`:
 ```
 X-Force-Skill: weather-skill
 ```
 
-**Via API request body** — when calling the JSON endpoint directly:
-```json
-{
-  "message": "What is the temperature in Berlin?",
-  "forceSkill": "weather-skill"
-}
-```
+Forced routing skips both semantic and LLM matching. If the named skill does not exist the
+request fails with a `SkillNotFoundException`.
 
-If both are present, the JSON body field wins. Forced routing skips both semantic and LLM matching. If the specified skill does not exist or is inactive, the request fails with a `SkillNotFoundException`.
+> There is no `forceSkill` field in the request body. `ChatRequest` carries only
+> `message`, and the controller reads the skill from the header alone — some API
+> descriptions still claim otherwise.
+
+> Forcing bypasses the `active` flag: a skill with `metadata.active: false` still runs when
+> named explicitly, because the registry resolves it by path rather than through the active
+> list. Deactivating a skill hides it from routing, it does not disable it.
 
 ---
 

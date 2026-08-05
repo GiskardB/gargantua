@@ -9,7 +9,6 @@ import ai.gargantua.adapters.web.ChatExportController;
 import ai.gargantua.adapters.web.ChatHistoryController;
 import ai.gargantua.adapters.web.ChatStreamController;
 import ai.gargantua.adapters.web.CostAdminController;
-// CostTracker is in the same package — no import needed
 import ai.gargantua.adapters.web.GuardrailAdminController;
 import ai.gargantua.adapters.web.LlmRoutingAdminController;
 import ai.gargantua.adapters.web.OpenApiConfig;
@@ -119,8 +118,9 @@ public class WebAutoConfiguration {
     @ConditionalOnMissingBean(GuardrailAdminController.class)
     public GuardrailAdminController guardrailAdminController(
             List<InputGuardrail> inputGuardrails,
-            List<OutputGuardrail> outputGuardrails) {
-        return new GuardrailAdminController(inputGuardrails, outputGuardrails);
+            List<OutputGuardrail> outputGuardrails,
+            GuardrailPipeline guardrailPipeline) {
+        return new GuardrailAdminController(inputGuardrails, outputGuardrails, guardrailPipeline);
     }
 
     @Bean

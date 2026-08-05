@@ -107,6 +107,36 @@ class AgentPropertiesTest {
         void routingRulesEmpty() {
             assertThat(new AgentProperties().getLlm().getRoutingRules()).isEmpty();
         }
+
+        @Test
+        @DisplayName("fallback defaults to anthropic provider")
+        void fallbackDefaultProvider() {
+            assertThat(new AgentProperties().getLlm().getFallback().getProvider()).isEqualTo("anthropic");
+        }
+
+        @Test
+        @DisplayName("fallback defaults to claude-sonnet model")
+        void fallbackDefaultModel() {
+            assertThat(new AgentProperties().getLlm().getFallback().getModel()).isEqualTo("claude-sonnet-4-20250514");
+        }
+
+        @Test
+        @DisplayName("routing model defaults to ollama provider")
+        void routingDefaultProvider() {
+            assertThat(new AgentProperties().getLlm().getRoutingModel().getProvider()).isEqualTo("ollama");
+        }
+
+        @Test
+        @DisplayName("routing model defaults to phi4-mini")
+        void routingDefaultModel() {
+            assertThat(new AgentProperties().getLlm().getRoutingModel().getModel()).isEqualTo("phi4-mini");
+        }
+
+        @Test
+        @DisplayName("routing model defaults to localhost:11434 endpoint")
+        void routingDefaultEndpoint() {
+            assertThat(new AgentProperties().getLlm().getRoutingModel().getEndpoint()).isEqualTo("http://localhost:11434");
+        }
     }
 
     @Nested

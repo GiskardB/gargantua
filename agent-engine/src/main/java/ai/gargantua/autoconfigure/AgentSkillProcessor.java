@@ -1,7 +1,10 @@
 package ai.gargantua.autoconfigure;
 
 import ai.gargantua.core.rag.RagConfig;
-import ai.gargantua.core.skill.*;
+import ai.gargantua.core.skill.AgentSkill;
+import ai.gargantua.core.skill.SkillCard;
+import ai.gargantua.core.skill.SkillMeta;
+import ai.gargantua.core.skill.SkillSource;
 import ai.gargantua.core.tool.AgentTool;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
@@ -9,7 +12,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationContext;
 
 import java.lang.reflect.Method;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Scans Spring beans for {@link AgentSkill} annotations at startup and registers

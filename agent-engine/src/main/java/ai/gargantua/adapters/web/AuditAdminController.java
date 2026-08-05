@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -52,8 +53,8 @@ public class AuditAdminController {
             @RequestParam(required = false) String to,
             @Parameter(description = "Maximum number of events to return")
             @RequestParam(defaultValue = "50") int limit) {
-        Instant fromInstant = from != null ? Instant.parse(from) : Instant.now().minus(30, ChronoUnit.DAYS);
-        Instant toInstant = to != null ? Instant.parse(to) : Instant.now();
+        Instant fromInstant = parseFrom(from);
+        Instant toInstant = parseTo(to);
         return ResponseEntity.ok(auditStore.findByUser(userId, fromInstant, toInstant, limit));
     }
 
@@ -70,8 +71,8 @@ public class AuditAdminController {
             @RequestParam(required = false) String to,
             @Parameter(description = "Maximum number of events to return")
             @RequestParam(defaultValue = "50") int limit) {
-        Instant fromInstant = from != null ? Instant.parse(from) : Instant.now().minus(30, ChronoUnit.DAYS);
-        Instant toInstant = to != null ? Instant.parse(to) : Instant.now();
+        Instant fromInstant = parseFrom(from);
+        Instant toInstant = parseTo(to);
         return ResponseEntity.ok(auditStore.findByTenant(tenantId, fromInstant, toInstant, limit));
     }
 
@@ -107,8 +108,26 @@ public class AuditAdminController {
             @RequestParam(required = false) String from,
             @Parameter(description = "End date (ISO-8601)")
             @RequestParam(required = false) String to) {
-        Instant fromInstant = from != null ? Instant.parse(from) : Instant.now().minus(30, ChronoUnit.DAYS);
-        Instant toInstant = to != null ? Instant.parse(to) : Instant.now();
+        Instant fromInstant = parseFrom(from);
+        Instant toInstant = parseTo(to);
         return ResponseEntity.ok(auditStore.countByTimeRange(fromInstant, toInstant));
+    }
+
+    private static Instant parseFrom(String value) {
+        if (value == null) return Instant.now().minus(30, ChronoUnit.DAYS);
+        try {
+            return Instant.parse(value);
+        } catch (DateTimeException e) {
+            throw new IllegalArgumentException("Invalid 'from' date (expected ISO-8601): " + value);
+        }
+    }
+
+    private static Instant parseTo(String value) {
+        if (value == null) return Instant.now();
+        try {
+            return Instant.parse(value);
+        } catch (DateTimeException e) {
+            throw new IllegalArgumentException("Invalid 'to' date (expected ISO-8601): " + value);
+        }
     }
 }

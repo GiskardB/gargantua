@@ -56,7 +56,10 @@
   <modules>
     <module>agent-core</module>
     <module>agent-memory-sdk</module>
+    <module>agent-mcp-client</module>
+    <module>agent-bundle</module>
     <module>agent-engine</module>
+    <module>agent-runtime</module>
     <module>agent-mcp-server</module>
     <module>agent-skill-linter-maven-plugin</module>
     <module>agent-archetype</module>
@@ -110,7 +113,22 @@
       </dependency>
       <dependency>
         <groupId>io.github.giskardb</groupId>
+        <artifactId>agent-mcp-client</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.github.giskardb</groupId>
+        <artifactId>agent-bundle</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.github.giskardb</groupId>
         <artifactId>agent-engine</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.github.giskardb</groupId>
+        <artifactId>agent-runtime</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>

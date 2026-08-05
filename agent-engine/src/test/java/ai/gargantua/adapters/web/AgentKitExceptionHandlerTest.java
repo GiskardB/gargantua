@@ -150,6 +150,21 @@ class AgentKitExceptionHandlerTest {
     }
 
 
+    // --- IllegalArgumentException ---
+
+    @Test
+    @DisplayName("handleBadRequest returns 400 for invalid arguments")
+    void handleBadRequest() {
+        var ex = new IllegalArgumentException("Invalid 'from' date (expected ISO-8601): bad-date");
+
+        ProblemDetail problem = handler.handleBadRequest(ex);
+
+        assertThat(problem.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(problem.getTitle()).isEqualTo("Bad Request");
+        assertThat(problem.getType().toString()).isEqualTo("https://agentkit.io/errors/bad-request");
+        assertThat(problem.getDetail()).contains("Invalid 'from' date");
+    }
+
     // --- NoResourceFoundException ---
 
     @Test

@@ -115,25 +115,6 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
                                      @Nullable AuditService auditService,
                                      @Nullable MemoryComposer memoryComposer,
                                      @Nullable WorkingMemoryPort workingMemoryPort,
-                                     @Nullable MongoTemplate mongoTemplate) {
-        this(guardrailPipeline, semanticRoutingService, tokenBudgetManager,
-                llmProviderFactory, promptBuilder, toolRegistry, properties,
-                skillRegistry, contextEnrichers, auditService, memoryComposer,
-                workingMemoryPort, mongoTemplate, null);
-    }
-
-    public DefaultOrchestratorEngine(GuardrailPipeline guardrailPipeline,
-                                     SemanticRoutingService semanticRoutingService,
-                                     TokenBudgetManager tokenBudgetManager,
-                                     LlmProviderFactory llmProviderFactory,
-                                     PromptBuilder promptBuilder,
-                                     ToolRegistry toolRegistry,
-                                     AgentProperties properties,
-                                     @Nullable SkillRegistry skillRegistry,
-                                     List<ContextEnricher> contextEnrichers,
-                                     @Nullable AuditService auditService,
-                                     @Nullable MemoryComposer memoryComposer,
-                                     @Nullable WorkingMemoryPort workingMemoryPort,
                                      @Nullable MongoTemplate mongoTemplate,
                                      @Nullable CostTracker costTracker) {
         this.guardrailPipeline = guardrailPipeline;
