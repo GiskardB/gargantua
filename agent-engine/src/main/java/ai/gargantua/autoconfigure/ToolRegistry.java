@@ -166,7 +166,8 @@ public class ToolRegistry {
                         method.isAnnotationPresent(CacheableToolResult.class),
                         approvalMessage,
                         showParameters,
-                        dangerous
+                        dangerous,
+                        parametersOf(method)
                 );
 
                 tools.put(toolName, def);
@@ -185,6 +186,24 @@ public class ToolRegistry {
         registerProviderTools();
         log.info("ToolRegistry: {} tool(s) — {} from annotations, {} from {} provider(s)",
                 tools.size(), count, providerRouting.size(), additionalProviders.size());
+    }
+
+    /**
+     * Describes a method's parameters as untyped strings, matching how arguments are
+     * converted at invocation time. Java parameter types are deliberately not propagated
+     * to the model — changing the advertised schema changes model behaviour, so it is
+     * kept as a separate step. Populating this keeps {@link ToolDefinition} consistent
+     * whatever the tool's source.
+     */
+    private static List<ToolParameter> parametersOf(Method method) {
+        if (method.getParameterCount() == 0) {
+            return List.of();
+        }
+        List<ToolParameter> parameters = new ArrayList<>(method.getParameterCount());
+        for (Parameter parameter : method.getParameters()) {
+            parameters.add(ToolParameter.string(parameter.getName()));
+        }
+        return parameters;
     }
 
     /**
