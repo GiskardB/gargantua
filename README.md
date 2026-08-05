@@ -626,6 +626,10 @@ Reference agents (weather, cookbook, fitcoach) live in a sibling repo:
 
 ## Documentation
 
+**New to the project?** [docs/project-handoff.md](docs/project-handoff.md) is the
+orientation map: repository scope, module layout, the invariants that are easy to
+break, and a reading order for everything below.
+
 **Getting started**
 
 | Topic | Link |
