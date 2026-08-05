@@ -47,7 +47,7 @@ sequenceDiagram
         LLM-->>Controller: SSE tool_call event
         Controller-->>Client: SSE tool_call
         LLM->>Tools: executeTool(name, args)
-        Note over Tools: ToolRegistry routes by name to the owning<br/>ToolProvider: AnnotationToolProvider (Java)<br/>or McpToolProvider (remote). First provider<br/>claiming a name wins.
+        Note over Tools: ToolRegistry serves @AgentTool methods it<br/>scanned itself, and routes other names to the<br/>owning ToolProvider (McpToolProvider, remote).<br/>Java tools shadow remote ones of the same name.
 
         alt @RequiresApproval (streaming endpoint only)
             Tools-->>Controller: approval_required

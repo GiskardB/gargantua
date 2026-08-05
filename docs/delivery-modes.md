@@ -49,10 +49,10 @@ Everything you already know keeps working: `@AgentTool`, `@ToolRetry`, `@Require
 `@CacheableToolResult`, `@AgentSkill`, `@AgentsFlow`, custom guardrails as `@Component` +
 `@Order`, custom `@Bean` overrides of any framework component.
 
-**Nothing was taken away.** The recent runtime work added a seam — tools now arrive through
-a `ToolProvider` — but annotation scanning is simply one implementation of it
-(`AnnotationToolProvider`), and it is registered for you. Your tools are discovered exactly
-as before, and they take precedence over remote tools with the same name.
+**Nothing was taken away.** The recent runtime work added a seam — external tool sources
+now arrive through a `ToolProvider` — but annotation scanning was left exactly where it
+was, inside the `ToolRegistry`. Your tools are discovered exactly as before, and they take
+precedence over remote tools with the same name.
 
 Library mode also gained MCP: you can now consume external MCP servers without writing any
 Java for them. See [Consuming MCP servers](tools-and-annotations.md#consuming-mcp-servers).

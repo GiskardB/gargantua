@@ -2,7 +2,7 @@
 
 ## @AgentTool
 
-The `@AgentTool` annotation marks a method as a tool that can be called by the LLM. Annotated methods are discovered at boot time by `AnnotationToolProvider`, which contributes them to the `ToolRegistry` alongside any other tool source.
+The `@AgentTool` annotation marks a method as a tool that can be called by the LLM. Annotated methods are discovered at boot time by the `ToolRegistry`, which scans the Spring context for them and registers them alongside tools contributed by any other source.
 
 ```java
 @AgentTool(
@@ -34,7 +34,7 @@ The `description` is the single most important factor in whether the LLM calls t
 
 ## @ToolRetry -- Automatic Retry with Exponential Backoff
 
-Wraps the tool invocation in a retry policy backed by [Resilience4j Retry](https://resilience4j.readme.io/docs/retry). Honored by `AnnotationToolProvider` whenever the tool method carries `@ToolRetry`. Use it for tools that call external services prone to transient failures.
+Wraps the tool invocation in a retry policy backed by [Resilience4j Retry](https://resilience4j.readme.io/docs/retry). Honored by the `ToolRegistry` whenever the tool method carries `@ToolRetry`. Use it for tools that call external services prone to transient failures.
 
 ```java
 @ToolRetry(
@@ -255,7 +255,7 @@ builder and the tool-calling loop cannot tell where a tool came from.
 
 | Source | Provider | Where tools are defined |
 |---|---|---|
-| Compiled Java | `AnnotationToolProvider` | `@AgentTool` methods in the Spring context |
+| Compiled Java | `ToolRegistry` itself, by annotation scan | `@AgentTool` methods in the Spring context |
 | MCP servers | `McpToolProvider` | An external MCP server, one provider per server |
 
 Providers are consulted in order and the first to claim a name wins, so a compiled Java

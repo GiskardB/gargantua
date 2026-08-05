@@ -228,7 +228,7 @@ bean of the same type replaces the default.
 | `TokenBudgetManager` | `DefaultTokenBudgetManager` | — |
 | `SecretResolver` | `EnvironmentSecretResolver` | Resolves `${secrets.*}` — see below |
 | `CapabilityRegistry` | empty | Populated from the manifest in runtime mode |
-| `ToolProvider` | `AnnotationToolProvider` + one per MCP server | See [Tools & Annotations](tools-and-annotations.md#writing-a-custom-tool-source) |
+| `ToolProvider` | none by default; one per declared MCP server | For external tool sources only — `@AgentTool` methods are scanned directly by the registry. See [Tools & Annotations](tools-and-annotations.md#writing-a-custom-tool-source) |
 
 ---
 

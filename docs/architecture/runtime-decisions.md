@@ -125,18 +125,23 @@ secret *references*, is not decided here — it is a cross-repository concern.
 
 **Status:** Accepted
 
-**Decision.** `ToolRegistry` no longer discovers tools itself. It composes a list of
-`ToolProvider`s and owns only name-to-provider routing. `AnnotationToolProvider` supplies
-compiled `@AgentTool` methods; one `McpToolProvider` is created per declared MCP server.
+**Decision.** Tools may come from sources outside the compiled application. `ToolRegistry`
+keeps its own scan of `@AgentTool` methods and additionally composes a list of
+`ToolProvider`s, owning the name-to-provider routing between them. One `McpToolProvider`
+is created per declared MCP server.
 
 **Rationale.** This is the seam that makes ADR-002 and ADR-003 hold at the same time.
 Library mode and runtime mode differ solely in where tools come from, so isolating that
 difference behind one interface means the orchestrator, prompt builder and tool-calling
 loop stay identical for both.
 
-The annotation-driven cross-cutting concerns — `@RequiresRole`, `@CacheableToolResult`,
-`@ToolRetry` — moved into `AnnotationToolProvider` rather than staying in the registry,
-because they read configuration from Java annotations that no external source has.
+An earlier draft of this work extracted annotation scanning into an
+`AnnotationToolProvider`, making the registry a pure composer. That class was dropped
+when this branch merged with `main`: the annotation-driven cross-cutting concerns —
+`@RequiresRole`, `@RequiresApproval`, `@CacheableToolResult`, `@ToolRetry` — are enforced
+by gates that sit in `ToolRegistry` and read Java annotations no external source has, so
+splitting them out duplicated the registry's logic without buying isolation. Annotation
+scanning therefore stayed where it was, and `ToolProvider` covers only external sources.
 
 **Consequences.**
 
