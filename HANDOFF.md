@@ -25,8 +25,7 @@ Il push mancante su `develop` è un **fast-forward puro**. Verificato:
 origin/develop  ⊂  origin/main  ⊂  develop (locale)
 ```
 
-`origin/develop` è antenato diretto di `develop` locale — 53 commit avanti, 0
-divergenti. Nessun merge, nessun conflitto, nessun `--force`.
+`origin/develop` è antenato diretto di `develop` locale: 0 commit divergenti. Nessun merge, nessun conflitto, nessun `--force`.
 
 ---
 
@@ -104,7 +103,11 @@ Decisioni di risoluzione da conoscere, se dovessi rifare il merge da zero:
   Clonarlo rompe silenziosamente quel test.
 - **`AgentProperties`** — versione di `main` più la classe annidata `McpClient`
   reintrodotta (`enabled`, `requestTimeoutSeconds`, `failFast`, `servers[]`).
-- **`AnnotationToolProvider`** — eliminato, era ridondante dopo il merge.
+- **`AnnotationToolProvider`** — eliminato, era ridondante dopo il merge. La
+  scansione delle annotazioni resta dentro `ToolRegistry`, accanto ai gate che
+  leggono quelle stesse annotazioni; `ToolProvider` copre solo le sorgenti
+  esterne. Sei punti della documentazione che descrivevano ancora la classe
+  eliminata sono stati corretti.
 
 ### `5fa1de9` — `fix(engine): populate ToolDefinition.parameters`
 
@@ -135,7 +138,7 @@ da `/home/user/gargantua`, i commit sono già lì:
 
 ```bash
 cd /home/user/gargantua
-git push origin develop        # fast-forward, 53 commit
+git push origin develop        # fast-forward, nessun conflitto possibile
 ```
 
 **Da un'altra macchina** — recupera dal bundle:
