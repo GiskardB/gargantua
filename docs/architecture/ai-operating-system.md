@@ -398,8 +398,8 @@ L'obiettivo non è creare un altro framework agentico. È creare l'infrastruttur
 
 # 19. Prossimo passo
 
-Il documento successivo è `gargantua-domain-model.md`, che risponde alla domanda fondamentale: **quali sono gli oggetti del sistema operativo?**
+Il documento successivo è [`gargantua-domain-model.md`](gargantua-domain-model.md), che risponde alla domanda fondamentale: **quali sono gli oggetti del sistema operativo?**
 
-Definirà formalmente AIWorkload, Agent, Capability, Skill, Tool, MCPServer, Bundle, Runtime, Deployment, GatewayRoute, Policy, Memory, Evaluation — con relazioni, lifecycle e API. Quello sarà il vero contratto su cui costruire tutto il resto.
+Definisce formalmente AIWorkload, Agent, Capability, Skill, Tool, MCPServer, Bundle, Runtime, Deployment, GatewayRoute, Policy, Memory, Evaluation — con relazioni, lifecycle e stato di implementazione. È il contratto condiviso su cui costruire tutti i repository della piattaforma.
 
-Parte del modello esiste già in codice nella Phase 1 (`WorkloadManifest`, `AgentSpec`, `Capability`, `McpServerSpec`): il documento dovrà partire da lì, non da zero.
+Parte del modello esiste già in codice nella Phase 1 (`WorkloadManifest`, `AgentSpec`, `Capability`, `McpServerSpec`): il documento parte da lì, non da zero.
