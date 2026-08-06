@@ -1,4 +1,4 @@
-FROM maven:3.9-eclipse-temurin-21-alpine AS builder
+FROM maven:3.9-eclipse-temurin-25-alpine AS builder
 WORKDIR /build
 COPY pom.xml .
 RUN --mount=type=cache,target=/root/.m2 mvn dependency:go-offline -q
@@ -8,7 +8,7 @@ RUN --mount=type=cache,target=/root/.m2 mvn clean package -DskipTests -q
 # Glibc-based runtime (NOT Alpine/musl) because Gargantua's semantic routing
 # pulls in ONNX Runtime via langchain4j-embeddings, whose native libonnxruntime.so
 # depends on libstdc++.so.6 — not available on Alpine. Ubuntu Jammy ships it.
-FROM eclipse-temurin:21-jre-jammy
+FROM eclipse-temurin:25-jre-jammy
 RUN groupadd --system app && useradd --system --gid app app
 USER app
 WORKDIR /app

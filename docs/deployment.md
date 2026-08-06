@@ -5,7 +5,7 @@
 ### CI Pipeline
 
 Every push to `main` or PR triggers the CI workflow (`.github/workflows/ci.yml`):
-- Builds all modules on Java 21 and Java 25
+- Builds all modules on Java 25
 - Runs unit tests
 - Verifies `agent-core` has zero Spring dependencies
 - Verifies no `javax.*` imports exist
@@ -96,7 +96,7 @@ docker run -p 8080:8080 \
 ```
 
 The image is non-root, exposes 8080, and has a `HEALTHCHECK` against
-`/actuator/health/readiness`. It is built on `eclipse-temurin:21-jre-jammy` rather than
+`/actuator/health/readiness`. It is built on `eclipse-temurin:25-jre-jammy` rather than
 Alpine because semantic routing loads ONNX Runtime, whose native library needs glibc.
 
 ### Bundle location
@@ -180,8 +180,8 @@ The **archetype-generated** `Dockerfile` — for an application that embeds the 
 
 | Stage | Base Image | Size | Startup |
 |-------|-----------|------|---------|
-| `builder` | maven:3.9-eclipse-temurin-21-alpine | — | (build only) |
-| runtime | eclipse-temurin:21-jre-jammy | ~300MB | ~3-5s |
+| `builder` | maven:3.9-eclipse-temurin-25-alpine | — | (build only) |
+| runtime | eclipse-temurin:25-jre-jammy | ~300MB | ~3-5s |
 
 > **Why `jammy`, not `alpine`?** The semantic routing path pulls in ONNX Runtime via `langchain4j-embeddings`, whose native `libonnxruntime.so` depends on `libstdc++.so.6` — not available on Alpine/musl. Ubuntu Jammy ships glibc.
 

@@ -14,7 +14,7 @@
 # it is the only supported way to get Java tools into runtime mode (ADR-003).
 # ══════════════════════════════════════════════════════════════════════════════
 
-FROM maven:3.9-eclipse-temurin-21 AS builder
+FROM maven:3.9-eclipse-temurin-25 AS builder
 WORKDIR /build
 
 # Dependency layer: copy poms first so a source-only change does not refetch.
@@ -42,7 +42,7 @@ RUN mvn -B -q -pl agent-core,agent-memory-sdk,agent-mcp-client,agent-bundle,agen
 # ── Runtime image ─────────────────────────────────────────────────────────────
 # Jammy rather than Alpine: semantic routing pulls in ONNX Runtime, whose native
 # library needs glibc.
-FROM eclipse-temurin:21-jre-jammy
+FROM eclipse-temurin:25-jre-jammy
 
 RUN groupadd --system gargantua && useradd --system --gid gargantua gargantua
 

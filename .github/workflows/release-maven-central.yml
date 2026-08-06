@@ -52,11 +52,11 @@ jobs:
           fetch-depth: 1
 
       # ── Java + GPG + Maven settings (Central server credentials) ────────────
-      - name: Set up JDK 21 and GPG
+      - name: Set up JDK 25 and GPG
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 21
+          java-version: 25
           cache: maven
           # `server-id` here matches the `<publishingServerId>central</…>` in
           # the parent pom's release profile. setup-java auto-generates

@@ -13,13 +13,13 @@
 
 Define what your agent can do in a `SKILL.md` file (or a Java `@AgentSkill` annotation), implement actions as `@AgentTool` methods, and chain them into multi-step `@AgentsFlow` pipelines. The framework handles everything else: skill routing, 3-layer memory, input/output guardrails, human-in-the-loop approvals, cost tracking, A2A interoperability, and Kubernetes deployment.
 
-Built on Java 21, Spring Boot 4.0.4, and LangChain4j.
+Built on Java 25, Spring Boot 4.1.0, and LangChain4j.
 
 ---
 
 ## Try it in 60 seconds
 
-> Requires: Java 21+, Maven, an OpenAI-compatible API key. No Docker needed.
+> Requires: Java 25+, Maven, an OpenAI-compatible API key. No Docker needed.
 
 ### Option A — add Gargantua to an existing project (Maven Central)
 
@@ -281,7 +281,7 @@ The "60 seconds" quickstart uses **embedded mode** (everything in-memory, no Doc
 
 ### Prerequisites
 
-- **Java 21+** — the framework uses Virtual Threads (Project Loom)
+- **Java 25+** — the framework uses Virtual Threads (Project Loom)
 - **Maven 3.9+**
 - **Docker & Docker Compose** — for MongoDB, Redis, and Ollama
 
@@ -595,7 +595,7 @@ JitPack uses the groupId `com.github.giskardb.gargantua` and versions match Git 
 | LangChain4j | 1.12.1 |
 | MongoDB | 8.0 |
 | Redis | 7.4 |
-| springdoc-openapi | 3.0.2 |
+| springdoc-openapi | 3.1.0 |
 | Resilience4j | 2.3.0 |
 | Caffeine | 3.2.0 |
 | MCP SDK | 0.9.0 |
