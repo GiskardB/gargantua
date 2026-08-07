@@ -311,11 +311,30 @@ Creazione — utente crea un Agent nello Studio
 
 Struttura a 9 moduli: `agent-core`, `agent-memory-sdk`, `agent-mcp-client`, `agent-bundle`, `agent-engine`, `agent-runtime`, `agent-mcp-server`, `agent-skill-linter-maven-plugin`, `agent-archetype`.
 
+## Implementato negli altri repository (2026-08)
+
+Il progetto è ormai **multi-repo** (vedi [platform-handoff.md](platform-handoff.md) per la
+mappa completa e lo stato aggiornato).
+
+| Componente | Repository | Stato |
+|---|---|---|
+| Control Plane (Registry + Catalog + Policy + Deployment) | `gargantua-control-plane` | **MVP** — Spring Boot 4.1 / Java 25, publish→index→discovery funzionante, usa `agent-core` condiviso |
+| Studio (frontend) | `gargantua-studio` | **MVP** — React Flow / Monaco / Zustand, Agent Designer + Skill Designer, collegato al backend, fallback offline |
+| Studio backend (BFF) | `gargantua-studio-backend` | **MVP** — costruisce manifest `gargantua.ai/v1` da form, gateway verso il Control Plane |
+| Modello di dominio condiviso | `agent-core` jar (Maven Central) | **Fatto** — un solo modello canonico Spring-free, dipeso dai componenti JVM |
+| Vertical slice locale | `gargantua-compose` | **Fatto** — Docker Compose Studio→backend→CP + Postgres + MinIO, **senza Kubernetes** |
+
 ## Da sviluppare
 
-Compiler, Registry completo, Catalog, Deployment Manager, Agent Gateway, Policy Engine centralizzato, Visual Studio, RBAC Management, Kubernetes Operator, CRD, GitOps.
+Prossime migliorie decise (dettaglio e razionale in
+[13-open-source-patterns.md](13-open-source-patterns.md) e in
+[platform-handoff.md](platform-handoff.md)): **Agent Loadout** nel manifest, envelope di
+governance, event model di esecuzione + trace, runtime supervisor + budget, agent lifecycle
+con gate di evaluation. Poi: Compiler, Deployment Manager completo, Agent Gateway
+(valutazione di `agentgateway`), RBAC Management, Kubernetes Operator, CRD, GitOps (Phase 5).
 
-Rimasti nel Runtime: verifica della **firma** dei bundle (il checksum SHA-256 c'è già), enforcement di RBAC e memory layer a livello di workload, `CatalogRegistrar` quando il Catalog esisterà.
+Rimasti nel Runtime: verifica della **firma** dei bundle (il checksum SHA-256 c'è già),
+enforcement di RBAC e memory layer a livello di workload, `CatalogRegistrar` verso il Catalog.
 
 ---
 

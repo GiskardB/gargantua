@@ -7,6 +7,12 @@ why*, and points at the documents that answer *how*.
 Read this first, then follow the links. Nothing here is duplicated from the other
 docs on purpose: this is the map, not the territory.
 
+> **Resuming work on the wider platform (not just this repo)?** Start from
+> [architecture/platform-handoff.md](architecture/platform-handoff.md) — it is the
+> cross-repository map (Control Plane, Studio, Studio backend, the Docker Compose
+> slice, the shared `agent-core` jar) and the decided roadmap. *This* document stays
+> focused on the Runtime repository internals.
+
 ---
 
 ## 1. What this repository is
@@ -127,17 +133,24 @@ model, agent manifest (`gargantua.ai/v1`, Kubernetes-shaped), bundle format and
 loader, standalone runtime, MCP client, secret referencing, composable tool
 providers.
 
-**Phase 2 (Control Plane)** — registry, catalog, deployment, API — has not
-started and belongs in a different repository.
+**Phase 2 (Control Plane)** — registry, catalog, deployment, API — is now an **MVP**
+in the sibling `gargantua-control-plane` repo (publish→index→discovery works, using
+the shared `agent-core`). **Studio** and its **BFF** exist too
+(`gargantua-studio`, `gargantua-studio-backend`), and a **Docker Compose vertical
+slice** (`gargantua-compose`) wires the agent-creation flow end to end. See
+[architecture/platform-handoff.md](architecture/platform-handoff.md) for the full
+cross-repo status and roadmap.
 
-Still open *here*:
+Still open *here* (in the Runtime):
 
 - bundle **signature** verification (the SHA-256 checksum exists; signatures do not)
 - workload-level enforcement of RBAC and memory layers (see §4)
-- `CatalogRegistrar`, once a Catalog API exists
+- `CatalogRegistrar`, once wired to the Catalog API
+- **Agent Loadout** (`spec.loadout`) once added to `agent-core` — the next decided
+  step (see platform-handoff §7)
 
-Branching: **`develop` is the working branch** and is the most up-to-date. `main`
-holds released state. Development continues on `develop`.
+Branching: this repo is on **`main`**. (Earlier drafts of this doc referenced a
+`develop` working branch; the repo family now commits to `main` directly.)
 
 ## 7. Reading order
 
@@ -145,7 +158,8 @@ holds released state. Development continues on `develop`.
 2. [`getting-started.md`](getting-started.md) — first agent, end to end
 3. [`delivery-modes.md`](delivery-modes.md) — library vs runtime, in depth
 4. [`architecture/ai-operating-system.md`](architecture/ai-operating-system.md) — the wider vision
-5. [`architecture/runtime-decisions.md`](architecture/runtime-decisions.md) — ADR-001..006, the binding decisions
+5. [`architecture/platform-handoff.md`](architecture/platform-handoff.md) — cross-repo status & roadmap
+6. [`architecture/runtime-decisions.md`](architecture/runtime-decisions.md) — ADR-001..006, the binding decisions
 6. [`architecture/agent-manifest.md`](architecture/agent-manifest.md) — manifest schema and what is actually enforced
 7. [`extending.md`](extending.md) — every port and its default adapter
 
