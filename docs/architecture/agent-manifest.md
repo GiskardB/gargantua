@@ -187,6 +187,42 @@ Roles permitted to invoke the workload.
 > `metadata.allowed-roles` in `SKILL.md`. As above, a manifest-level declaration is
 > reported rather than applied.
 
+## `spec.loadout`
+
+The specific subset of knowledge, memory, skills and resources the agent is *equipped*
+with — as opposed to `spec.memoryLayers` (which toggles which layers are on) and
+`spec.capabilities` (what it advertises). The loadout provisions an agent deliberately:
+two agents on the same image with the same layers can still carry different knowledge
+bases and resources.
+
+```yaml
+spec:
+  loadout:
+    knowledge:                       # knowledge bases (vector collections) to equip
+      - name: payments-kb            # required — the collection/index name
+        description: Payment policies and refund rules
+        maxResults: 8                # optional — overrides the skill/runtime retrieval default
+        minScore: 0.55               # optional — similarity threshold in [0.0, 1.0]
+      - name: refunds-kb             # name only → inherits retrieval defaults
+    memoryScopes: [customer-history] # named memory collections, beyond the layer toggles
+    skills: [refund-skill, status-skill]   # skills to equip, beyond spec.defaultSkill
+    resources:                       # arbitrary named resources (files, datasets, endpoints)
+      - name: refund-form
+        type: file                   # optional hint: file | dataset | http | s3 | …
+        uri: resources/refund.pdf    # optional; never inline secrets — use ${secrets.NAME}
+```
+
+All four parts are optional; an absent `loadout` means "nothing explicitly equipped" and
+the agent relies on what its skills configure. `knowledge` is the first-class,
+targeted-knowledge part — the same identifier a skill's `metadata.knowledge-base` points
+at (see `RagConfig`). Knowledge-base and resource names must be unique within a loadout.
+
+> **Not provisioned by the runtime yet.** A loadout is parsed, validated and reported at
+> startup, but the runtime does not yet attach knowledge/memory/resources from it —
+> knowledge bases are currently wired per skill via `metadata.knowledge-base` in
+> `SKILL.md`. This is intent carried by the manifest for the Control Plane and future
+> runtime provisioning.
+
 ## `spec.guardrails`
 
 Raw overrides keyed by guardrail name, applied on top of runtime configuration.
@@ -215,6 +251,7 @@ picture.
 | `spec.guardrails` | Applied — binds onto `agent.guardrail.*` |
 | `spec.memoryLayers` | Reported, not applied — use per-skill declaration |
 | `spec.allowedRoles` | Reported, not applied — use per-skill declaration |
+| `spec.loadout` | Reported, not applied — knowledge bases wired per skill via `metadata.knowledge-base` |
 | `metadata.json` checksum | Applied — a mismatch refuses to load |
 | `metadata.json` signature | Recorded; not verified (needs key distribution) |
 

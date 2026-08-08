@@ -35,6 +35,9 @@ import java.util.Set;
  *                       its own configuration objects
  * @param allowedRoles   roles permitted to invoke this agent at all; empty means no
  *                       restriction beyond per-skill checks
+ * @param loadout        the specific knowledge, memory, skills and resources this agent is
+ *                       equipped with; {@link Loadout#empty()} when nothing is explicitly
+ *                       provisioned (the agent then relies on what its skills configure)
  */
 public record AgentSpec(
         RuntimeSpec runtime,
@@ -44,7 +47,8 @@ public record AgentSpec(
         Set<MemoryLayer> memoryLayers,
         String defaultSkill,
         Map<String, Object> guardrails,
-        Set<String> allowedRoles
+        Set<String> allowedRoles,
+        Loadout loadout
 ) implements WorkloadSpec {
 
     public AgentSpec {
@@ -55,6 +59,7 @@ public record AgentSpec(
         memoryLayers = memoryLayers == null ? Set.of() : Set.copyOf(memoryLayers);
         guardrails = guardrails == null ? Map.of() : Map.copyOf(guardrails);
         allowedRoles = allowedRoles == null ? Set.of() : Set.copyOf(allowedRoles);
+        loadout = loadout == null ? Loadout.empty() : loadout;
 
         long distinctServers = mcpServers.stream().map(McpServerSpec::name).distinct().count();
         if (distinctServers != mcpServers.size()) {
@@ -66,10 +71,27 @@ public record AgentSpec(
         }
     }
 
+    /**
+     * Backward-compatible constructor for callers written before loadout existed; equivalent
+     * to passing {@link Loadout#empty()}. Keeps the pre-1.3 8-argument shape source-compatible.
+     */
+    public AgentSpec(
+            RuntimeSpec runtime,
+            List<Capability> capabilities,
+            ModelSpec model,
+            List<McpServerSpec> mcpServers,
+            Set<MemoryLayer> memoryLayers,
+            String defaultSkill,
+            Map<String, Object> guardrails,
+            Set<String> allowedRoles) {
+        this(runtime, capabilities, model, mcpServers, memoryLayers, defaultSkill, guardrails,
+                allowedRoles, Loadout.empty());
+    }
+
     /** Minimal spec: platform runtime, inherited models, no MCP servers, all memory layers. */
     public static AgentSpec minimal() {
         return new AgentSpec(RuntimeSpec.platformDefault(), List.of(), ModelSpec.inherit(),
-                List.of(), Set.of(), null, Map.of(), Set.of());
+                List.of(), Set.of(), null, Map.of(), Set.of(), Loadout.empty());
     }
 
     @Override
@@ -85,5 +107,10 @@ public record AgentSpec(
     /** Whether every memory layer is in play — the default when none are listed. */
     public boolean usesAllMemoryLayers() {
         return memoryLayers.isEmpty();
+    }
+
+    /** Whether this agent is explicitly provisioned with a non-empty {@link Loadout}. */
+    public boolean hasLoadout() {
+        return !loadout.isEmpty();
     }
 }

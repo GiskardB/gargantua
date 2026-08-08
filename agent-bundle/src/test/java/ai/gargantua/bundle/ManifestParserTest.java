@@ -365,4 +365,68 @@ class ManifestParserTest {
                 """);
         assertEquals(WorkloadManifest.CURRENT_API_VERSION, manifest.apiVersion());
     }
+
+    @Test
+    @DisplayName("parses spec.loadout (knowledge bases, memory scopes, skills, resources)")
+    void parsesLoadout() {
+        WorkloadManifest manifest = ManifestParser.parse("""
+                apiVersion: gargantua.ai/v1
+                kind: Agent
+                metadata:
+                  name: kb-agent
+                  version: 1.0.0
+                spec:
+                  loadout:
+                    knowledge:
+                      - name: payments-kb
+                        description: Payments policies
+                        maxResults: 8
+                        minScore: 0.55
+                      - name: refunds-kb
+                    memoryScopes: [customer-history]
+                    skills: [refund-skill, status-skill]
+                    resources:
+                      - name: refund-form
+                        type: file
+                        uri: resources/refund.pdf
+                """);
+
+        var loadout = manifest.agentSpec().loadout();
+        assertTrue(manifest.agentSpec().hasLoadout());
+        assertEquals(2, loadout.knowledge().size());
+        assertEquals("payments-kb", loadout.knowledge().get(0).name());
+        assertEquals(8, loadout.knowledge().get(0).maxResults());
+        assertEquals(0.55, loadout.knowledge().get(0).minScore());
+        assertNull(loadout.knowledge().get(1).maxResults(), "second ref inherits retrieval defaults");
+        assertEquals(java.util.List.of("customer-history"), loadout.memoryScopes());
+        assertEquals(java.util.List.of("refund-skill", "status-skill"), loadout.skills());
+        assertEquals(1, loadout.resources().size());
+        assertEquals("refund-form", loadout.resources().get(0).name());
+        assertEquals("file", loadout.resources().get(0).type());
+    }
+
+    @Test
+    @DisplayName("an absent loadout yields an empty one")
+    void absentLoadoutIsEmpty() {
+        WorkloadManifest manifest = ManifestParser.parse(MINIMAL);
+        assertTrue(manifest.agentSpec().loadout().isEmpty());
+        assertFalse(manifest.agentSpec().hasLoadout());
+    }
+
+    @Test
+    @DisplayName("a loadout knowledge entry without a name is rejected")
+    void loadoutKnowledgeRequiresName() {
+        BundleException ex = assertThrows(BundleException.class, () -> ManifestParser.parse("""
+                apiVersion: gargantua.ai/v1
+                kind: Agent
+                metadata:
+                  name: a
+                  version: 1.0.0
+                spec:
+                  loadout:
+                    knowledge:
+                      - description: nameless
+                """));
+        assertTrue(ex.getMessage().contains("spec.loadout.knowledge[0].name"));
+    }
 }

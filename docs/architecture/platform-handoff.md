@@ -45,9 +45,12 @@ also mirror to GitHub (`GiskardB`). Sibling repos are checked out side by side u
 The single most important structural decision after the multi-repo split:
 **all JVM components share ONE canonical domain model**, not local mirrors.
 
-- Coordinates: `io.github.giskardb:agent-core:1.2.20` — **published to Maven Central**
-  (verified). So sibling repos and Docker builds resolve it normally; you do **not**
-  need the Runtime checked out to build the Control Plane or Studio backend.
+- Coordinates: `io.github.giskardb:agent-core` — released versions are **published to
+  Maven Central** (`1.2.20` is the latest released; the working tree is now on
+  **`1.3.0-SNAPSHOT`** locally after the Agent Loadout change — install it to `.m2`, see
+  below). Released versions mean sibling repos and Docker builds resolve it normally; you
+  do **not** need the Runtime checked out to build the Control Plane or Studio backend.
+  A SNAPSHOT, however, is local-only until tagged/released — see roadmap §7.2.
 - It is a **module of `gargantua-parent`** (which extends `spring-boot-starter-parent
   4.1.0`). Pure domain: **no Spring, no Jackson annotations.** YAML↔record binding
   lives in the Runtime's `agent-bundle/ManifestParser` and in the Studio backend's
@@ -149,12 +152,19 @@ control-plane cap / runtime cap / context cap / *impl detail* / *external infra*
 the last two, adopt a standard or component instead of reinventing it.
 
 1. ✅ **Docker Compose vertical slice** — done (`gargantua-compose`).
-2. **▶ NEXT — Agent Loadout (ADOPT, P0, cheapest high-value).** `AgentSpec` today
-   binds capabilities/mcp/memoryLayers/model but **not** specific knowledge bases or
-   resources. Add `spec.loadout` (memory / knowledge / skills / resources) to the
-   manifest → `agent-core` → Studio → Runtime. This is the biggest domain gap and the
-   most economical to close.
-3. **Governance envelope (ADAPT, P1).** Add owner/tenant/version/status/visibility/
+2. ✅ **Agent Loadout (ADOPT, P0)** — done. `spec.loadout` (knowledge / memoryScopes /
+   skills / resources) added to `agent-core` (`Loadout`, `KnowledgeRef`, `ResourceRef`;
+   `AgentSpec.loadout`, additive), parsed by the Runtime's `ManifestParser`, emitted by the
+   Studio backend's `ManifestBuilder`, and editable in the Studio Agent Designer (knowledge
+   bases first-class, with `maxResults`/`minScore` retrieval overrides). Bumped the shared
+   model to **`1.3.0-SNAPSHOT`**. Reported as an unapplied field for now — runtime
+   provisioning of a loadout is not implemented (knowledge is still wired per skill via
+   `SKILL.md metadata.knowledge-base`). **Caveat:** `1.3.0-SNAPSHOT` lives only in the local
+   `.m2`; the `gargantua-compose` Docker builds resolve `agent-core` from Maven Central, so
+   they need `1.3.0` **released** (tag `v1.3.0` → the release-maven-central workflow) before
+   they will build again — or switch the JVM service Dockerfiles to build `agent-core` from
+   source.
+3. **▶ NEXT — Governance envelope (ADAPT, P1).** Add owner/tenant/version/status/visibility/
    ACL/timestamps as a **shared trait** on agents/skills/capabilities/memory/
    knowledge. **Do NOT** collapse them into one `ContextAsset` supertype — keep the
    distinct domain types.

@@ -6,7 +6,10 @@ import ai.gargantua.core.mcp.McpServerSpec;
 import ai.gargantua.core.mcp.McpTransport;
 import ai.gargantua.core.memory.MemoryLayer;
 import ai.gargantua.core.workload.AgentSpec;
+import ai.gargantua.core.workload.KnowledgeRef;
+import ai.gargantua.core.workload.Loadout;
 import ai.gargantua.core.workload.ModelSpec;
+import ai.gargantua.core.workload.ResourceRef;
 import ai.gargantua.core.workload.RuntimeSpec;
 import ai.gargantua.core.workload.WorkloadKind;
 import ai.gargantua.core.workload.WorkloadManifest;
@@ -129,10 +132,67 @@ public final class ManifestParser {
                     memoryLayers(list(spec, "memoryLayers", "spec.memoryLayers")),
                     string(spec, "defaultSkill", "spec.defaultSkill"),
                     map(spec, "guardrails", "spec.guardrails"),
-                    new LinkedHashSet<>(stringList(spec, "allowedRoles", "spec.allowedRoles")));
+                    new LinkedHashSet<>(stringList(spec, "allowedRoles", "spec.allowedRoles")),
+                    loadout(map(spec, "loadout", "spec.loadout")));
         } catch (IllegalArgumentException e) {
             throw new BundleException(e.getMessage(), e);
         }
+    }
+
+    private static Loadout loadout(Map<String, Object> loadout) {
+        if (loadout == null) {
+            return Loadout.empty();
+        }
+        try {
+            return new Loadout(
+                    knowledgeRefs(list(loadout, "knowledge", "spec.loadout.knowledge")),
+                    stringList(loadout, "memoryScopes", "spec.loadout.memoryScopes"),
+                    stringList(loadout, "skills", "spec.loadout.skills"),
+                    resourceRefs(list(loadout, "resources", "spec.loadout.resources")));
+        } catch (IllegalArgumentException e) {
+            throw new BundleException(e.getMessage(), e);
+        }
+    }
+
+    private static List<KnowledgeRef> knowledgeRefs(List<Object> raw) {
+        if (raw == null) {
+            return List.of();
+        }
+        List<KnowledgeRef> refs = new ArrayList<>();
+        for (int i = 0; i < raw.size(); i++) {
+            String path = "spec.loadout.knowledge[" + i + "]";
+            Map<String, Object> entry = asMap(raw.get(i), path);
+            String name = string(entry, "name", path + ".name");
+            if (name == null || name.isBlank()) {
+                throw BundleException.at(path + ".name", "is required");
+            }
+            refs.add(new KnowledgeRef(
+                    name,
+                    string(entry, "description", path + ".description"),
+                    integer(entry, "maxResults", path + ".maxResults"),
+                    decimal(entry, "minScore", path + ".minScore")));
+        }
+        return refs;
+    }
+
+    private static List<ResourceRef> resourceRefs(List<Object> raw) {
+        if (raw == null) {
+            return List.of();
+        }
+        List<ResourceRef> refs = new ArrayList<>();
+        for (int i = 0; i < raw.size(); i++) {
+            String path = "spec.loadout.resources[" + i + "]";
+            Map<String, Object> entry = asMap(raw.get(i), path);
+            String name = string(entry, "name", path + ".name");
+            if (name == null || name.isBlank()) {
+                throw BundleException.at(path + ".name", "is required");
+            }
+            refs.add(new ResourceRef(
+                    name,
+                    string(entry, "type", path + ".type"),
+                    string(entry, "uri", path + ".uri")));
+        }
+        return refs;
     }
 
     private static RuntimeSpec runtimeSpec(Map<String, Object> runtime) {

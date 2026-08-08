@@ -81,6 +81,15 @@ public final class ManifestProperties {
                     + spec.runtime().minVersion() + ") but is not verified by the runtime; "
                     + "the Deployment Manager is expected to enforce it");
         }
+        if (spec.hasLoadout()) {
+            var loadout = spec.loadout();
+            warnings.add("spec.loadout is declared (knowledge=" + loadout.knowledge().size()
+                    + ", memoryScopes=" + loadout.memoryScopes().size()
+                    + ", skills=" + loadout.skills().size()
+                    + ", resources=" + loadout.resources().size()
+                    + ") but loadout provisioning is not implemented yet; knowledge bases are "
+                    + "currently attached per skill via SKILL.md metadata.knowledge-base");
+        }
         return List.copyOf(warnings);
     }
 
