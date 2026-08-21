@@ -164,11 +164,15 @@ the last two, adopt a standard or component instead of reinventing it.
    they need `1.3.0` **released** (tag `v1.3.0` → the release-maven-central workflow) before
    they will build again — or switch the JVM service Dockerfiles to build `agent-core` from
    source.
-3. **▶ NEXT — Governance envelope (ADAPT, P1).** Add owner/tenant/version/status/visibility/
-   ACL/timestamps as a **shared trait** on agents/skills/capabilities/memory/
-   knowledge. **Do NOT** collapse them into one `ContextAsset` supertype — keep the
-   distinct domain types.
-4. **Execution event model + Trace (ADOPT, P1).** Structured `ExecutionEvent` stream
+3. ✅ **Governance envelope (ADAPT, P1)** — first increment done. `core.governance`:
+   `GovernanceEnvelope` (tenant / visibility[PRIVATE·INTERNAL·PUBLIC] / status / access /
+   createdAt / updatedAt) + a `Governed` interface (a **shared trait**, *not* a
+   `ContextAsset` supertype). Attached additively to `WorkloadMetadata` (`metadata.governance`)
+   — parsed by the Runtime, emitted by the Studio backend, edited in the Studio Agent
+   Designer. Timestamps are Control-Plane-assigned (never in a bundle). Reported, not yet
+   enforced (Policy Manager owns enforcement). **Follow-on:** apply the same `Governed` trait
+   to `Capability` / `SkillMeta` / memory / knowledge (cheap now the trait exists).
+4. **▶ NEXT — Execution event model + Trace (ADOPT, P1).** Structured `ExecutionEvent` stream
    over OTel; powers the Studio trace screen (already mocked) and later Experience→Skill.
 5. **Runtime supervisor + execution budgets (ADOPT, P1)** — timeout/loop/thrash/cost
    caps (partial today via `TokenBudgetManager`/cost tracking).

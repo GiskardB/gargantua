@@ -414,6 +414,53 @@ class ManifestParserTest {
     }
 
     @Test
+    @DisplayName("parses metadata.governance (tenant, visibility, status, access)")
+    void parsesGovernance() {
+        WorkloadManifest manifest = ManifestParser.parse("""
+                apiVersion: gargantua.ai/v1
+                kind: Agent
+                metadata:
+                  name: gov-agent
+                  version: 1.0.0
+                  governance:
+                    tenant: acme
+                    visibility: internal
+                    status: active
+                    access: [ops, support]
+                spec: {}
+                """);
+        var gov = manifest.metadata().governance();
+        assertEquals("acme", gov.tenant());
+        assertEquals(ai.gargantua.core.governance.Visibility.INTERNAL, gov.visibility());
+        assertEquals("active", gov.status());
+        assertEquals(java.util.List.of("ops", "support"), gov.access());
+        assertNull(gov.createdAt(), "bundle manifests do not carry timestamps");
+    }
+
+    @Test
+    @DisplayName("absent governance defaults to none() / PRIVATE")
+    void absentGovernanceIsNone() {
+        WorkloadManifest manifest = ManifestParser.parse(MINIMAL);
+        assertTrue(manifest.metadata().governance().isDefault());
+    }
+
+    @Test
+    @DisplayName("an unknown visibility is rejected")
+    void rejectsUnknownVisibility() {
+        BundleException ex = assertThrows(BundleException.class, () -> ManifestParser.parse("""
+                apiVersion: gargantua.ai/v1
+                kind: Agent
+                metadata:
+                  name: a
+                  version: 1.0.0
+                  governance:
+                    visibility: secret
+                spec: {}
+                """));
+        assertTrue(ex.getMessage().contains("metadata.governance.visibility"));
+    }
+
+    @Test
     @DisplayName("a loadout knowledge entry without a name is rejected")
     void loadoutKnowledgeRequiresName() {
         BundleException ex = assertThrows(BundleException.class, () -> ManifestParser.parse("""

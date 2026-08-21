@@ -105,6 +105,30 @@ spec:
 | `description` | no | Shown in Studio and Catalog; defaults to empty |
 | `owner` | no | Owning team, used for Catalog ownership and alerting |
 | `labels` | no | Free-form key/value metadata for selection |
+| `governance` | no | Cross-cutting governance envelope — see below |
+
+## `metadata.governance`
+
+The shared **governance envelope**: cross-cutting ownership, visibility and lifecycle that
+the Catalog and Policy Manager reason over. The same shape is designed to attach to other
+governed resources (skills, capabilities, memory, knowledge) — carried as a trait, not by
+collapsing those types into one supertype.
+
+```yaml
+metadata:
+  governance:
+    tenant: acme                 # owning tenant/organisation; omit for the default tenant
+    visibility: internal         # private (default) | internal | public
+    status: active               # free-form lifecycle label (draft/active/deprecated/…)
+    access: [ops, support]       # ACL: roles/principals granted access beyond `visibility`
+```
+
+`visibility` defaults to `private` and is only emitted when it departs from it. `createdAt`
+and `updatedAt` are **assigned by the Control Plane** when a resource is registered — a
+signed bundle manifest does not carry them, so they never appear here.
+
+> **Reported, not enforced yet.** The runtime parses and validates the envelope; the Policy
+> Manager is the component that will enforce visibility and access.
 
 ## `spec.runtime`
 
@@ -241,6 +265,7 @@ picture.
 | Field | Status |
 |---|---|
 | `metadata.*` | Applied — becomes the agent identity and A2A card |
+| `metadata.governance` | Reported, not applied — the Policy Manager will enforce visibility/access |
 | `spec.capabilities` | Applied — advertised on the A2A Agent Card |
 | `spec.capabilities[].inputSchema` / `outputSchema` | Carried for discovery; not resolved or validated |
 | `spec.runtime.image` | Recorded; honoured by the Deployment Manager, not the runtime |

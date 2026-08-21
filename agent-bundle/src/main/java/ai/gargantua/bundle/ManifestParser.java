@@ -5,6 +5,8 @@ import ai.gargantua.core.mcp.McpAuth;
 import ai.gargantua.core.mcp.McpServerSpec;
 import ai.gargantua.core.mcp.McpTransport;
 import ai.gargantua.core.memory.MemoryLayer;
+import ai.gargantua.core.governance.GovernanceEnvelope;
+import ai.gargantua.core.governance.Visibility;
 import ai.gargantua.core.workload.AgentSpec;
 import ai.gargantua.core.workload.KnowledgeRef;
 import ai.gargantua.core.workload.Loadout;
@@ -113,9 +115,35 @@ public final class ManifestParser {
                     string(metadata, "version", "metadata.version"),
                     string(metadata, "description", "metadata.description"),
                     string(metadata, "owner", "metadata.owner"),
-                    stringMap(metadata, "labels", "metadata.labels"));
+                    stringMap(metadata, "labels", "metadata.labels"),
+                    governance(map(metadata, "governance", "metadata.governance")));
         } catch (IllegalArgumentException e) {
             throw new BundleException(e.getMessage(), e);
+        }
+    }
+
+    private static GovernanceEnvelope governance(Map<String, Object> gov) {
+        if (gov == null) {
+            return GovernanceEnvelope.none();
+        }
+        // createdAt/updatedAt are Control-Plane-assigned and not carried in a bundle manifest.
+        return GovernanceEnvelope.of(
+                string(gov, "tenant", "metadata.governance.tenant"),
+                visibility(gov),
+                string(gov, "status", "metadata.governance.status"),
+                stringList(gov, "access", "metadata.governance.access"));
+    }
+
+    private static Visibility visibility(Map<String, Object> gov) {
+        String raw = string(gov, "visibility", "metadata.governance.visibility");
+        if (raw == null || raw.isBlank()) {
+            return Visibility.PRIVATE;
+        }
+        try {
+            return Visibility.valueOf(raw.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw BundleException.at("metadata.governance.visibility",
+                    "unknown visibility '" + raw + "'");
         }
     }
 
