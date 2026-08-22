@@ -100,6 +100,13 @@ without CORS or a per-host rebuild. Published ports live in a high range (**1808
 **18090** backend, **18081** Studio, **19000/19001** MinIO) so they never clash with
 Cave's own services; override any of them in `.env`.
 
+**Static preview (no backend):** the built Studio is published via `cave-publish` at
+**`https://<CAVE_HOST>:7443/gargantua-studio/`** (CAVE_HOST=192.168.1.118) so it can be
+viewed without running anything. It runs offline/mock there (a published static site
+can't reach a localhost backend) — Loadout, Governance and the Trace Explorer show sample
+data. Re-publish after a UI change: `npm run build` then copy `dist/` into
+`~/workspace/sites/gargantua-studio/`.
+
 **Scope of the slice:** creating an agent needs only Studio → backend → Control
 Plane. *Running* an agent (the Runtime, with Mongo/Redis) is deliberately out of
 this slice; it comes later.
@@ -201,9 +208,11 @@ the last two, adopt a standard or component instead of reinventing it.
    map), `ExecutionEventType`, `ExecutionTrace` (ordered timeline), and the
    `ExecutionEventPublisher` **port** with a `noOp()` default — the single seam that keeps
    the bus choice (NATS/Kafka/none) open. Distinct from `AuditEvent` (one post-hoc summary
-   row) — this is the fine-grained live stream. **Follow-on:** emit events from the engine
-   pipeline (routing/guardrail/tool/LLM/memory), an in-memory + OTel adapter, a Runtime
-   trace API, and wire the Studio trace screen (already mocked) to it.
+   row) — this is the fine-grained live stream. The Studio has a **Trace Explorer** screen
+   (`/trace`) rendering an `ExecutionTrace` timeline on sample data (visible in the published
+   preview). **Follow-on:** emit events from the engine pipeline
+   (routing/guardrail/tool/LLM/memory), an in-memory + OTel adapter, a Runtime trace API,
+   and point the Trace Explorer at it.
 5. **Runtime supervisor + execution budgets (ADOPT, P1)** — timeout/loop/thrash/cost
    caps (partial today via `TokenBudgetManager`/cost tracking).
 6. **Agent lifecycle + evaluation gate (ADAPT, P1)** — DRAFT→…→ACTIVE; no publish
