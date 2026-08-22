@@ -196,8 +196,14 @@ the last two, adopt a standard or component instead of reinventing it.
    Designer. Timestamps are Control-Plane-assigned (never in a bundle). Reported, not yet
    enforced (Policy Manager owns enforcement). **Follow-on:** apply the same `Governed` trait
    to `Capability` / `SkillMeta` / memory / knowledge (cheap now the trait exists).
-4. **▶ NEXT — Execution event model + Trace (ADOPT, P1).** Structured `ExecutionEvent` stream
-   over OTel; powers the Studio trace screen (already mocked) and later Experience→Skill.
+4. **◐ IN PROGRESS — Execution event model + Trace (ADOPT, P1).** Domain foundation laid
+   in `agent-core` `core.execution`: `ExecutionEvent` (OTel-friendly: typed + attributes
+   map), `ExecutionEventType`, `ExecutionTrace` (ordered timeline), and the
+   `ExecutionEventPublisher` **port** with a `noOp()` default — the single seam that keeps
+   the bus choice (NATS/Kafka/none) open. Distinct from `AuditEvent` (one post-hoc summary
+   row) — this is the fine-grained live stream. **Follow-on:** emit events from the engine
+   pipeline (routing/guardrail/tool/LLM/memory), an in-memory + OTel adapter, a Runtime
+   trace API, and wire the Studio trace screen (already mocked) to it.
 5. **Runtime supervisor + execution budgets (ADOPT, P1)** — timeout/loop/thrash/cost
    caps (partial today via `TokenBudgetManager`/cost tracking).
 6. **Agent lifecycle + evaluation gate (ADAPT, P1)** — DRAFT→…→ACTIVE; no publish
@@ -223,6 +229,8 @@ an `EventPublisher` if events land — NATS-vs-Kafka stays open); a "modular mon
 - **Governance is only on the agent so far** — `Governed` is implemented by
   `WorkloadMetadata`; applying it to `Capability`/`SkillMeta`/memory/knowledge is a
   planned follow-on (see §7.3).
+- **Execution events are model-only so far** — `core.execution` defines the types and the
+  `ExecutionEventPublisher` port, but nothing emits or consumes them yet (see §7.4).
 - **Bundle *signature* verification** is not implemented (SHA-256 checksum is).
 - The Control Plane is an **MVP**: Registry/Catalog/Policy/Deployment exist; auth is
   permit-all in dev (OIDC/Keycloak profile stubbed), no RBAC enforcement yet.
