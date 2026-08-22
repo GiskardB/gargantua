@@ -115,8 +115,20 @@ this slice; it comes later.
 and statically verified (compose YAML valid, frontend build clean, smoke bash ok) but
 not executed here; run it where you have a Docker daemon. Ports already default to the
 18xxx/19xxx range so they don't clash with Cave's own services (including its `minio` on
-9000/9001). Remember the `agent-core 1.3.0-SNAPSHOT` release caveat (§7.2) — the Docker
-builds need it on Maven Central.
+9000/9001). The images build `agent-core` from source (context `runtime_src=../gargantua`),
+so no Maven Central release is needed — but the `gargantua` repo must be a sibling.
+
+**Autonomous Docker testing — status (2026-08):** the Portainer MCP connector works (one
+env, `primary`, Docker 29.5.3), but that daemon runs on a **different host** — a bind mount
+of `/home/dev/workspace` comes back empty — so it cannot build from this workspace's source,
+and there is no Docker CLI in the Cave IDE box. Net: the compose **cannot be built/tested
+from here** yet. To make an agent autonomous at running it, give the IDE container Docker
+access: either bind-mount the host Docker socket (`/var/run/docker.sock`) and install the
+`docker` CLI, or expose the daemon over TCP and set `DOCKER_HOST`. With the CLI, `docker
+compose up --build` streams the (sibling) build contexts to the daemon over the API — the
+daemon does **not** need to see the workspace — and the source-built agent-core means no
+release is required. Alternatively, publish prebuilt images to a registry the `primary`
+daemon can pull and deploy an image-based compose via Portainer.
 
 **Build toolchain note (2026-08):** the Cave IDE box was re-provisioned mid-session
 **without Java/Maven**. If `mvn`/`java` are missing, install a portable toolchain (this is
@@ -190,11 +202,11 @@ the last two, adopt a standard or component instead of reinventing it.
    bases first-class, with `maxResults`/`minScore` retrieval overrides). Bumped the shared
    model to **`1.3.0-SNAPSHOT`**. Reported as an unapplied field for now — runtime
    provisioning of a loadout is not implemented (knowledge is still wired per skill via
-   `SKILL.md metadata.knowledge-base`). **Caveat:** `1.3.0-SNAPSHOT` lives only in the local
-   `.m2`; the `gargantua-compose` Docker builds resolve `agent-core` from Maven Central, so
-   they need `1.3.0` **released** (tag `v1.3.0` → the release-maven-central workflow) before
-   they will build again — or switch the JVM service Dockerfiles to build `agent-core` from
-   source.
+   `SKILL.md metadata.knowledge-base`). **Version note:** `1.3.0-SNAPSHOT` lives only in the
+   local `.m2`. The `gargantua-compose` Docker images now **build agent-core from source**
+   (named build context `runtime_src=../gargantua`), so the stack no longer needs `agent-core`
+   on Maven Central — publishing `v1.3.0` is still wanted for sibling repos that consume it as
+   a released dependency, but it's no longer a blocker for running the compose.
 3. ✅ **Governance envelope (ADAPT, P1)** — first increment done. `core.governance`:
    `GovernanceEnvelope` (tenant / visibility[PRIVATE·INTERNAL·PUBLIC] / status / access /
    createdAt / updatedAt) + a `Governed` interface (a **shared trait**, *not* a
