@@ -12,6 +12,12 @@ and what comes next. It complements — does not replace — two narrower docs:
 **Last updated:** 2026-08. If a fact here disagrees with the code, the code wins —
 fix this doc.
 
+**Recent progress (most recent first):** governance envelope (`metadata.governance`,
+shared `Governed` trait) → Agent Loadout (`spec.loadout`, knowledge bases first-class,
+shared model bumped to `1.3.0-SNAPSHOT`) → Docker Compose vertical slice
+(`gargantua-compose`, with `start.bat`/`stop.bat`, ports in the 18xxx/19xxx range). See §7
+for the roadmap and what's next.
+
 ---
 
 ## 1. What Gargantua is (one paragraph)
@@ -32,11 +38,11 @@ also mirror to GitHub (`GiskardB`). Sibling repos are checked out side by side u
 
 | Repo | Role | Stack | Status (2026-08) |
 |---|---|---|---|
-| `gargantua` | **Runtime** + execution-side Kernel; **home of all architecture docs**; publishes `agent-core` | Java 25 / Spring Boot 4.1, 9 Maven modules | Phase 1 implemented; docs hub |
-| `gargantua-control-plane` | **Control Plane**: Registry + Catalog + Policy + Deployment | Java 25 / Boot 4.1, `agent-core` | **MVP** — publish→index→discovery works |
-| `gargantua-studio-backend` | **Studio BFF**: builds `gargantua.ai/v1` manifests from form drafts; gateway to the Control Plane | Java 25 / Boot 4.1, `agent-core` | **MVP** — 30 tests green |
-| `gargantua-studio` | **Studio** frontend (Agent Designer, Skill Designer, catalog views) | React 18 / Vite 5 / React Flow / Monaco / Zustand / React Router (HashRouter) | **MVP** — wired to backend, offline fallback |
-| `gargantua-compose` | **Local vertical slice** (Docker Compose) wiring the agent-creation flow | Compose v2 | **Done** — authored + statically verified |
+| `gargantua` | **Runtime** + execution-side Kernel; **home of all architecture docs**; publishes `agent-core` | Java 25 / Spring Boot 4.1, 9 Maven modules | Phase 1 + loadout + governance parsing; docs hub; on `1.3.0-SNAPSHOT` |
+| `gargantua-control-plane` | **Control Plane**: Registry + Catalog + Policy + Deployment | Java 25 / Boot 4.1, `agent-core` | **MVP** — publish→index→discovery works; 18 tests |
+| `gargantua-studio-backend` | **Studio BFF**: builds `gargantua.ai/v1` manifests from form drafts; gateway to the Control Plane | Java 25 / Boot 4.1, `agent-core` | **MVP** — builds loadout + governance; 30 tests |
+| `gargantua-studio` | **Studio** frontend (Agent + Skill Designer, Loadout & Governance sections, catalog views) | React 18 / Vite 5 / React Flow / Monaco / Zustand / React Router (HashRouter) | **MVP** — wired to backend, offline fallback; 8 tests |
+| `gargantua-compose` | **Local vertical slice** (Docker Compose) wiring the agent-creation flow; `start.bat`/`stop.bat` | Compose v2 | **Done** — ports in 18xxx/19xxx (off Cave's range); authored + statically verified |
 | `gargantua-gateway` | Agent Gateway (Intent/Capability/Version routing) | TBD | **Not built** — Phase 4; decision: *evaluate `agentgateway`* first |
 | `gargantua-operator` | Kubernetes Operator + CRDs | Java Operator SDK (planned) | **Not built** — Phase 5 |
 
@@ -58,8 +64,11 @@ The single most important structural decision after the multi-repo split:
 - To refresh the local `.m2` after changing it, from the Runtime repo:
   `mvn -N install && mvn -pl agent-core install -DskipTests`.
 - Key types: `WorkloadManifest` (apiVersion/kind/metadata/spec; `CURRENT_API_VERSION
-  = "gargantua.ai/v1"`), `AgentSpec` (runtime, capabilities, model, mcpServers,
-  memoryLayers, defaultSkill, guardrails, allowedRoles), `Capability`
+  = "gargantua.ai/v1"`), `WorkloadMetadata` (name/version/description/owner/labels +
+  **`governance`**, implements `Governed`), `AgentSpec` (runtime, capabilities, model,
+  mcpServers, memoryLayers, defaultSkill, guardrails, allowedRoles, **`loadout`**),
+  `Loadout`/`KnowledgeRef`/`ResourceRef` (`core.workload`),
+  `GovernanceEnvelope`/`Visibility`/`Governed` (`core.governance`), `Capability`
   (name, description, version, inputSchema, outputSchema, **`implementedBy`**,
   `Set<String> tags`), `SkillMeta`/`SkillCard`, `RagConfig`, `McpServerSpec`,
   `MemoryLayer`, A2A (`AgentCard`), rag ports (`EmbeddingPort`, `VectorStorePort`).
@@ -81,13 +90,15 @@ browser ─▶ studio            nginx: serves the SPA, proxies /api same-origin
 ```bash
 cd gargantua-compose
 cp .env.example .env                    # optional; defaults work
-docker compose up -d --build --wait
+docker compose up -d --build --wait     # Windows: start.bat  (stop.bat / stop.bat clean)
 ./smoke/smoke.sh                        # build → publish → catalog round-trip
 ```
 
-Studio UI at `http://localhost:8081` (or `http://<CAVE_HOST>:8081`). The SPA talks
+Studio UI at `http://localhost:18081` (or `http://<CAVE_HOST>:18081`). The SPA talks
 to the backend **same-origin via nginx**, so it works on localhost or a LAN IP
-without CORS or a per-host rebuild.
+without CORS or a per-host rebuild. Published ports live in a high range (**18080** CP,
+**18090** backend, **18081** Studio, **19000/19001** MinIO) so they never clash with
+Cave's own services; override any of them in `.env`.
 
 **Scope of the slice:** creating an agent needs only Studio → backend → Control
 Plane. *Running* an agent (the Runtime, with Mongo/Redis) is deliberately out of
@@ -95,9 +106,22 @@ this slice; it comes later.
 
 **Caveats:** `docker` is **not installed in Cave's IDE env** — the slice was authored
 and statically verified (compose YAML valid, frontend build clean, smoke bash ok) but
-not executed here; run it where you have a Docker daemon. If you run it **on the Cave
-host**, override `MINIO_API_PORT`/`MINIO_CONSOLE_PORT` in `.env` — Cave already runs a
-`minio` on 9000/9001.
+not executed here; run it where you have a Docker daemon. Ports already default to the
+18xxx/19xxx range so they don't clash with Cave's own services (including its `minio` on
+9000/9001). Remember the `agent-core 1.3.0-SNAPSHOT` release caveat (§7.2) — the Docker
+builds need it on Maven Central.
+
+**Build toolchain note (2026-08):** the Cave IDE box was re-provisioned mid-session
+**without Java/Maven**. If `mvn`/`java` are missing, install a portable toolchain (this is
+what the recent JVM work was built/verified with):
+```bash
+# Temurin JDK 25 + Maven 3.9.9 under ~/tools
+curl -fsSL -o ~/tools/jdk25.tar.gz "https://api.adoptium.net/v3/binary/latest/25/ga/linux/x64/jdk/hotspot/normal/eclipse"
+curl -fsSL -o ~/tools/maven.tar.gz "https://archive.apache.org/dist/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz"
+# extract both under ~/tools, then:
+export JAVA_HOME=~/tools/jdk-25.0.4.1+1
+export PATH=$JAVA_HOME/bin:~/tools/apache-maven-3.9.9/bin:$PATH
+```
 
 ## 5. The agent-creation flow (contracts, end to end)
 
@@ -192,12 +216,19 @@ an `EventPublisher` if events land — NATS-vs-Kafka stays open); a "modular mon
 ## 8. Known gaps & honest caveats
 
 - **Not everything in the manifest is enforced yet** — see the Runtime's
-  `ManifestProperties.unappliedFields()` and `project-handoff.md` §4.
+  `ManifestProperties.unappliedFields()` and `project-handoff.md` §4. In particular
+  `spec.loadout` and `metadata.governance` are **parsed and reported, not enforced**:
+  loadout provisioning isn't implemented (knowledge is wired per skill via
+  `SKILL.md metadata.knowledge-base`), and governance visibility/access await the Policy Manager.
+- **Governance is only on the agent so far** — `Governed` is implemented by
+  `WorkloadMetadata`; applying it to `Capability`/`SkillMeta`/memory/knowledge is a
+  planned follow-on (see §7.3).
 - **Bundle *signature* verification** is not implemented (SHA-256 checksum is).
 - The Control Plane is an **MVP**: Registry/Catalog/Policy/Deployment exist; auth is
   permit-all in dev (OIDC/Keycloak profile stubbed), no RBAC enforcement yet.
 - The Studio backend security is **permit-all in dev**, JWT under the `oidc` profile.
-- Docker is unavailable in the Cave IDE env (§4).
+- Docker is unavailable in the Cave IDE env (§4); Java/Maven may be missing after a
+  re-provision — restore a portable toolchain (§4 build note).
 
 ## 9. Where to go next in the docs
 
