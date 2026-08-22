@@ -107,9 +107,15 @@ can't reach a localhost backend) — Loadout, Governance and the Trace Explorer 
 data. Re-publish after a UI change: `npm run build` then copy `dist/` into
 `~/workspace/sites/gargantua-studio/`.
 
-**Scope of the slice:** creating an agent needs only Studio → backend → Control
-Plane. *Running* an agent (the Runtime, with Mongo/Redis) is deliberately out of
-this slice; it comes later.
+**Scope of the slice:** the core 5 services cover *creating* an agent (Studio → backend
+→ Control Plane). *Running* an agent is now an **opt-in second loop** — `docker compose
+--profile agent-runtime up` adds `ollama` (local, OpenAI-compatible LLM, no external key),
+a one-shot model pull, and `runtime` (the generic Runtime image with a demo bundle
+`examples/hello-agent` baked in — `embedded` Spring profile = in-memory, no Mongo/Redis;
+`semantic` ONNX routing). **Verified end to end (2026-08):** the bundle boots, `greeter-skill`
+registers, and `POST :18100/api/agent/chat` returns a real LLM-generated reply routed
+SEMANTICally to the skill. Note: the bundle is **baked into the image** (build-time COPY),
+not bind-mounted — a workspace bind mount arrives empty when the daemon is remote (Cave).
 
 **Verified end-to-end against a live Docker daemon (2026-08).** `docker` + `docker compose`
 became available in the Cave IDE box mid-session (`DOCKER_HOST=tcp://socket-proxy:2375` —
