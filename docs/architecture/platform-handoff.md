@@ -111,24 +111,38 @@ data. Re-publish after a UI change: `npm run build` then copy `dist/` into
 Plane. *Running* an agent (the Runtime, with Mongo/Redis) is deliberately out of
 this slice; it comes later.
 
-**Caveats:** `docker` is **not installed in Cave's IDE env** — the slice was authored
-and statically verified (compose YAML valid, frontend build clean, smoke bash ok) but
-not executed here; run it where you have a Docker daemon. Ports already default to the
-18xxx/19xxx range so they don't clash with Cave's own services (including its `minio` on
-9000/9001). The images build `agent-core` from source (context `runtime_src=../gargantua`),
-so no Maven Central release is needed — but the `gargantua` repo must be a sibling.
+**Verified end-to-end against a live Docker daemon (2026-08).** `docker` + `docker compose`
+became available in the Cave IDE box mid-session (`DOCKER_HOST=tcp://socket-proxy:2375` —
+the daemon runs on a different host than the IDE shell, same as Portainer's). Built and ran
+the full stack; all 5 containers reported healthy and `smoke/smoke.sh` passed end to end —
+confirmed against the real Control Plane response (a `smoke-agent@1.0.0` bundle with its
+capability actually in the Catalog), and separately exercised `/api/studio/manifest/build`
+with a full Loadout + Governance draft and got back correct canonical YAML.
 
-**Autonomous Docker testing — status (2026-08):** the Portainer MCP connector works (one
-env, `primary`, Docker 29.5.3), but that daemon runs on a **different host** — a bind mount
-of `/home/dev/workspace` comes back empty — so it cannot build from this workspace's source,
-and there is no Docker CLI in the Cave IDE box. Net: the compose **cannot be built/tested
-from here** yet. To make an agent autonomous at running it, give the IDE container Docker
-access: either bind-mount the host Docker socket (`/var/run/docker.sock`) and install the
-`docker` CLI, or expose the daemon over TCP and set `DOCKER_HOST`. With the CLI, `docker
-compose up --build` streams the (sibling) build contexts to the daemon over the API — the
-daemon does **not** need to see the workspace — and the source-built agent-core means no
-release is required. Alternatively, publish prebuilt images to a registry the `primary`
-daemon can pull and deploy an image-based compose via Portainer.
+Three real bugs were found and fixed this way (all pushed):
+1. **`additional_contexts` needs BuildKit** — the classic builder rejects it outright
+   (`the classic builder doesn't support additional contexts`). Prefix build/up with
+   `DOCKER_BUILDKIT=1` if your Docker doesn't default to it.
+2. **`mvn -N install` validates the whole reactor**, not just the module being installed —
+   copying only `pom.xml` + `agent-core/` into the `agentcore` build stage failed with
+   `Child module ... does not exist` for the other 8 modules, even non-recursively. Fixed by
+   copying the **whole Runtime repo** into that stage instead (added a `.dockerignore` to
+   `gargantua` — excludes `target/`, `.git` — so this stays cheap).
+3. **The `studio` (nginx) healthcheck used `localhost`**, which resolves to `::1` first
+   inside the container; the image only listens on IPv4 (`0.0.0.0:80`, no `listen [::]:80`
+   in our `nginx.conf`), so the healthcheck failed with "Connection refused" while nginx was
+   serving fine. Fixed by probing `127.0.0.1` instead.
+
+**The published-ports gotcha:** if the Docker daemon isn't on the same host as your shell
+(true in Cave — `DOCKER_HOST` points at a remote daemon), `curl localhost:18080` will
+refuse to connect even though the containers are healthy — the ports are bound on the
+*daemon's* host, not the shell's. Use the actual Docker host address (in Cave, `<CAVE_HOST>`)
+instead; see the `gargantua-compose` README for detail.
+
+Ports default to the 18xxx/19xxx range so they don't clash with Cave's own services
+(including its `minio` on 9000/9001). The images build `agent-core` from source (context
+`runtime_src=../gargantua`), so no Maven Central release is needed — but the `gargantua`
+repo must be a sibling checkout.
 
 **Build toolchain note (2026-08):** the Cave IDE box was re-provisioned mid-session
 **without Java/Maven**. If `mvn`/`java` are missing, install a portable toolchain (this is
@@ -256,8 +270,10 @@ an `EventPublisher` if events land — NATS-vs-Kafka stays open); a "modular mon
 - The Control Plane is an **MVP**: Registry/Catalog/Policy/Deployment exist; auth is
   permit-all in dev (OIDC/Keycloak profile stubbed), no RBAC enforcement yet.
 - The Studio backend security is **permit-all in dev**, JWT under the `oidc` profile.
-- Docker is unavailable in the Cave IDE env (§4); Java/Maven may be missing after a
-  re-provision — restore a portable toolchain (§4 build note).
+- Docker availability in the Cave IDE env has flipped state at least once mid-project —
+  it works now (verified, §4) but treat it as environment-dependent, not guaranteed.
+  Java/Maven may also be missing after a re-provision — restore a portable toolchain
+  (§4 build note) if `mvn`/`java` vanish.
 
 ## 9. Where to go next in the docs
 
