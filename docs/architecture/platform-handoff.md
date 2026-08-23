@@ -235,16 +235,19 @@ the last two, adopt a standard or component instead of reinventing it.
    Designer. Timestamps are Control-Plane-assigned (never in a bundle). Reported, not yet
    enforced (Policy Manager owns enforcement). **Follow-on:** apply the same `Governed` trait
    to `Capability` / `SkillMeta` / memory / knowledge (cheap now the trait exists).
-4. **◐ IN PROGRESS — Execution event model + Trace (ADOPT, P1).** Domain foundation laid
-   in `agent-core` `core.execution`: `ExecutionEvent` (OTel-friendly: typed + attributes
-   map), `ExecutionEventType`, `ExecutionTrace` (ordered timeline), and the
-   `ExecutionEventPublisher` **port** with a `noOp()` default — the single seam that keeps
-   the bus choice (NATS/Kafka/none) open. Distinct from `AuditEvent` (one post-hoc summary
-   row) — this is the fine-grained live stream. The Studio has a **Trace Explorer** screen
-   (`/trace`) rendering an `ExecutionTrace` timeline on sample data (visible in the published
-   preview). **Follow-on:** emit events from the engine pipeline
-   (routing/guardrail/tool/LLM/memory), an in-memory + OTel adapter, a Runtime trace API,
-   and point the Trace Explorer at it.
+4. **◕ MOSTLY DONE — Execution event model + Trace (ADOPT, P1).** `agent-core`
+   `core.execution`: `ExecutionEvent` (OTel-friendly: typed + attributes map),
+   `ExecutionEventType`, `ExecutionTrace`, and the `ExecutionEventPublisher` **port**
+   (noOp default — keeps the NATS/Kafka/none choice open). The **engine now emits** a
+   per-turn trace (TURN_STARTED → ROUTING_DECIDED → SKILL_SELECTED → LLM_CALL → TOOL_CALLED
+   → TURN_COMPLETED / ERROR), best-effort and additive. Default sink is an
+   `InMemoryExecutionEventPublisher` (bounded ring); **`GET /api/traces` + `/api/traces/{id}`**
+   expose it. Distinct from `AuditEvent` (one post-hoc summary). Verified live: real chats
+   produce real traces via the API. The Studio has a **Trace Explorer** (`/trace`) on sample
+   data. **Remaining follow-on:** (a) point the Trace Explorer at a runtime's `/api/traces`
+   (per-agent service — needs a target-runtime selector, or surface traces through a
+   central collector); (b) an OTel exporter implementation of the port; (c) finer events
+   (guardrail verdicts, memory read/write, per-tool results).
 5. **Runtime supervisor + execution budgets (ADOPT, P1)** — timeout/loop/thrash/cost
    caps (partial today via `TokenBudgetManager`/cost tracking).
 6. **Agent lifecycle + evaluation gate (ADAPT, P1)** — DRAFT→…→ACTIVE; no publish
@@ -270,8 +273,9 @@ an `EventPublisher` if events land — NATS-vs-Kafka stays open); a "modular mon
 - **Governance is only on the agent so far** — `Governed` is implemented by
   `WorkloadMetadata`; applying it to `Capability`/`SkillMeta`/memory/knowledge is a
   planned follow-on (see §7.3).
-- **Execution events are model-only so far** — `core.execution` defines the types and the
-  `ExecutionEventPublisher` port, but nothing emits or consumes them yet (see §7.4).
+- **Execution events flow at runtime** — the engine emits them, an in-memory sink retains
+  the recent ones, and `GET /api/traces` serves them (verified live). Still open: wiring the
+  Studio Trace Explorer to a real runtime, an OTel exporter, and finer-grained events (§7.4).
 - **Bundle *signature* verification** is not implemented (SHA-256 checksum is).
 - The Control Plane is an **MVP**: Registry/Catalog/Policy/Deployment exist; auth is
   permit-all in dev (OIDC/Keycloak profile stubbed), no RBAC enforcement yet.
