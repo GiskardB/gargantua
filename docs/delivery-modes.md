@@ -215,6 +215,35 @@ and the `SecretResolver` extension point in [Extending](extending.md).
 
 ---
 
+## Runtime mode inside the platform (the "AI OS")
+
+Runtime mode is also how an agent runs when driven by the wider **Gargantua platform**
+rather than by hand. The two are the same execution pipeline — the difference is *who
+produces and places the bundle*:
+
+- **Studio** (a visual designer) turns a form draft into a `gargantua.ai/v1` manifest.
+- The **Studio backend (BFF)** validates it against the shared `agent-core` model and
+  publishes it to the **Control Plane**.
+- The **Control Plane** (Registry + Catalog) stores the bundle and indexes its
+  capabilities for discovery. (ADR-004: the Control Plane *defines*, the Runtime *applies*.)
+- A **Runtime** container then executes that bundle exactly as described above.
+
+None of this requires Kubernetes: the whole loop runs locally via Docker Compose. See
+[`architecture/platform-handoff.md`](architecture/platform-handoff.md) for the cross-repo
+map and the `gargantua-compose` repo for a one-command vertical slice (including an
+optional `agent-runtime` profile that boots a bundle against a local LLM).
+
+Two manifest additions support this platform mode (both parsed and reported by the
+Runtime today, enforced by the Control Plane/Policy Manager later — see
+[agent-manifest.md](architecture/agent-manifest.md)):
+
+- **`spec.loadout`** — the specific knowledge bases, memory scopes, skills and resources
+  an agent is equipped with.
+- **`metadata.governance`** — cross-cutting ownership/tenant/visibility/status/ACL.
+
+Observability across a run is exposed by the Runtime's **execution trace** API
+(`GET /api/traces`) — see [api-reference.md](api-reference.md).
+
 ## Related
 
 - [Agent Manifest reference](architecture/agent-manifest.md) — the bundle schema

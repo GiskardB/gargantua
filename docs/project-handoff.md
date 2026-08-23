@@ -109,15 +109,25 @@ mode instead. See ADR-003.
 
 ```bash
 mvn -q clean install -DskipTests    # build all 9 modules
-mvn test                            # 823 tests
+mvn test                            # 842 tests (green on 1.3.0-SNAPSHOT, 2026-08)
 ```
 
 The examples live in a **separate repository**,
 [GiskardB/gargantua-examples](https://github.com/GiskardB/gargantua-examples) —
-22 projects, ~220 tests. They are the framework's real integration suite: several
+23 projects. They are the framework's real integration suite: several
 regressions in this codebase were caught by an example and by nothing else. If
 you change public behaviour, build the examples against your branch before
-believing it works.
+believing it works. Note: each example pins a *released* framework version via
+**JitPack** (`com.github.giskardb.gargantua`, Boot parent 4.0.4); to run them against
+a local build, repoint to `io.github.giskardb:<module>:<version>` and bump the Boot
+parent to match (4.1.0 for 1.3.0-SNAPSHOT).
+
+**Verified against 1.3.0-SNAPSHOT (2026-08):** full suite green (842); the archetype
+generates a project that builds, its context-load test passes, and it boots and answers
+`POST /api/agent/chat` against a local Ollama; representative examples (tool-basics,
+guardrails, output-schema, llm-routing) compile and their test suites pass once repointed.
+The public consumer API is backward-compatible — loadout/governance/execution-event
+additions are all additive.
 
 The `embedded` Spring profile excludes the Mongo and Redis auto-configurations,
 which takes boot from ~41s to ~6.5s. Use it for anything iterative.

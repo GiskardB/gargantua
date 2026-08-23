@@ -399,6 +399,30 @@ Storage: `MongoAuditStore` writes to an append-only `audit_trail` MongoDB collec
 
 ---
 
+## Execution Traces
+
+The engine emits a fine-grained, per-turn **execution trace** (an ordered stream of
+`ExecutionEvent`s: `TURN_STARTED` → `ROUTING_DECIDED` → `SKILL_SELECTED` → `LLM_CALL` →
+`TOOL_CALLED` → `TURN_COMPLETED` / `ERROR`). This is distinct from the audit trail (one
+post-hoc summary row per request): a trace is the live, step-by-step timeline. By default
+they are kept in a bounded in-memory buffer; swap the `ExecutionEventPublisher` bean for an
+OpenTelemetry or bus exporter to ship them elsewhere.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/traces?limit=20` | Recent traces, newest first (`limit` optional). |
+| GET | `/api/traces/{traceId}` | One trace by id, or `404` if evicted/unknown. |
+
+```bash
+curl http://localhost:8080/api/traces?limit=5
+```
+
+Each event carries: `traceId`, `sequence`, `timestamp`, `type`, `agentId`, `sessionId`,
+`phase` (`main`/`routing`/`summarizer`), `message`, an OTel-style `attributes` map,
+optional `durationMs`, and `error` (set only on `ERROR`).
+
+---
+
 ## Error Responses (RFC 7807 / 9457)
 
 All errors use the [Problem Details for HTTP APIs](https://www.rfc-editor.org/rfc/rfc9457) format (`application/problem+json`). This provides a consistent, machine-readable error structure across every endpoint.

@@ -29,7 +29,7 @@ This is the recommended path. No `settings.xml` changes, no extra `<repository>`
 <dependency>
   <groupId>io.github.giskardb</groupId>
   <artifactId>agent-engine</artifactId>
-  <version>1.2.19</version>
+  <version>1.2.20</version>
 </dependency>
 ```
 
@@ -42,7 +42,7 @@ Both the framework jars **and the archetype itself** are published to Maven Cent
 mvn archetype:generate \
   -DarchetypeGroupId=io.github.giskardb \
   -DarchetypeArtifactId=agent-archetype \
-  -DarchetypeVersion=1.2.19 \
+  -DarchetypeVersion=1.2.20 \
   -DgroupId=com.mycompany -DartifactId=my-agent \
   -Dversion=1.0.0 -DagentName=MyAgent -DinteractiveMode=false
 
@@ -108,7 +108,7 @@ Then generate with the JitPack coordinates (note the `v` prefix on the version):
 mvn archetype:generate \
   -DarchetypeGroupId=com.github.giskardb.gargantua \
   -DarchetypeArtifactId=agent-archetype \
-  -DarchetypeVersion=v1.2.19 \
+  -DarchetypeVersion=v1.2.20 \
   -DgroupId=com.mycompany -DartifactId=my-agent \
   -Dversion=1.0.0 -DagentName=MyAgent -DinteractiveMode=false
 ```
@@ -293,7 +293,7 @@ The archetype lives on Maven Central along with the rest of the framework — no
 mvn archetype:generate \
   -DarchetypeGroupId=io.github.giskardb \
   -DarchetypeArtifactId=agent-archetype \
-  -DarchetypeVersion=1.2.19 \
+  -DarchetypeVersion=1.2.20 \
   -DgroupId=com.mycompany \
   -DartifactId=my-agent \
   -Dversion=1.0.0 \
@@ -527,14 +527,14 @@ Two distribution channels, same source code:
 
 | Channel | When to use | Versioning |
 |---------|-------------|------------|
-| **Maven Central** *(default)* | Tagged releases — signed, immutable, queried by default. No `settings.xml` needed. | semver, no prefix (`1.2.19`) |
-| **JitPack** | Snapshots, intermediate tags, `develop-SNAPSHOT`, branch builds — built on-demand. | mirrors Git tags (`v1.2.19`) |
+| **Maven Central** *(default)* | Tagged releases — signed, immutable, queried by default. No `settings.xml` needed. | semver, no prefix (`1.2.20`) |
+| **JitPack** | Snapshots, intermediate tags, `develop-SNAPSHOT`, branch builds — built on-demand. | mirrors Git tags (`v1.2.20`) |
 
 ### Maven Central (recommended)
 
 ```xml
 <properties>
-    <gargantua.version>1.2.19</gargantua.version>
+    <gargantua.version>1.2.20</gargantua.version>
 </properties>
 
 <dependencies>
@@ -562,7 +562,7 @@ No `<repositories>` block needed — Maven Central is in the default Maven repos
 
 ```xml
 <properties>
-    <gargantua.version>v1.2.19</gargantua.version>
+    <gargantua.version>v1.2.20</gargantua.version>
 </properties>
 
 <repositories>
