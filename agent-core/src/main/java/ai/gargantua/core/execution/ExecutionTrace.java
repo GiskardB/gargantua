@@ -47,7 +47,7 @@ public record ExecutionTrace(
 
     /** Whether any event in the trace is an error. */
     public boolean hasError() {
-        return events.stream().anyMatch(ExecutionEvent::isError);
+        return events.stream().anyMatch(ExecutionEvent::failed);
     }
 
     /** The last event by sequence, or {@code null} if the trace is empty. */

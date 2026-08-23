@@ -30,7 +30,7 @@ class ExecutionTraceTest {
                 Map.of("tool", "getPayment"), 12L, null);
         assertEquals("getPayment", e.attributes().get("tool"));
         assertThrows(UnsupportedOperationException.class, () -> e.attributes().put("x", 1));
-        assertFalse(e.isError());
+        assertFalse(e.failed());
     }
 
     private static ExecutionEvent evtWithTrace(String traceId) {

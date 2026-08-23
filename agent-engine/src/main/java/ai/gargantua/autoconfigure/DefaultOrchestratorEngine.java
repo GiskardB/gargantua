@@ -2,6 +2,9 @@ package ai.gargantua.autoconfigure;
 
 import ai.gargantua.core.exception.GuardrailBlockedException;
 import ai.gargantua.core.exception.SkillNotFoundException;
+import ai.gargantua.core.execution.ExecutionEvent;
+import ai.gargantua.core.execution.ExecutionEventPublisher;
+import ai.gargantua.core.execution.ExecutionEventType;
 import ai.gargantua.core.guardrail.GuardrailInputContext;
 import ai.gargantua.core.guardrail.GuardrailOutputContext;
 import ai.gargantua.core.llm.LlmRoutingContext;
@@ -46,6 +49,8 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Default implementation of {@link OrchestratorEngine} that executes the full
@@ -102,6 +107,7 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
 
     @Nullable
     private final CostTracker costTracker;
+    private final ExecutionEventPublisher eventPublisher;
 
     public DefaultOrchestratorEngine(GuardrailPipeline guardrailPipeline,
                                      SemanticRoutingService semanticRoutingService,
@@ -116,7 +122,8 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
                                      @Nullable MemoryComposer memoryComposer,
                                      @Nullable WorkingMemoryPort workingMemoryPort,
                                      @Nullable MongoTemplate mongoTemplate,
-                                     @Nullable CostTracker costTracker) {
+                                     @Nullable CostTracker costTracker,
+                                     @Nullable ExecutionEventPublisher eventPublisher) {
         this.guardrailPipeline = guardrailPipeline;
         this.semanticRoutingService = semanticRoutingService;
         this.tokenBudgetManager = tokenBudgetManager;
@@ -137,10 +144,68 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
         this.workingMemoryPort = workingMemoryPort;
         this.mongoTemplate = mongoTemplate;
         this.costTracker = costTracker;
+        this.eventPublisher = eventPublisher == null ? ExecutionEventPublisher.noOp() : eventPublisher;
+    }
+
+    /**
+     * Backward-compatible constructor for callers written before execution-event emission;
+     * equivalent to passing {@link ExecutionEventPublisher#noOp()}.
+     */
+    public DefaultOrchestratorEngine(GuardrailPipeline guardrailPipeline,
+                                     SemanticRoutingService semanticRoutingService,
+                                     TokenBudgetManager tokenBudgetManager,
+                                     LlmProviderFactory llmProviderFactory,
+                                     PromptBuilder promptBuilder,
+                                     ToolRegistry toolRegistry,
+                                     AgentProperties properties,
+                                     @Nullable SkillRegistry skillRegistry,
+                                     List<ContextEnricher> contextEnrichers,
+                                     @Nullable AuditService auditService,
+                                     @Nullable MemoryComposer memoryComposer,
+                                     @Nullable WorkingMemoryPort workingMemoryPort,
+                                     @Nullable MongoTemplate mongoTemplate,
+                                     @Nullable CostTracker costTracker) {
+        this(guardrailPipeline, semanticRoutingService, tokenBudgetManager, llmProviderFactory,
+                promptBuilder, toolRegistry, properties, skillRegistry, contextEnrichers,
+                auditService, memoryComposer, workingMemoryPort, mongoTemplate, costTracker, null);
     }
 
     @Override
     public AgentResponse invoke(AgentRequest request) {
+        String traceId = UUID.randomUUID().toString();
+        AtomicLong seq = new AtomicLong();
+        String agentId = properties.getApi() != null ? properties.getApi().getAgentId() : null;
+        emit(traceId, seq, ExecutionEventType.TURN_STARTED, "main", "turn started",
+                Map.of(), agentId, request.sessionId(), null);
+        try {
+            return invokeInternal(request, traceId, seq, agentId);
+        } catch (RuntimeException e) {
+            emit(traceId, seq, ExecutionEventType.ERROR, "main", e.getClass().getSimpleName(),
+                    Map.of("message", String.valueOf(e.getMessage())),
+                    agentId, request.sessionId(), e.getMessage());
+            throw e;
+        }
+    }
+
+    /**
+     * Emits one execution event; never throws on the agent's hot path (a broken sink must
+     * not break a turn). Errors from the publisher are swallowed by design.
+     */
+    private void emit(String traceId, AtomicLong seq, ExecutionEventType type, String phase,
+                      String message, Map<String, Object> attributes, String agentId,
+                      String sessionId, String error) {
+        try {
+            eventPublisher.publish(new ExecutionEvent(
+                    null, traceId, seq.getAndIncrement(), Instant.now(), type,
+                    agentId, sessionId, phase, message,
+                    attributes == null ? Map.of() : attributes, null, error));
+        } catch (Exception ignored) {
+            // A trace sink is best-effort; never let it affect the response.
+        }
+    }
+
+    private AgentResponse invokeInternal(AgentRequest request, String traceId, AtomicLong seq,
+                                         String agentId) {
         long startTime = System.currentTimeMillis();
         log.info("[Pipeline] START userId={}, sessionId={}, messageLength={}, forceSkill={}",
                 request.userId(), request.sessionId(),
@@ -206,6 +271,12 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
                     routingResult.skillName(), routingResult.method(),
                     "%.3f".formatted(routingResult.confidence()));
         }
+        emit(traceId, seq, ExecutionEventType.ROUTING_DECIDED, "routing",
+                "routed to " + routingResult.skillName(),
+                Map.of("skill", routingResult.skillName(),
+                        "method", String.valueOf(routingResult.method()),
+                        "confidence", routingResult.confidence()),
+                agentId, effectiveSessionId, null);
 
         // 5. Load skill card
         SkillCard skillCard;
@@ -221,6 +292,11 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
                     true, false, "general", ai.gargantua.core.skill.SkillSource.FILESYSTEM, java.util.Set.of());
             skillCard = new SkillCard(meta, "", List.of(), null, List.of(), null, null, null, null);
         }
+
+        emit(traceId, seq, ExecutionEventType.SKILL_SELECTED, "main",
+                skillCard.meta().name(),
+                Map.of("skill", skillCard.meta().name(), "domain", skillCard.meta().domain()),
+                agentId, effectiveSessionId, null);
 
         // 5b. Post-routing RBAC check — now that the skill is resolved, re-run input guardrails
         //     with the activated skill so that RbacGuardrail can enforce role-based access control.
@@ -347,8 +423,15 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
                 allocation.systemPrompt(), request.message(), memory.workingMessages());
 
         var toolContext = ToolExecutionContext.of(securityContext, effectiveSessionId);
+        emit(traceId, seq, ExecutionEventType.LLM_CALL, "main", "model " + alias,
+                Map.of("model", alias, "toolsAvailable", toolSpecs.size()),
+                agentId, effectiveSessionId, null);
         var rawResponse = executeLlmWithTools(model, messages, toolSpecs, toolsCalled, toolContext, skillCard);
         log.info("[Pipeline] Step 9 — LLM call complete, tools called: {}", toolsCalled);
+        for (String tool : toolsCalled) {
+            emit(traceId, seq, ExecutionEventType.TOOL_CALLED, "main", tool,
+                    Map.of("tool", tool), agentId, effectiveSessionId, null);
+        }
 
         // Expose the skill's output schema to SchemaValidatorGuardrail via the input attributes.
         if (skillCard.outputSchema() != null && !skillCard.outputSchema().isBlank()) {
@@ -435,6 +518,13 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
         log.info("[Pipeline] END userId={}, skill={}, method={}, tokens={}, durationMs={}, dryRun={}",
                 request.userId(), routingResult.skillName(), routingResult.method(),
                 response.totalTokens(), durationMs, isDryRun);
+
+        emit(traceId, seq, ExecutionEventType.TURN_COMPLETED, "main", "turn completed",
+                Map.of("skill", routingResult.skillName(),
+                        "totalTokens", response.totalTokens(),
+                        "durationMs", durationMs,
+                        "toolsCalled", toolsCalled.size()),
+                agentId, effectiveSessionId, null);
 
         return response;
     }

@@ -65,8 +65,13 @@ public record ExecutionEvent(
                 null, null, null, null, Map.of(), null, null);
     }
 
-    /** Whether this event represents a failure. */
-    public boolean isError() {
+    /**
+     * Whether this event represents a failure. Named {@code failed()} rather than
+     * {@code isError()} on purpose: an {@code isError()} accessor would be picked up by
+     * JSON serializers as a bean property called "error", shadowing the {@link #error()}
+     * string component (the message) in the output.
+     */
+    public boolean failed() {
         return type == ExecutionEventType.ERROR;
     }
 }

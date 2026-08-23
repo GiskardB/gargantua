@@ -115,6 +115,14 @@ public class WebAutoConfiguration {
     }
 
     @Bean
+    @ConditionalOnBean(ai.gargantua.adapters.execution.InMemoryExecutionEventPublisher.class)
+    @ConditionalOnMissingBean(ai.gargantua.adapters.web.TraceController.class)
+    public ai.gargantua.adapters.web.TraceController traceController(
+            ai.gargantua.adapters.execution.InMemoryExecutionEventPublisher store) {
+        return new ai.gargantua.adapters.web.TraceController(store);
+    }
+
+    @Bean
     @ConditionalOnMissingBean(GuardrailAdminController.class)
     public GuardrailAdminController guardrailAdminController(
             List<InputGuardrail> inputGuardrails,

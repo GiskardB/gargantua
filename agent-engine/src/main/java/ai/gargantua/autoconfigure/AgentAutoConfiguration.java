@@ -1,5 +1,7 @@
 package ai.gargantua.autoconfigure;
 
+import ai.gargantua.adapters.execution.InMemoryExecutionEventPublisher;
+import ai.gargantua.core.execution.ExecutionEventPublisher;
 import ai.gargantua.core.memory.WorkingMemoryPort;
 import ai.gargantua.core.orchestrator.ContextEnricher;
 import ai.gargantua.core.orchestrator.OrchestratorEngine;
@@ -54,12 +56,24 @@ public class AgentAutoConfiguration {
             @Nullable MemoryComposer memoryComposer,
             @Nullable WorkingMemoryPort workingMemoryPort,
             @Nullable MongoTemplate mongoTemplate,
-            @Nullable CostTracker costTracker) {
+            @Nullable CostTracker costTracker,
+            @Nullable ExecutionEventPublisher eventPublisher) {
         return new DefaultOrchestratorEngine(
                 guardrailPipeline, semanticRoutingService, tokenBudgetManager,
                 llmProviderFactory, promptBuilder, toolRegistry, properties,
                 skillRegistry, contextEnrichers, auditService,
-                memoryComposer, workingMemoryPort, mongoTemplate, costTracker);
+                memoryComposer, workingMemoryPort, mongoTemplate, costTracker, eventPublisher);
+    }
+
+    /**
+     * Default execution-event sink: an in-memory ring the trace API reads back. Replace
+     * this bean (an OTel or bus publisher) to ship events elsewhere — the engine only
+     * depends on the {@link ExecutionEventPublisher} port.
+     */
+    @Bean
+    @ConditionalOnMissingBean(ExecutionEventPublisher.class)
+    public InMemoryExecutionEventPublisher executionEventPublisher() {
+        return new InMemoryExecutionEventPublisher();
     }
 
     @Bean
