@@ -1,8 +1,12 @@
 package ai.gargantua.runtime;
 
+import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -74,5 +78,36 @@ class GargantuaRuntimeCliTest {
     void emptyFlagIgnored() {
         assertThat(GargantuaRuntime.bundlePath(List.of("run", "--bundle="), "/env/bundle"))
                 .isEqualTo(Path.of("/env/bundle"));
+    }
+
+    @Test
+    @DisplayName("a blank bundle URL falls through to local path resolution")
+    void blankUrlFallsThrough() {
+        assertThat(GargantuaRuntime.resolveBundlePath(List.of("run", "/bundles/a"), null))
+                .isEqualTo(Path.of("/bundles/a"));
+        assertThat(GargantuaRuntime.resolveBundlePath(List.of("run", "/bundles/a"), "  "))
+                .isEqualTo(Path.of("/bundles/a"));
+    }
+
+    @Test
+    @DisplayName("a bundle URL is downloaded to a temp file")
+    void bundleDownloadedFromUrl() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        byte[] body = "PK-fake-bundle-bytes".getBytes(StandardCharsets.UTF_8);
+        server.createContext("/bundle", exchange -> {
+            exchange.sendResponseHeaders(200, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
+        server.start();
+        try {
+            String url = "http://127.0.0.1:" + server.getAddress().getPort() + "/bundle";
+            Path downloaded = GargantuaRuntime.resolveBundlePath(List.of("run"), url);
+            assertThat(downloaded).exists();
+            assertThat(Files.readAllBytes(downloaded)).isEqualTo(body);
+            Files.deleteIfExists(downloaded);
+        } finally {
+            server.stop(0);
+        }
     }
 }

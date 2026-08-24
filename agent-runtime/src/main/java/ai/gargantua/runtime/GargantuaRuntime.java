@@ -13,7 +13,13 @@ import org.springframework.core.env.MutablePropertySources;
 import org.springframework.core.env.StandardEnvironment;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +46,7 @@ public class GargantuaRuntime {
     private static final Logger log = LoggerFactory.getLogger(GargantuaRuntime.class);
 
     static final String BUNDLE_ENV = "GARGANTUA_BUNDLE";
+    static final String BUNDLE_URL_ENV = "GARGANTUA_BUNDLE_URL";
     static final String DEFAULT_BUNDLE_PATH = "/bundle";
     private static final String BUNDLE_FLAG = "--bundle=";
 
@@ -66,13 +73,16 @@ public class GargantuaRuntime {
     }
 
     private static void run(List<String> arguments) {
+        Path path = resolveBundlePath(arguments);
         LoadedBundle bundle;
         try {
-            bundle = BundleLoader.load(bundlePath(arguments));
+            bundle = BundleLoader.load(path);
         } catch (BundleException e) {
             log.error("Cannot start: {}", e.getMessage());
             System.exit(EXIT_FAILURE);
             return;
+        } finally {
+            deleteDownloadedBundleQuietly(path);
         }
 
         for (String warning : ManifestProperties.unappliedFields(bundle)) {
@@ -108,7 +118,8 @@ public class GargantuaRuntime {
     }
 
     private static int validate(List<String> arguments) {
-        try (LoadedBundle bundle = BundleLoader.load(bundlePath(arguments))) {
+        Path path = resolveBundlePath(arguments);
+        try (LoadedBundle bundle = BundleLoader.load(path)) {
             var manifest = bundle.manifest();
             var spec = manifest.agentSpec();
 
@@ -137,6 +148,8 @@ public class GargantuaRuntime {
         } catch (IOException e) {
             System.err.println("INVALID: " + e.getMessage());
             return EXIT_FAILURE;
+        } finally {
+            deleteDownloadedBundleQuietly(path);
         }
     }
 
@@ -179,6 +192,61 @@ public class GargantuaRuntime {
         return Path.of(DEFAULT_BUNDLE_PATH);
     }
 
+    /**
+     * Resolves the bundle location, preferring a remote fetch when
+     * {@code GARGANTUA_BUNDLE_URL} is set (e.g. the Control Plane's bundle download
+     * endpoint), otherwise falling back to the local-path resolution above.
+     */
+    static Path resolveBundlePath(List<String> arguments) {
+        return resolveBundlePath(arguments, System.getenv(BUNDLE_URL_ENV));
+    }
+
+    static Path resolveBundlePath(List<String> arguments, String bundleUrl) {
+        if (bundleUrl != null && !bundleUrl.isBlank()) {
+            return downloadBundle(bundleUrl);
+        }
+        return bundlePath(arguments);
+    }
+
+    private static Path downloadBundle(String url) {
+        Path target;
+        try {
+            target = Files.createTempFile("gargantua-bundle-", ".tmp");
+        } catch (IOException e) {
+            throw new BundleException("Cannot create a temp file to download the bundle: " + e.getMessage(), e);
+        }
+        try {
+            HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+            HttpRequest request = HttpRequest.newBuilder(URI.create(url))
+                    .timeout(Duration.ofMinutes(2))
+                    .GET()
+                    .build();
+            HttpResponse<Path> response = client.send(request, HttpResponse.BodyHandlers.ofFile(target));
+            if (response.statusCode() != 200) {
+                throw new BundleException("Downloading bundle from " + url + " failed: HTTP " + response.statusCode());
+            }
+            return target;
+        } catch (IOException e) {
+            throw new BundleException("Downloading bundle from " + url + " failed: " + e.getMessage(), e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new BundleException("Downloading bundle from " + url + " was interrupted", e);
+        }
+    }
+
+    /** Only deletes {@code path} when it's the temp file {@link #downloadBundle} created. */
+    private static void deleteDownloadedBundleQuietly(Path path) {
+        String url = System.getenv(BUNDLE_URL_ENV);
+        if (url == null || url.isBlank()) {
+            return;
+        }
+        try {
+            Files.deleteIfExists(path);
+        } catch (IOException e) {
+            log.warn("Could not delete downloaded bundle file {}: {}", path, e.getMessage());
+        }
+    }
+
     private static void closeQuietly(LoadedBundle bundle) {
         try {
             bundle.close();
@@ -197,11 +265,13 @@ public class GargantuaRuntime {
                   gargantua validate  bundle    parse and verify a bundle, then exit
                   gargantua help                show this message
 
-                Bundle location, in order of precedence:
-                  1. positional argument
-                  2. --bundle=<path>
-                  3. GARGANTUA_BUNDLE environment variable
-                  4. /bundle
+                Bundle location:
+                  If GARGANTUA_BUNDLE_URL is set, the bundle is downloaded from it.
+                  Otherwise, in order of precedence:
+                    1. positional argument
+                    2. --bundle=<path>
+                    3. GARGANTUA_BUNDLE environment variable
+                    4. /bundle
                 """);
     }
 }

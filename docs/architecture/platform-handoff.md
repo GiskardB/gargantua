@@ -104,7 +104,7 @@ graph TD
     Backend -->|POST /api/v1/registry/bundles| CP
     CP --> PG
     CP --> MinIO
-    Runtime -.->|loads a published bundle| CP
+    Runtime -->|fetches bundle by URL| CP
     Runtime --> Mongo
     Runtime --> Redis
     Runtime --> Ollama
@@ -116,9 +116,9 @@ graph TD
 ```
 
 All JVM boxes (`Backend`, `CP`, `Runtime`) share the one `agent-core` domain model (§3).
-`Runtime` does not yet pull bundles from the Control Plane automatically — today it's given
-one directly (baked into its image or a bind mount); wiring `Runtime → CP` for real bundle
-fetch is open, tracked alongside `CatalogRegistrar` (§8).
+`Runtime` fetches its bundle from the Control Plane at startup (`GARGANTUA_BUNDLE_URL` →
+`GET /bundles/{name}/{version}/bundle`); the Studio's **Launch** button starts a runtime
+pointed at a freshly published bundle (see §8 for the loop and its caveats).
 
 ## 4. How to run the whole thing locally (the `gargantua-compose` slice)
 
@@ -354,9 +354,23 @@ an `EventPublisher` if events land — NATS-vs-Kafka stays open); a "modular mon
   `WorkloadMetadata`; applying it to `Capability`/`SkillMeta`/memory/knowledge is a
   planned follow-on (see §7.3).
 - **Execution events flow at runtime** — the engine emits them, an in-memory sink retains
-  the recent ones, and `GET /api/traces` serves them (verified live). Still open: wiring the
-  Studio Trace Explorer to a real runtime, an OTel exporter, and finer-grained events (§7.4).
-- **Bundle *signature* verification** is not implemented (SHA-256 checksum is).
+  the recent ones, and `GET /api/traces` serves them. The Studio **Trace Explorer** and
+  **Playground** now read a runtime directly (a user-set Runtime URL; the runtime opts into
+  CORS via `agent.web.cors.allowed-origins`). Still open: an OTel exporter and finer-grained
+  events (guardrail verdicts, memory read/write, per-tool results) (§7.4).
+- **The full create→launch→test loop works** (verified live, `gargantua-compose`): Studio
+  publishes a manifest **plus skill content**; the Control Plane stores a runnable `.gbundle`
+  (`GET /bundles/{n}/{v}/bundle`); the Runtime **fetches its bundle by URL**
+  (`GARGANTUA_BUNDLE_URL`) instead of a baked/mounted one; and a Studio **Launch** button has
+  `studio-backend` run an editable command (`docker run`) to start a runtime pointed at the
+  bundle. **Caveats:** the launch command runs with the backend's Docker privileges —
+  local-dev/demo only, never expose it. The Runtime still hosts **one agent per process**
+  (ADR-001): "launch" recreates the runtime container, it does not hot-swap. The Control Plane
+  still does **not track running Runtime instances** (Deployment Manager remains a stub,
+  ADR-004) — a manifest that pins a cloud model (e.g. `gpt-4o`) won't run against the local
+  Ollama; leave the model blank or set it to the local tag for the demo.
+- **Bundle *signature* verification** is not implemented (SHA-256 checksum is). The bundle
+  zip the Control Plane assembles is likewise unsigned.
 - The Control Plane is an **MVP**: Registry/Catalog/Policy/Deployment exist; auth is
   permit-all in dev (OIDC/Keycloak profile stubbed), no RBAC enforcement yet.
 - The Studio backend security is **permit-all in dev**, JWT under the `oidc` profile.

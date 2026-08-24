@@ -2,14 +2,18 @@ package ai.gargantua.adapters.web;
 
 import ai.gargantua.autoconfigure.AgentProperties;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+import java.util.List;
 
 /**
  * Web MVC configuration.
  * <ul>
  *   <li>{@code /docs} → Redoc API documentation</li>
  *   <li>{@code /chat} → Built-in chat UI (when {@code agent.chat-ui.enabled=true})</li>
+ *   <li>CORS for {@code /api/**} → the origins in {@code agent.web.cors.allowed-origins}</li>
  * </ul>
  */
 @Configuration
@@ -27,5 +31,17 @@ public class WebMvcConfig implements WebMvcConfigurer {
         if (properties.getChatUi().isEnabled()) {
             registry.addRedirectViewController("/chat", "/chat.html");
         }
+    }
+
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        List<String> origins = properties.getWeb().getCors().getAllowedOrigins();
+        if (origins == null || origins.isEmpty()) {
+            return; // opt-in: no origins configured means no cross-origin access
+        }
+        registry.addMapping("/api/**")
+                .allowedOrigins(origins.toArray(String[]::new))
+                .allowedMethods("GET", "POST", "DELETE", "OPTIONS")
+                .allowedHeaders("*");
     }
 }

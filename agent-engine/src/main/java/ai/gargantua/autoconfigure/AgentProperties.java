@@ -714,4 +714,30 @@ public class AgentProperties {
         public boolean isEnabled() { return enabled; }
         public void setEnabled(boolean enabled) { this.enabled = enabled; }
     }
+
+    private Web web = new Web();
+    public Web getWeb() { return web; }
+    public void setWeb(Web web) { this.web = web; }
+
+    /** HTTP/web-layer settings that are not specific to any one feature. */
+    public static class Web {
+        private Cors cors = new Cors();
+        public Cors getCors() { return cors; }
+        public void setCors(Cors cors) { this.cors = cors; }
+
+        /**
+         * Cross-origin access to the runtime's API. Disabled by default: library-mode
+         * apps must not silently expose their API to browsers on other origins. The
+         * platform (Studio) sets {@code agent.web.cors.allowed-origins} to the Studio
+         * origin so its Playground can call a runtime directly.
+         */
+        public static class Cors {
+            private java.util.List<String> allowedOrigins = new java.util.ArrayList<>();
+
+            public java.util.List<String> getAllowedOrigins() { return allowedOrigins; }
+            public void setAllowedOrigins(java.util.List<String> allowedOrigins) {
+                this.allowedOrigins = allowedOrigins;
+            }
+        }
+    }
 }
