@@ -80,6 +80,11 @@ Il sistema non ragiona principalmente sul nome dell'agente. Ragiona sulle capabi
 
 # 4. Macro Architettura
 
+> Questo è il disegno a tendere (north star), non lo stato attuale. Per l'architettura
+> **realmente implementata** — cosa gira in `gargantua-compose` oggi, cosa è ancora dashed/
+> pianificato, e il sequence diagram di come uno Studio pubblica un agente — vedi
+> [platform-handoff.md §3.1 e §5](platform-handoff.md#31-macro-architecture).
+
 ```
                      +--------------------------------+
                      |       Gargantua Studio         |

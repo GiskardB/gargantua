@@ -75,6 +75,51 @@ The single most important structural decision after the multi-repo split:
 
 See [gargantua-domain-model.md](gargantua-domain-model.md) for the full model.
 
+## 3.1 Macro architecture
+
+What's actually built (solid) vs. planned (dashed) as of this doc, and how it maps to the
+`gargantua-compose` slice:
+
+```mermaid
+graph TD
+    Browser[Browser]
+
+    subgraph Compose["gargantua-compose (docker compose up)"]
+        Studio["gargantua-studio<br/>React SPA, served by nginx"]
+        Backend["gargantua-studio-backend<br/>BFF — builds gargantua.ai/v1 manifests"]
+        CP["gargantua-control-plane<br/>Registry + Catalog + Policy + Deployment (MVP)"]
+        Runtime["gargantua (Runtime)<br/>optional --profile agent-runtime"]
+        PG[(Postgres)]
+        Mongo[(MongoDB)]
+        Redis[(Redis)]
+        MinIO[(MinIO / S3)]
+        Ollama["ollama<br/>local LLM, agent-runtime profile"]
+    end
+
+    Gateway["gargantua-gateway<br/>Intent/Capability/Version routing"]
+    Operator["gargantua-operator<br/>Kubernetes Operator + CRDs"]
+
+    Browser --> Studio
+    Studio -->|same-origin /api| Backend
+    Backend -->|POST /api/v1/registry/bundles| CP
+    CP --> PG
+    CP --> MinIO
+    Runtime -.->|loads a published bundle| CP
+    Runtime --> Mongo
+    Runtime --> Redis
+    Runtime --> Ollama
+    Gateway -.->|not built — Phase 4| Runtime
+    Operator -.->|not built — Phase 5| Runtime
+
+    style Gateway stroke-dasharray: 5 5
+    style Operator stroke-dasharray: 5 5
+```
+
+All JVM boxes (`Backend`, `CP`, `Runtime`) share the one `agent-core` domain model (§3).
+`Runtime` does not yet pull bundles from the Control Plane automatically — today it's given
+one directly (baked into its image or a bind mount); wiring `Runtime → CP` for real bundle
+fetch is open, tracked alongside `CatalogRegistrar` (§8).
+
 ## 4. How to run the whole thing locally (the `gargantua-compose` slice)
 
 This is the answer to *"does Studio emit something the rest of the platform accepts?"*
@@ -163,6 +208,41 @@ export PATH=$JAVA_HOME/bin:~/tools/apache-maven-3.9.9/bin:$PATH
 ```
 
 ## 5. The agent-creation flow (contracts, end to end)
+
+How clicking "Publish" in the Studio's Agent Designer turns a form into a Catalog entry:
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Studio as Studio SPA<br/>(AgentDesigner + draftStore)
+    participant Backend as studio-backend (BFF)
+    participant CP as Control Plane
+    participant Registry as RegistryService
+    participant Catalog as CatalogService
+
+    User->>Studio: fills Agent Designer form<br/>(metadata, model, loadout, skills)
+    Note over Studio: Skill Designer "Assign to agent" upserts a<br/>Capability(implementedBy=skillName) on the draft —<br/>capabilities are derived, never hand-typed twice.
+
+    Studio->>Backend: POST /api/studio/manifest/build (AgentDraft JSON)
+    Backend->>Backend: ManifestBuilder: AgentDraft → agent-core records
+    Backend-->>Studio: {valid, yaml, errors}
+    Studio-->>User: live YAML preview + validation
+
+    User->>Studio: clicks Publish
+    Studio->>Backend: POST /api/studio/publish (AgentDraft JSON)
+    Backend->>Backend: build gargantua.ai/v1 manifest (same builder)
+    Backend->>CP: POST /api/v1/registry/bundles {manifest: yaml}
+    CP->>Registry: publish(manifest)
+    Registry->>Registry: derive name/version/kind/capabilities
+    Registry-->>CP: bundle stored (Postgres + MinIO blob)
+    CP->>Catalog: indexBundle(bundle)
+    Note over Catalog: publish auto-indexes — discovery stays in step
+    CP-->>Backend: 201 Created (or 409 exists / 400 invalid)
+    Backend-->>Studio: publish result
+    Studio-->>User: success — capability now discoverable in Catalog
+
+    Note over CP: A Runtime executes this bundle later,<br/>independently — see §3.1. Publishing does not<br/>itself start a running agent.
+```
 
 | Hop | Call | Notes |
 |---|---|---|
