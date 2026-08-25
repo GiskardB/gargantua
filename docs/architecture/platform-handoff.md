@@ -39,9 +39,9 @@ also mirror to GitHub (`GiskardB`). Sibling repos are checked out side by side u
 | Repo | Role | Stack | Status (2026-08) |
 |---|---|---|---|
 | `gargantua` | **Runtime** + execution-side Kernel; **home of all architecture docs**; publishes `agent-core` | Java 25 / Spring Boot 4.1, 9 Maven modules | Phase 1 + loadout + governance parsing; docs hub; on `1.3.0-SNAPSHOT` |
-| `gargantua-control-plane` | **Control Plane**: Registry + Catalog + Policy + Deployment | Java 25 / Boot 4.1, `agent-core` | **MVP** — publish→index→discovery works; 18 tests |
-| `gargantua-studio-backend` | **Studio BFF**: builds `gargantua.ai/v1` manifests from form drafts; gateway to the Control Plane | Java 25 / Boot 4.1, `agent-core` | **MVP** — builds loadout + governance; 30 tests |
-| `gargantua-studio` | **Studio** frontend (Agent + Skill Designer, Loadout & Governance sections, catalog views) | React 18 / Vite 5 / React Flow / Monaco / Zustand / React Router (HashRouter) | **MVP** — wired to backend, offline fallback; 8 tests |
+| `gargantua-control-plane` | **Control Plane**: Registry + Catalog + Policy + Deployment | Java 25 / Boot 4.1, `agent-core` | **MVP** — publish→index→discovery works; 20 tests |
+| `gargantua-studio` | **Studio** — frontend **and** BFF in ONE repo / ONE image (Spring serves the SPA at `/`, API at `/api`). Agent+Skill Designer, Playground/Trace against a runtime, Launch button. | React 18 / Vite 5 (in `frontend/`) + Java 25 / Boot 4.1 BFF (`agent-core`) | **MVP** — merged 2026-08; 30 backend tests |
+| ~~`gargantua-studio-backend`~~ | **Merged into `gargantua-studio`** (2026-08) — no longer a separate repo/image | — | Deprecated |
 | `gargantua-compose` | **Local vertical slice** (Docker Compose) wiring the agent-creation flow; `start.bat`/`stop.bat` | Compose v2 | **Done** — ports in 18xxx/19xxx (off Cave's range); authored + statically verified |
 | `gargantua-gateway` | Agent Gateway (Intent/Capability/Version routing) | TBD | **Not built** — Phase 4; decision: *evaluate `agentgateway`* first |
 | `gargantua-operator` | Kubernetes Operator + CRDs | Java Operator SDK (planned) | **Not built** — Phase 5 |
@@ -85,8 +85,7 @@ graph TD
     Browser[Browser]
 
     subgraph Compose["gargantua-compose (docker compose up)"]
-        Studio["gargantua-studio<br/>React SPA, served by nginx"]
-        Backend["gargantua-studio-backend<br/>BFF — builds gargantua.ai/v1 manifests"]
+        Studio["gargantua-studio<br/>SPA + BFF in ONE image<br/>(Spring serves the SPA + /api)"]
         CP["gargantua-control-plane<br/>Registry + Catalog + Policy + Deployment (MVP)"]
         Runtime["gargantua (Runtime)<br/>optional --profile agent-runtime"]
         PG[(Postgres)]
@@ -100,8 +99,8 @@ graph TD
     Operator["gargantua-operator<br/>Kubernetes Operator + CRDs"]
 
     Browser --> Studio
-    Studio -->|same-origin /api| Backend
-    Backend -->|POST /api/v1/registry/bundles| CP
+    Studio -->|POST /api/v1/registry/bundles| CP
+    Studio -.->|Launch: docker run| Runtime
     CP --> PG
     CP --> MinIO
     Runtime -->|fetches bundle by URL| CP
@@ -115,7 +114,7 @@ graph TD
     style Operator stroke-dasharray: 5 5
 ```
 
-All JVM boxes (`Backend`, `CP`, `Runtime`) share the one `agent-core` domain model (§3).
+All JVM boxes (`Studio`, `CP`, `Runtime`) share the one `agent-core` domain model (§3).
 `Runtime` fetches its bundle from the Control Plane at startup (`GARGANTUA_BUNDLE_URL` →
 `GET /bundles/{name}/{version}/bundle`); the Studio's **Launch** button starts a runtime
 pointed at a freshly published bundle (see §8 for the loop and its caveats).
@@ -125,11 +124,10 @@ pointed at a freshly published bundle (see §8 for the loop and its caveats).
 This is the answer to *"does Studio emit something the rest of the platform accepts?"*
 
 ```
-browser ─▶ studio            nginx: serves the SPA, proxies /api same-origin
-              └─▶ studio-backend   BFF: builds gargantua.ai/v1 manifests
-                     └─▶ control-plane   Registry + Catalog
-                            ├─▶ postgres   control-plane + studio state
-                            └─▶ minio      bundle manifest blobs
+browser ─▶ studio            ONE image: Spring serves the SPA (/) + BFF API (/api)
+              └─▶ control-plane   Registry + Catalog
+                     ├─▶ postgres   control-plane + studio state
+                     └─▶ minio      bundle manifest blobs
 ```
 
 ```bash
@@ -215,7 +213,7 @@ How clicking "Publish" in the Studio's Agent Designer turns a form into a Catalo
 sequenceDiagram
     participant User
     participant Studio as Studio SPA<br/>(AgentDesigner + draftStore)
-    participant Backend as studio-backend (BFF)
+    participant Backend as Studio BFF<br/>(same image, /api)
     participant CP as Control Plane
     participant Registry as RegistryService
     participant Catalog as CatalogService
