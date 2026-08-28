@@ -9,14 +9,14 @@ and what comes next. It complements — does not replace — two narrower docs:
 - [`ai-operating-system.md`](ai-operating-system.md) — the **vision** (the north
   star, not a sprint plan).
 
-**Last updated:** 2026-08. If a fact here disagrees with the code, the code wins —
-fix this doc.
+**Last updated:** 2026-08-28. If a fact here disagrees with the code, the code wins —
+fix this doc. For changes made in the 2026-08-28 session, see
+[`SESSION_HANDOFF_2026-08-28.md`](architecture/SESSION_HANDOFF_2026-08-28.md).
 
-**Recent progress (most recent first):** governance envelope (`metadata.governance`,
-shared `Governed` trait) → Agent Loadout (`spec.loadout`, knowledge bases first-class,
-shared model bumped to `1.3.0-SNAPSHOT`) → Docker Compose vertical slice
-(`gargantua-compose`, with `start.bat`/`stop.bat`, ports in the 18xxx/19xxx range). See §7
-for the roadmap and what's next.
+**Recent progress (most recent first):** Postgres-only bundle storage (MinIO/S3
+removed; `PostgresBlobStore` stores bundle bytes in `cp_document`) → Studio merged into
+one repo/image (SPA + BFF) → interactive graph editor + Publish dialog in Studio →
+CP launch-config namespace fix. See §7 for the roadmap and what's next.
 
 ---
 
@@ -40,7 +40,7 @@ also mirror to GitHub (`GiskardB`). Sibling repos are checked out side by side u
 |---|---|---|---|
 | `gargantua` | **Runtime** + execution-side Kernel; **home of all architecture docs**; publishes `agent-core` | Java 25 / Spring Boot 4.1, 9 Maven modules | Phase 1 + loadout + governance parsing; docs hub; on `1.3.0-SNAPSHOT` |
 | `gargantua-control-plane` | **Control Plane**: Registry + Catalog + Policy + Deployment | Java 25 / Boot 4.1, `agent-core` | **MVP** — publish→index→discovery works; 20 tests |
-| `gargantua-studio` | **Studio** — frontend **and** BFF in ONE repo / ONE image (Spring serves the SPA at `/`, API at `/api`). Agent+Skill Designer, Playground/Trace against a runtime, Launch button. | React 18 / Vite 5 (in `frontend/`) + Java 25 / Boot 4.1 BFF (`agent-core`) | **MVP** — merged 2026-08; 30 backend tests |
+| `gargantua-studio` | **Studio** — frontend **and** BFF in ONE repo / ONE image (Spring serves the SPA at `/`, API at `/api`). Agent+Skill Designer, interactive graph editor, Publish dialog, Playground/Trace against a runtime, Launch button. | React 18 / Vite 5 / XYFlow (in `frontend/`) + Java 25 / Boot 4.1 BFF (`agent-core`) | **MVP** — merged 2026-08; 30 backend tests; 8 frontend tests; TypeScript clean |
 | ~~`gargantua-studio-backend`~~ | **Merged into `gargantua-studio`** (2026-08) — no longer a separate repo/image | — | Deprecated |
 | `gargantua-compose` | **Local vertical slice** (Docker Compose) wiring the agent-creation flow; `start.bat`/`stop.bat` | Compose v2 | **Done** — ports in 18xxx/19xxx (off Cave's range); authored + statically verified |
 | `gargantua-gateway` | Agent Gateway (Intent/Capability/Version routing) | TBD | **Not built** — Phase 4; decision: *evaluate `agentgateway`* first |
@@ -91,7 +91,6 @@ graph TD
         PG[(Postgres)]
         Mongo[(MongoDB)]
         Redis[(Redis)]
-        MinIO[(MinIO / S3)]
         Ollama["ollama<br/>local LLM, agent-runtime profile"]
     end
 
@@ -102,7 +101,6 @@ graph TD
     Studio -->|POST /api/v1/registry/bundles| CP
     Studio -.->|Launch: docker run| Runtime
     CP --> PG
-    CP --> MinIO
     Runtime -->|fetches bundle by URL| CP
     Runtime --> Mongo
     Runtime --> Redis
@@ -126,8 +124,7 @@ This is the answer to *"does Studio emit something the rest of the platform acce
 ```
 browser ─▶ studio            ONE image: Spring serves the SPA (/) + BFF API (/api)
               └─▶ control-plane   Registry + Catalog
-                     ├─▶ postgres   control-plane + studio state
-                     └─▶ minio      bundle manifest blobs
+                     ├─▶ postgres   control-plane + studio state + bundle blobs
 ```
 
 ```bash
@@ -138,10 +135,10 @@ docker compose up -d --build --wait     # Windows: start.bat  (stop.bat / stop.b
 ```
 
 Studio UI at `http://localhost:18081` (or `http://<CAVE_HOST>:18081`). The SPA talks
-to the backend **same-origin via nginx**, so it works on localhost or a LAN IP
-without CORS or a per-host rebuild. Published ports live in a high range (**18080** CP,
-**18090** backend, **18081** Studio, **19000/19001** MinIO) so they never clash with
-Cave's own services; override any of them in `.env`.
+to the backend **same-origin** (Spring serves the SPA at `/` and the BFF API at `/api` on
+the same origin), so it works on localhost or a LAN IP without CORS or a per-host rebuild.
+Published ports live in a high range (**18080** CP, **18081** Studio) so they never clash
+with Cave's own services; override any of them in `.env`.
 
 **Static preview (no backend):** the built Studio is published via `cave-publish` at
 **`https://<CAVE_HOST>:7443/gargantua-studio/`** (CAVE_HOST=192.168.1.118) so it can be
@@ -188,8 +185,8 @@ refuse to connect even though the containers are healthy — the ports are bound
 *daemon's* host, not the shell's. Use the actual Docker host address (in Cave, `<CAVE_HOST>`)
 instead; see the `gargantua-compose` README for detail.
 
-Ports default to the 18xxx/19xxx range so they don't clash with Cave's own services
-(including its `minio` on 9000/9001). The images build `agent-core` from source (context
+Ports default to the 18xxx range so they don't clash with Cave's own services.
+The images build `agent-core` from source (context
 `runtime_src=../gargantua`), so no Maven Central release is needed — but the `gargantua`
 repo must be a sibling checkout.
 
@@ -232,7 +229,7 @@ sequenceDiagram
     Backend->>CP: POST /api/v1/registry/bundles {manifest: yaml}
     CP->>Registry: publish(manifest)
     Registry->>Registry: derive name/version/kind/capabilities
-    Registry-->>CP: bundle stored (Postgres + MinIO blob)
+    Registry-->>CP: bundle stored (Postgres blob only)
     CP->>Catalog: indexBundle(bundle)
     Note over Catalog: publish auto-indexes — discovery stays in step
     CP-->>Backend: 201 Created (or 409 exists / 400 invalid)
@@ -250,10 +247,11 @@ sequenceDiagram
 | CP internal | `RegistryService.publish` → `CatalogService.indexBundle` | publishing **auto-indexes** the Catalog — discovery stays in step |
 | SPA → backend → CP | `GET /api/studio/{workloads,capabilities,policies,deployments}` | read-through to `/api/v1/{registry/bundles, catalog/capabilities, policies, deployments}` |
 
-Ports: Control Plane **8080**, Studio backend **8090**, Studio (nginx) **8081**,
-MinIO **9000/9001**. Postgres is unpublished (internal only). In dev the JVM services
-default to embedded H2 + filesystem blobs; the compose slice activates the `postgres`
-(and `minio`, for the CP) Spring profiles.
+Ports: Control Plane **8080**, Studio backend **8090**. Postgres is unpublished
+(internal only). In dev the JVM services default to embedded H2 + filesystem blobs;
+the compose slice activates the `postgres` Spring profile. Bundle blobs live in the
+same Postgres database as the rest of Control Plane state (no separate object store
+since 2026-08-28).
 
 ## 6. Frozen decisions (do not relitigate without a reason)
 
@@ -275,8 +273,8 @@ Full rationale in memory and in the linked docs; the load-bearing ones:
   [skills-and-routing.md](skills-and-routing.md).
 - **Shared `agent-core` jar, not mirrored types.** (§3.)
 - **Stack (frozen):** Java 25 LTS + Boot 4.1 + Maven everywhere; Postgres
-  (control-plane state), MongoDB (runtime state), Redis (cache/rate-limit), MinIO/S3
-  (bundle blobs); A2A + MCP as interop; React Flow / Monaco / Zustand for Studio.
+  (control-plane state + bundle blobs), MongoDB (runtime state), Redis (cache/rate-limit);
+  A2A + MCP as interop; React Flow / Monaco / Zustand for Studio.
   Vector search stays pluggable (pgvector / Qdrant / in-memory behind `EmbeddingPort`).
 - **Gateway: evaluate `agentgateway` before building** (Rust; MCP/A2A/LLM proxy, CEL
   policy, RBAC, rate-limit, OTel). Gargantua keeps the **Intent Router** as its value
@@ -386,3 +384,4 @@ an `EventPublisher` if events land — NATS-vs-Kafka stays open); a "modular mon
 - Manifest schema & enforcement → [`agent-manifest.md`](agent-manifest.md)
 - Skills & routing → [`skills-and-routing.md`](skills-and-routing.md)
 - OSS pattern evaluation & the roadmap rationale → [`13-open-source-patterns.md`](13-open-source-patterns.md)
+- **Session handoff (2026-08-28)** → [`SESSION_HANDOFF_2026-08-28.md`](architecture/SESSION_HANDOFF_2026-08-28.md)

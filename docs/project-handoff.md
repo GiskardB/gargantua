@@ -10,8 +10,10 @@ docs on purpose: this is the map, not the territory.
 > **Resuming work on the wider platform (not just this repo)?** Start from
 > [architecture/platform-handoff.md](architecture/platform-handoff.md) — it is the
 > cross-repository map (Control Plane, Studio, Studio backend, the Docker Compose
-> slice, the shared `agent-core` jar) and the decided roadmap. *This* document stays
-> focused on the Runtime repository internals.
+> slice, the shared `agent-core` jar) and the decided roadmap. For the most recent
+> session's changes and open todos, see
+> [SESSION_HANDOFF_2026-08-28.md](architecture/SESSION_HANDOFF_2026-08-28.md).
+> *This* document stays focused on the Runtime repository internals.
 
 ---
 
