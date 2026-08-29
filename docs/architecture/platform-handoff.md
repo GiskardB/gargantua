@@ -11,17 +11,20 @@ and what comes next. It complements — does not replace — two narrower docs:
 
 **Last updated:** 2026-08-29. If a fact here disagrees with the code, the code wins —
 fix this doc. For changes made in the 2026-08-29 session, see
-[`SESSION_HANDOFF_2026-08-29.md`](architecture/SESSION_HANDOFF_2026-08-29.md) (and
-[`SESSION_HANDOFF_2026-08-28.md`](architecture/SESSION_HANDOFF_2026-08-28.md) before it).
+[`SESSION_HANDOFF_2026-08-29.md`](SESSION_HANDOFF_2026-08-29.md) (and
+[`SESSION_HANDOFF_2026-08-28.md`](SESSION_HANDOFF_2026-08-28.md) before it).
 
-**Recent progress (most recent first):** **Real concurrent multi-agent hosting** — the
-Studio Launch button now gives every agent its own container + host port instead of one
-shared slot that got replaced on every launch, and the Control Plane's Deployment
-subsystem tracks each one's port (§3.1, §8) → a chain of Playground bugs fixed
-(insecure-context crash, hardcoded-localhost runtime URL, CORS pinned to one origin) →
-Agent Graph rewritten as a connected radial layout → Postgres-only bundle storage
-(MinIO/S3 removed) → Studio merged into one repo/image (SPA + BFF). See §7 for the
-roadmap and what's next.
+**Recent progress (most recent first):** **Multi-Control-Plane Settings** — Studio can
+now register several named Control Planes and connect/disconnect/switch between them at
+runtime (no restart), and the CP-optional workflow (create/save locally with the Control
+Plane off; only publish/reads fail, cleanly) has been verified live, not just assumed →
+**Real concurrent multi-agent hosting** — the Studio Launch button gives every agent its
+own container + host port instead of one shared slot that got replaced on every launch,
+and the Control Plane's Deployment subsystem tracks each one's port (§3.1, §8) → a chain
+of Playground bugs fixed (insecure-context crash, hardcoded-localhost runtime URL, CORS
+pinned to one origin) → Agent Graph rewritten as a connected radial layout →
+Postgres-only bundle storage (MinIO/S3 removed) → Studio merged into one repo/image
+(SPA + BFF). See §7 for the roadmap and what's next.
 
 ---
 
@@ -382,6 +385,12 @@ an `EventPublisher` if events land — NATS-vs-Kafka stays open); a "modular mon
   port correctly, but the old version's deployment record isn't marked superseded, so it
   lingers as a second (harmless but confusing) `HEALTHY` entry — see
   `SESSION_HANDOFF_2026-08-29.md` §"medium priority".
+- **Studio works with the Control Plane switched off** (verified live, not just assumed):
+  creating/saving skills and drafts, building/validating manifests, and downloading
+  `.gbundle` bundles all work; only publish and CP-proxied reads fail, cleanly (502, clear
+  message). Studio can also be pointed at **more than one Control Plane** — a `/settings`
+  screen registers named CP configs and switches the active one at runtime, no restart
+  (`ControlPlaneRegistry`/`ControlPlaneClient`, see `SESSION_HANDOFF_2026-08-29.md`).
 - **Bundle *signature* verification** is not implemented (SHA-256 checksum is). The bundle
   zip the Control Plane assembles is likewise unsigned.
 - The Control Plane is an **MVP**: Registry/Catalog/Policy/Deployment exist; auth is
@@ -397,9 +406,9 @@ an `EventPublisher` if events land — NATS-vs-Kafka stays open); a "modular mon
 - Runtime internals & invariants → [`../project-handoff.md`](../project-handoff.md)
 - Vision → [`ai-operating-system.md`](ai-operating-system.md)
 - Binding decisions (ADR-001..006) → [`runtime-decisions.md`](runtime-decisions.md)
+- **Session handoff (2026-08-29)** → [`SESSION_HANDOFF_2026-08-29.md`](SESSION_HANDOFF_2026-08-29.md)
+- **Session handoff (2026-08-28)** → [`SESSION_HANDOFF_2026-08-28.md`](SESSION_HANDOFF_2026-08-28.md)
 - Domain model → [`gargantua-domain-model.md`](gargantua-domain-model.md)
 - Manifest schema & enforcement → [`agent-manifest.md`](agent-manifest.md)
 - Skills & routing → [`skills-and-routing.md`](skills-and-routing.md)
 - OSS pattern evaluation & the roadmap rationale → [`13-open-source-patterns.md`](13-open-source-patterns.md)
-- **Session handoff (2026-08-29)** → [`SESSION_HANDOFF_2026-08-29.md`](architecture/SESSION_HANDOFF_2026-08-29.md)
-- **Session handoff (2026-08-28)** → [`SESSION_HANDOFF_2026-08-28.md`](architecture/SESSION_HANDOFF_2026-08-28.md)

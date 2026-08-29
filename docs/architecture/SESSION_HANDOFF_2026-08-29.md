@@ -131,6 +131,60 @@ Playground UI — each routed to the correct skill.
   switching to `minmax(0, 1fr)` (the standard fix). Also caught the same bug clipping the
   manifest preview's Copy/Export buttons.
 
+### 7. CP-optional verification + multi-CP Settings (second half of this session)
+
+**CP-optional verification.** Stopped `control-plane` (`docker compose stop
+control-plane`) and re-tested the full Studio-only workflow, both at the API and UI
+level:
+- Skill create, draft save, manifest build/validate, `.gbundle` download → all **201/200,
+  unaffected**.
+- `publish`, and any CP-proxied read (workloads/deployments list) → clean **502** with a
+  clear message (`Control Plane unreachable for publish`), not a crash. UI: Workload
+  Designer falls back to its existing "sample data" cards with Edit/Launch still working,
+  Agent Designer's "Save & Publish" disables while "Download bundle" stays enabled, zero
+  page errors. Restarted `control-plane` afterward and confirmed it rejoins cleanly.
+- Conclusion: **Studio already worked standalone** before this session; nothing needed
+  fixing here, only proving.
+
+**Multi-Control-Plane Settings.** New `/settings` screen (`SettingsScreen.tsx`) plus a
+backend `ControlPlaneRegistry` (`gargantua-studio`, `SettingsStore`-backed, same
+key-value table as launch config/ports):
+- Register any number of named Control Planes (name + base URL); **connect** (activate)
+  exactly one, or **disconnect** entirely (no fallback to a default — an explicit
+  disconnect must actually disconnect).
+- `ControlPlaneClient` no longer has a base URL fixed at bean-creation; it resolves
+  `registry.activeBaseUrl()` on every call, so switching or disconnecting takes effect on
+  the *next* request, no restart. Disconnected state throws a clear
+  `UpstreamException("No Control Plane is connected — pick one in Settings")`, surfaced
+  as a 502 with that message.
+- First run seeds one config from the existing `gargantua.control-plane.base-url`
+  property, so existing single-CP deployments are unaffected.
+- 9 new backend tests (`ControlPlaneRegistryTest`) + 1 (`ControlPlaneClientTest`) — seed,
+  create, activate, delete-active-falls-back, delete-last-disconnects,
+  deactivate/reconnect, unknown-id 404, trailing-slash normalization, clear-failure-when-
+  disconnected. All 65 backend tests pass; frontend typecheck clean, existing frontend
+  tests pass.
+- Verified live end-to-end (curl + Playwright, both viewports): seeded default config
+  active on first boot → added a second config → activated it, confirmed a CP-proxied
+  read still succeeds against the new URL → deactivated, confirmed the exact clean 502
+  above → reactivated the default, confirmed reads succeed again → cleaned up the test
+  config. Screenshots: desktop renders the connection list + add-form correctly; mobile
+  (390px) stacks each row without overflow; the off-canvas nav shows a new "System" group
+  (Control Plane Status, Settings).
+- **Bug found and fixed along the way**: `SpaController` mapped one `@GetMapping` per
+  React Router path by hand, and `/control-plane` was already missing (pre-existing,
+  predates this session) — a hard refresh or direct link to that path 500'd
+  (`No static resource control-plane`). Adding `/settings` the same way would have
+  repeated the mistake. Replaced the whole enumeration with a single catch-all
+  (`/{path:[^.]*}`, single segment only — a wildcard suffix would also swallow
+  `/assets/*.js|css` since browsers send a wildcard `Accept` header, which was the first,
+  wrong version of this fix). In practice this backend route only matters for a raw
+  (non-hash) URL: the SPA itself uses a `HashRouter` (`main.tsx`, chosen so deep links
+  survive Cave's static hosting), so real navigation and refreshes go through `/#/...`
+  and always hit `/`, never the per-path backend mapping — but the catch-all is strictly
+  less code than the enumeration it replaced and closes the gap for anyone who pastes a
+  bare path.
+
 ---
 
 ## Current verified state
@@ -139,7 +193,7 @@ Playground UI — each routed to the correct skill.
 |---|---|---|---|
 | `gargantua` | main | (this doc) | — |
 | `gargantua-control-plane` | main | `ececed1` | 28 (was 20) |
-| `gargantua-studio` | main | `996114e` | 55 backend (was 30) / 8 frontend / TS clean |
+| `gargantua-studio` | main | `edeaef7` | 65 backend (was 55) / 8 frontend / TS clean |
 | `gargantua-compose` | main | `bb257d7` | authored + verified live |
 
 All four repos' `main` pushed to `origin` (Forgejo) at the end of this session.
@@ -152,18 +206,13 @@ on ports 18101–18103; `customer-agent`/`customer-agenteee` published but not l
 
 ## What's still open / needs review
 
-### High priority
-1. **CP-optional Studio workflow** — the user wants it *proven*, not just claimed, that
-   Studio is fully usable with the Control Plane switched off (create/save drafts and
-   skills locally; publish/launch simply disabled). Verification requested for the next
-   part of this session — not yet re-confirmed against the multi-agent-era code.
-2. **Multi-Control-Plane configuration** — requested next: a Settings section in Studio
-   to register multiple Control Planes (name + base URL, maybe more), pick which one is
-   "active" (connect/disconnect), and have publish/launch/health-checks/deployments all
-   go through whichever is currently selected — i.e. multiple named deploy-environment
-   configs. Today `ControlPlaneClient` is wired to a single `RestClient` bean with a
-   base-url fixed at startup (`gargantua.control-plane.base-url`) — this needs to become
-   dynamic per-request against a stored, switchable list. Not started as of this doc.
+### Done later in this session (see §"CP-optional verification + multi-CP Settings" below)
+1. ✅ **CP-optional Studio workflow** — verified live with the Control Plane stopped:
+   create/save skills and drafts, build/validate manifests, download `.gbundle` bundles
+   all work; only publish and CP-proxied reads fail, cleanly (502, clear message).
+2. ✅ **Multi-Control-Plane configuration** — a Settings screen (`/settings`) now lets
+   Studio register multiple named Control Planes and connect/disconnect/switch between
+   them at runtime, no restart. Full write-up below.
 
 ### Medium priority (carried over, still true)
 3. **Undeploy is bookkeeping-only.** It clears the Control Plane's record so a bundle can
