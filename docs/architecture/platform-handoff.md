@@ -9,14 +9,19 @@ and what comes next. It complements — does not replace — two narrower docs:
 - [`ai-operating-system.md`](ai-operating-system.md) — the **vision** (the north
   star, not a sprint plan).
 
-**Last updated:** 2026-08-28. If a fact here disagrees with the code, the code wins —
-fix this doc. For changes made in the 2026-08-28 session, see
-[`SESSION_HANDOFF_2026-08-28.md`](architecture/SESSION_HANDOFF_2026-08-28.md).
+**Last updated:** 2026-08-29. If a fact here disagrees with the code, the code wins —
+fix this doc. For changes made in the 2026-08-29 session, see
+[`SESSION_HANDOFF_2026-08-29.md`](architecture/SESSION_HANDOFF_2026-08-29.md) (and
+[`SESSION_HANDOFF_2026-08-28.md`](architecture/SESSION_HANDOFF_2026-08-28.md) before it).
 
-**Recent progress (most recent first):** Postgres-only bundle storage (MinIO/S3
-removed; `PostgresBlobStore` stores bundle bytes in `cp_document`) → Studio merged into
-one repo/image (SPA + BFF) → interactive graph editor + Publish dialog in Studio →
-CP launch-config namespace fix. See §7 for the roadmap and what's next.
+**Recent progress (most recent first):** **Real concurrent multi-agent hosting** — the
+Studio Launch button now gives every agent its own container + host port instead of one
+shared slot that got replaced on every launch, and the Control Plane's Deployment
+subsystem tracks each one's port (§3.1, §8) → a chain of Playground bugs fixed
+(insecure-context crash, hardcoded-localhost runtime URL, CORS pinned to one origin) →
+Agent Graph rewritten as a connected radial layout → Postgres-only bundle storage
+(MinIO/S3 removed) → Studio merged into one repo/image (SPA + BFF). See §7 for the
+roadmap and what's next.
 
 ---
 
@@ -39,8 +44,8 @@ also mirror to GitHub (`GiskardB`). Sibling repos are checked out side by side u
 | Repo | Role | Stack | Status (2026-08) |
 |---|---|---|---|
 | `gargantua` | **Runtime** + execution-side Kernel; **home of all architecture docs**; publishes `agent-core` | Java 25 / Spring Boot 4.1, 9 Maven modules | Phase 1 + loadout + governance parsing; docs hub; on `1.3.0-SNAPSHOT` |
-| `gargantua-control-plane` | **Control Plane**: Registry + Catalog + Policy + Deployment | Java 25 / Boot 4.1, `agent-core` | **MVP** — publish→index→discovery works; 20 tests |
-| `gargantua-studio` | **Studio** — frontend **and** BFF in ONE repo / ONE image (Spring serves the SPA at `/`, API at `/api`). Agent+Skill Designer, interactive graph editor, Publish dialog, Playground/Trace against a runtime, Launch button. | React 18 / Vite 5 / XYFlow (in `frontend/`) + Java 25 / Boot 4.1 BFF (`agent-core`) | **MVP** — merged 2026-08; 30 backend tests; 8 frontend tests; TypeScript clean |
+| `gargantua-control-plane` | **Control Plane**: Registry + Catalog + Policy + Deployment (now with per-agent port tracking + undeploy) | Java 25 / Boot 4.1, `agent-core` | **MVP** — publish→index→discovery works; Deployment tracks real running instances; 28 tests |
+| `gargantua-studio` | **Studio** — frontend **and** BFF in ONE repo / ONE image (Spring serves the SPA at `/`, API at `/api`). Agent+Skill Designer, radial graph editor, Publish dialog, Playground (multi-agent aware) against real runtimes, Launch button (concurrent, per-agent). | React 18 / Vite 5 / XYFlow (in `frontend/`) + Java 25 / Boot 4.1 BFF (`agent-core`) | **MVP** — merged 2026-08; concurrent multi-agent launch 2026-08-29; 55 backend tests; 8 frontend tests; TypeScript clean |
 | ~~`gargantua-studio-backend`~~ | **Merged into `gargantua-studio`** (2026-08) — no longer a separate repo/image | — | Deprecated |
 | `gargantua-compose` | **Local vertical slice** (Docker Compose) wiring the agent-creation flow; `start.bat`/`stop.bat` | Compose v2 | **Done** — ports in 18xxx/19xxx (off Cave's range); authored + statically verified |
 | `gargantua-gateway` | Agent Gateway (Intent/Capability/Version routing) | TBD | **Not built** — Phase 4; decision: *evaluate `agentgateway`* first |
@@ -115,7 +120,10 @@ graph TD
 All JVM boxes (`Studio`, `CP`, `Runtime`) share the one `agent-core` domain model (§3).
 `Runtime` fetches its bundle from the Control Plane at startup (`GARGANTUA_BUNDLE_URL` →
 `GET /bundles/{name}/{version}/bundle`); the Studio's **Launch** button starts a runtime
-pointed at a freshly published bundle (see §8 for the loop and its caveats).
+pointed at a freshly published bundle (see §8 for the loop and its caveats). The `Runtime`
+box in the diagram can be **several concurrent containers**, not one — each launched
+agent (by name) gets its own container and host port (2026-08-29), so the platform can
+run and serve multiple agents at once instead of one launch replacing the last.
 
 ## 4. How to run the whole thing locally (the `gargantua-compose` slice)
 
@@ -361,10 +369,19 @@ an `EventPublisher` if events land — NATS-vs-Kafka stays open); a "modular mon
   `studio-backend` run an editable command (`docker run`) to start a runtime pointed at the
   bundle. **Caveats:** the launch command runs with the backend's Docker privileges —
   local-dev/demo only, never expose it. The Runtime still hosts **one agent per process**
-  (ADR-001): "launch" recreates the runtime container, it does not hot-swap. The Control Plane
-  still does **not track running Runtime instances** (Deployment Manager remains a stub,
-  ADR-004) — a manifest that pins a cloud model (e.g. `gpt-4o`) won't run against the local
-  Ollama; leave the model blank or set it to the local tag for the demo.
+  (ADR-001): "launch" recreates *that agent's* runtime container, it does not hot-swap —
+  but as of 2026-08-29 that's a per-agent-name container/port, not one shared slot, so
+  **several agents run concurrently** (verified live: 3 agents, 3 containers, 3 ports,
+  all answering chat independently). The Control Plane's Deployment subsystem **does now
+  track running instances** — `Deployment.port`, updated by Studio's `LaunchService`
+  once a health check confirms the container actually answers — which is what lets the
+  Playground list genuinely-reachable agents instead of guessing. Still true: a manifest
+  that pins a cloud model (e.g. `gpt-4o`) won't run against the local Ollama the `cave`
+  profile wires up; leave the model blank or set it to the local tag for the demo. Also
+  still open: relaunching a *newer version* of the same agent name reuses its container/
+  port correctly, but the old version's deployment record isn't marked superseded, so it
+  lingers as a second (harmless but confusing) `HEALTHY` entry — see
+  `SESSION_HANDOFF_2026-08-29.md` §"medium priority".
 - **Bundle *signature* verification** is not implemented (SHA-256 checksum is). The bundle
   zip the Control Plane assembles is likewise unsigned.
 - The Control Plane is an **MVP**: Registry/Catalog/Policy/Deployment exist; auth is
@@ -384,4 +401,5 @@ an `EventPublisher` if events land — NATS-vs-Kafka stays open); a "modular mon
 - Manifest schema & enforcement → [`agent-manifest.md`](agent-manifest.md)
 - Skills & routing → [`skills-and-routing.md`](skills-and-routing.md)
 - OSS pattern evaluation & the roadmap rationale → [`13-open-source-patterns.md`](13-open-source-patterns.md)
+- **Session handoff (2026-08-29)** → [`SESSION_HANDOFF_2026-08-29.md`](architecture/SESSION_HANDOFF_2026-08-29.md)
 - **Session handoff (2026-08-28)** → [`SESSION_HANDOFF_2026-08-28.md`](architecture/SESSION_HANDOFF_2026-08-28.md)
