@@ -180,10 +180,10 @@ Impact · Alternative*.
 | Pluggable retrieval | ADOPT | P0 | **done** (`core.rag`) |
 | Code-free signable bundle | ADOPT | P0 | **done** (ADR-003) |
 | Skill as `SKILL.md` artifact | ADOPT | P0 | **done** (Skill Designer) |
-| Agent Loadout | ADOPT | P0 | **todo** |
+| Agent Loadout | ADOPT | P0 | **done** (`spec.loadout`, reported not yet provisioned) |
 | Agentgateway | EVALUATE | P0 | **spike (Phase 4)** |
-| Governance envelope | ADAPT | P1 | todo |
-| Execution event model + trace | ADOPT | P1 | todo |
+| Governance envelope | ADAPT | P1 | **done**, first increment (`core.governance`, reported not yet enforced) |
+| Execution event model + trace | ADOPT | P1 | **mostly done** (`core.execution`, Trace Explorer on sample data) |
 | Runtime supervisor + budgets | ADOPT | P1 | partial (cost/budget) |
 | Agent lifecycle + eval gate | ADAPT | P1 | partial (promotion) |
 | Progressive disclosure / context budget | ADAPT | P1/P2 | todo |

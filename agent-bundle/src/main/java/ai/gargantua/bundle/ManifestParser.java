@@ -7,6 +7,13 @@ import ai.gargantua.core.mcp.McpTransport;
 import ai.gargantua.core.memory.MemoryLayer;
 import ai.gargantua.core.governance.GovernanceEnvelope;
 import ai.gargantua.core.governance.Visibility;
+import ai.gargantua.core.pact.Autonomy;
+import ai.gargantua.core.pact.Cognition;
+import ai.gargantua.core.pact.CognitionModels;
+import ai.gargantua.core.pact.CognitionRequirements;
+import ai.gargantua.core.pact.Contract;
+import ai.gargantua.core.pact.InterfaceEndpoint;
+import ai.gargantua.core.pact.ModelDescriptor;
 import ai.gargantua.core.workload.AgentSpec;
 import ai.gargantua.core.workload.KnowledgeRef;
 import ai.gargantua.core.workload.Loadout;
@@ -161,10 +168,100 @@ public final class ManifestParser {
                     string(spec, "defaultSkill", "spec.defaultSkill"),
                     map(spec, "guardrails", "spec.guardrails"),
                     new LinkedHashSet<>(stringList(spec, "allowedRoles", "spec.allowedRoles")),
-                    loadout(map(spec, "loadout", "spec.loadout")));
+                    loadout(map(spec, "loadout", "spec.loadout")),
+                    cognition(map(spec, "cognition", "spec.cognition")),
+                    contract(map(spec, "contract", "spec.contract")),
+                    interfaces(list(spec, "interfaces", "spec.interfaces")));
         } catch (IllegalArgumentException e) {
             throw new BundleException(e.getMessage(), e);
         }
+    }
+
+    private static Cognition cognition(Map<String, Object> cognition) {
+        if (cognition == null) {
+            return Cognition.none();
+        }
+        try {
+            return new Cognition(
+                    new LinkedHashSet<>(stringList(cognition, "modalities", "spec.cognition.modalities")),
+                    new LinkedHashSet<>(stringList(cognition, "capabilities", "spec.cognition.capabilities")),
+                    cognitionModels(map(cognition, "models", "spec.cognition.models")),
+                    cognitionRequirements(map(cognition, "requirements", "spec.cognition.requirements")));
+        } catch (IllegalArgumentException e) {
+            throw new BundleException(e.getMessage(), e);
+        }
+    }
+
+    private static CognitionModels cognitionModels(Map<String, Object> models) {
+        if (models == null) {
+            return null;
+        }
+        return new CognitionModels(
+                modelDescriptor(map(models, "primary", "spec.cognition.models.primary"),
+                        "spec.cognition.models.primary"),
+                modelDescriptor(map(models, "fallback", "spec.cognition.models.fallback"),
+                        "spec.cognition.models.fallback"));
+    }
+
+    private static ModelDescriptor modelDescriptor(Map<String, Object> descriptor, String path) {
+        if (descriptor == null) {
+            return null;
+        }
+        return new ModelDescriptor(
+                string(descriptor, "provider", path + ".provider"),
+                string(descriptor, "family", path + ".family"),
+                string(descriptor, "name", path + ".name"));
+    }
+
+    private static CognitionRequirements cognitionRequirements(Map<String, Object> requirements) {
+        if (requirements == null) {
+            return null;
+        }
+        Map<String, Object> modalities = map(requirements, "modalities", "spec.cognition.requirements.modalities");
+        Map<String, Object> capabilities = map(requirements, "capabilities", "spec.cognition.requirements.capabilities");
+        Map<String, Object> contextWindow = map(requirements, "contextWindow", "spec.cognition.requirements.contextWindow");
+        return new CognitionRequirements(
+                modalities == null ? Set.of() : new LinkedHashSet<>(
+                        stringList(modalities, "required", "spec.cognition.requirements.modalities.required")),
+                capabilities == null ? Set.of() : new LinkedHashSet<>(
+                        stringList(capabilities, "required", "spec.cognition.requirements.capabilities.required")),
+                contextWindow == null ? null
+                        : integer(contextWindow, "minimum", "spec.cognition.requirements.contextWindow.minimum"));
+    }
+
+    private static Contract contract(Map<String, Object> contract) {
+        if (contract == null) {
+            return Contract.none();
+        }
+        Map<String, Object> autonomy = map(contract, "autonomy", "spec.contract.autonomy");
+        try {
+            Integer level = autonomy == null ? null : integer(autonomy, "level", "spec.contract.autonomy.level");
+            return new Contract(
+                    level == null ? null : Autonomy.ofLevel(level),
+                    new LinkedHashSet<>(stringList(contract, "permissions", "spec.contract.permissions")));
+        } catch (IllegalArgumentException e) {
+            throw new BundleException(e.getMessage(), e);
+        }
+    }
+
+    private static List<InterfaceEndpoint> interfaces(List<Object> raw) {
+        if (raw == null) {
+            return List.of();
+        }
+        List<InterfaceEndpoint> endpoints = new ArrayList<>();
+        for (int i = 0; i < raw.size(); i++) {
+            String path = "spec.interfaces[" + i + "]";
+            Map<String, Object> entry = asMap(raw.get(i), path);
+            try {
+                endpoints.add(new InterfaceEndpoint(
+                        string(entry, "protocol", path + ".protocol"),
+                        string(entry, "endpoint", path + ".endpoint"),
+                        string(entry, "version", path + ".version")));
+            } catch (IllegalArgumentException e) {
+                throw new BundleException(e.getMessage(), e);
+            }
+        }
+        return endpoints;
     }
 
     private static Loadout loadout(Map<String, Object> loadout) {

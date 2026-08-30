@@ -1,12 +1,12 @@
-# Gargantua -- AI Agent Framework
+# Gargantua -- AI Agent Framework & Runtime
 
 [![License](https://img.shields.io/github/license/GiskardB/gargantua?style=flat-square&color=blue)](LICENSE)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.giskardb/agent-engine?style=flat-square&label=Maven%20Central&color=blue&logo=apachemaven&logoColor=white)](https://central.sonatype.com/artifact/io.github.giskardb/agent-engine)
 [![Latest tag](https://img.shields.io/github/v/tag/GiskardB/gargantua?style=flat-square&label=tag&color=brightgreen)](https://github.com/GiskardB/gargantua/tags)
 [![JitPack](https://jitpack.io/v/GiskardB/gargantua.svg?style=flat-square)](https://jitpack.io/#GiskardB/gargantua)
 [![CI](https://img.shields.io/github/actions/workflow/status/GiskardB/gargantua/ci.yml?style=flat-square&label=CI)](https://github.com/GiskardB/gargantua/actions/workflows/ci.yml)
-[![Java](https://img.shields.io/badge/Java-21-007396?style=flat-square&logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/21/)
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.0.4-6DB33F?style=flat-square&logo=spring&logoColor=white)](https://spring.io/projects/spring-boot)
+[![Java](https://img.shields.io/badge/Java-25-007396?style=flat-square&logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/25/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.0-6DB33F?style=flat-square&logo=spring&logoColor=white)](https://spring.io/projects/spring-boot)
 [![LangChain4j](https://img.shields.io/badge/LangChain4j-1.12-ff6b35?style=flat-square)](https://docs.langchain4j.dev/)
 
 **AI agents as a service, in Java.** Write a skill file and a tool class — Gargantua gives you a deployable REST API with streaming, persistent memory, guardrails, and multi-agent orchestration.
@@ -14,6 +14,19 @@
 Define what your agent can do in a `SKILL.md` file (or a Java `@AgentSkill` annotation), implement actions as `@AgentTool` methods, and chain them into multi-step `@AgentsFlow` pipelines. The framework handles everything else: skill routing, 3-layer memory, input/output guardrails, human-in-the-loop approvals, cost tracking, A2A interoperability, and Kubernetes deployment.
 
 Built on Java 25, Spring Boot 4.1.0, and LangChain4j.
+
+**This repository is complete and self-contained.** Add the dependency, or generate a
+project from the archetype, and you have a running agent — nothing else to install, no
+other repo required. Hand-write a `manifest.yaml` per
+[the spec](docs/architecture/agent-manifest.md) and a `.gbundle`, and `gargantua run` it —
+no authoring tool needed either. Its manifest (`gargantua.ai/v1`) also composes with
+[PACT](PACT_v0.3_Agent_Contract_Specification.md), an open, implementation-neutral
+agent-description spec this project is drafting.
+
+Separately, and entirely optionally, a few companion projects build **on top of** this
+one for teams that want a visual authoring UI or fleet management across many agents —
+see [**Optional companions**](#optional-companions) below if that's what brought you
+here. Otherwise, the quickstart is next.
 
 ---
 
@@ -507,6 +520,48 @@ heading, [Agent Manifest](docs/architecture/agent-manifest.md) for the bundle sc
 
 ---
 
+## Optional companions
+
+Gargantua doesn't need any of what follows — it's already a complete way to build and
+run an agent, by hand, with just this repo. A few **separate, optional** projects build
+*on top of* it for teams that want more than a Java dependency and a CLI:
+
+| Repo | Adds | Status |
+|---|---|---|
+| [`gargantua-studio`](../gargantua-studio) | A visual Agent/Skill Designer, Playground, and one-click publish — for authoring a manifest without hand-writing YAML | MVP |
+| [`gargantua-control-plane`](../gargantua-control-plane) | A Registry/Catalog/Policy/Deployment service — for running and discovering a *fleet* of agents, not just one | MVP |
+| [`gargantua-compose`](../gargantua-compose) | A one-command Docker Compose slice wiring the two above together | Done |
+
+None of these are required to author or run a single agent — that's what the rest of
+this README already showed you. They exist for the case where you want a GUI instead of
+hand-editing a manifest, or you're operating many agents instead of one. Start with
+[`docs/architecture/platform-handoff.md`](docs/architecture/platform-handoff.md) for the
+current cross-repo status, or
+[`docs/architecture/ai-operating-system.md`](docs/architecture/ai-operating-system.md) for
+the north-star vision, if that's the problem you have. Kubernetes is an additive, later
+piece of that optional layer (Gateway + Operator) — never a requirement, here or there.
+
+## An open standard for describing agents (PACT)
+
+Gargantua's manifest (`gargantua.ai/v1`) already covers governance, deployment and
+runtime concerns on its own. What it didn't have a portable, vendor-neutral way to
+express — what an agent's *cognition* looks like, what basic *contract* it operates
+under, how it can be *reached* — is being factored out into
+**[PACT](PACT_v0.3_Agent_Contract_Specification.md)**, a small companion specification
+drafted in this repo with the eventual goal of proposing it to AAIF.
+
+PACT is a **draft, not a released standard** — version 0.3, unpublished elsewhere. This
+repo is its first reference implementation: `spec.cognition`, `spec.contract` and
+`spec.interfaces` are real, tested manifest fields today (`core.pact` in `agent-core`),
+and `PactManifest.from(...)` projects a standalone PACT document from any manifest — all
+of it usable with just this repo, no companion project involved. What's *not* there yet:
+a UI for these fields in Studio (optional, see above), and a live endpoint serving a PACT
+document over HTTP. Read the spec itself for the full rationale, or
+[`docs/architecture/agent-manifest.md`](docs/architecture/agent-manifest.md) for exactly
+how Gargantua's manifest maps onto it, field by field.
+
+---
+
 ## Framework Libraries (Maven coordinates)
 
 Gargantua is distributed as a set of Maven libraries. You don't clone this repo -- you add dependencies.
@@ -589,8 +644,8 @@ JitPack uses the groupId `com.github.giskardb.gargantua` and versions match Git 
 
 | Component | Version |
 |-----------|---------|
-| Java | 21 (Virtual Threads) |
-| Spring Boot | 4.0.4 |
+| Java | 25 (Virtual Threads) |
+| Spring Boot | 4.1.0 |
 | Spring Framework | 7.0.5 |
 | LangChain4j | 1.12.1 |
 | MongoDB | 8.0 |
@@ -650,10 +705,13 @@ break, and a reading order for everything below.
 
 | Topic | Link |
 |-------|------|
+| Platform Handoff — cross-repo status & roadmap (**start here for the platform**) | [docs/architecture/platform-handoff.md](docs/architecture/platform-handoff.md) |
 | AI Operating System — vision | [docs/architecture/ai-operating-system.md](docs/architecture/ai-operating-system.md) |
-| Agent Manifest — bundle schema | [docs/architecture/agent-manifest.md](docs/architecture/agent-manifest.md) |
+| Gargantua Domain Model — shared object vocabulary | [docs/architecture/gargantua-domain-model.md](docs/architecture/gargantua-domain-model.md) |
+| Agent Manifest — bundle schema (+ PACT field mapping) | [docs/architecture/agent-manifest.md](docs/architecture/agent-manifest.md) |
+| **PACT** — the open agent-description spec drafted here (v0.3, unreleased) | [PACT_v0.3_Agent_Contract_Specification.md](PACT_v0.3_Agent_Contract_Specification.md) |
 | Runtime Decisions — ADR log | [docs/architecture/runtime-decisions.md](docs/architecture/runtime-decisions.md) |
-| Runtime Observability — requirements | [docs/runtime-observability-requirements.md](docs/runtime-observability-requirements.md) |
+| Runtime Observability — requirements (proposed, not implemented) | [docs/runtime-observability-requirements.md](docs/runtime-observability-requirements.md) |
 
 ---
 

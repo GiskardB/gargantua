@@ -549,8 +549,8 @@ public class VectorStoreConfig {
 
 `VectorStorePort` follows the same `@ConditionalOnMissingBean` pattern
 as all other adapters — your bean wins, the framework's default is
-not registered. The `agent-example-rag` per-feature example exercises
-the full wiring end-to-end with the in-memory cosine store.
+not registered. `RagAutoConfigurationTest`/`RagEnricherTest` (in `agent-engine`)
+exercise the full wiring end-to-end with the in-memory cosine store.
 
 ---
 

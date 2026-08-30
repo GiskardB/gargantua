@@ -10,6 +10,38 @@ The `apiVersion / kind / metadata / spec` shape mirrors a Kubernetes object so t
 eventual Custom Resource Definition is a transcription of this schema rather than a
 second, divergent model.
 
+**Relationship to PACT.** This manifest covers all seven pillars of PACT's conceptual
+model (metadata, identity, purpose, capabilities, cognition, contract, interfaces — PACT
+§3). In PACT's own terms, this manifest *is* the "Agent Manifest" layer (authority,
+operational boundaries, governance — see PACT §16-17), composed with PACT's vendor-neutral
+capability/cognition/contract/interfaces layer:
+
+| PACT pillar | Where it lives here |
+|---|---|
+| Metadata | `metadata.name` / `.version` / `.description` |
+| Identity | *derived* from `metadata.owner` — no dedicated field |
+| Purpose | *derived* from `metadata.description` — no dedicated field |
+| Capabilities | `spec.capabilities[].name` (≡ PACT `id`) / `.description` |
+| Cognition | `spec.cognition` — new field, no prior equivalent |
+| Contract | `spec.contract` — new field, no prior equivalent |
+| Interfaces | `spec.interfaces` — new field, no prior equivalent |
+
+`spec.cognition`, `spec.contract` and `spec.interfaces` are genuinely new fields with no
+prior representation. Identity and Purpose are **not** new fields — they are *derived*
+by [`PactManifest.from(WorkloadManifest)`](../../agent-core/src/main/java/ai/gargantua/core/pact/PactManifest.java)
+from `metadata.owner`/`metadata.description`, which already answer close-enough
+questions, rather than adding a redundant second place to say the same thing (same
+reasoning as capability `name` ≡ PACT `id`, no new field either). This is a pragmatic
+default, not a perfect semantic match: PACT's own Human Questions table (§24) treats
+"what is it" (`metadata.description`) and "what is it for" (`purpose`) as different
+questions. A manifest that genuinely needs to answer them differently has nowhere to put
+the second answer yet — extend `PactManifest.from` if that need shows up for real, don't
+add the field speculatively before it does.
+
+`PactManifest.from(WorkloadManifest)` projects a manifest onto a standalone PACT v1 Core
+document, for anyone who wants the portable subset without the rest. See
+[PACT_v0.3_Agent_Contract_Specification.md](../../PACT_v0.3_Agent_Contract_Specification.md).
+
 ---
 
 ## Complete example
@@ -92,6 +124,26 @@ spec:
       enabled: true
     max-length:
       maxChars: 8000
+
+  # PACT Core — see "Relationship to PACT" above. Declarative only; not enforced by the
+  # runtime, by design (PACT §31 Declaration vs Verification).
+  cognition:
+    modalities: [text]
+    capabilities: [reasoning, planning]
+    models:
+      primary:
+        provider: anthropic
+        family: claude
+
+  contract:
+    autonomy:
+      level: 2
+    permissions: [read_repository]
+
+  interfaces:
+    - protocol: a2a
+      version: "1.0"
+      endpoint: https://agents.internal/customer-agent/.well-known/agent.json
 ```
 
 ---
@@ -254,6 +306,95 @@ Deliberately untyped, because guardrail settings vary per implementation and the
 binds them onto its own configuration objects. Keys are converted to kebab-case, so
 `maxLengthChars` and `max-length-chars` both bind.
 
+## `spec.cognition`
+
+PACT Core's "Cognition" pillar: what kind of reasoning/modalities this agent exposes,
+vendor-neutrally — distinct from `spec.model`, which names the *operational* model alias
+the runtime resolves via environment.
+
+```yaml
+spec:
+  cognition:
+    modalities: [text, image]              # what the agent can understand/produce
+    capabilities: [reasoning, planning]     # cognitive abilities offered
+    models:
+      primary: {provider: anthropic, family: claude}   # semantic, not an alias
+      fallback: {provider: openai, family: gpt}
+    requirements:                           # what the *substrate* must provide, not
+      modalities:                           # what this agent itself offers — enables
+        required: [text]                    # selection without naming a vendor
+      capabilities:
+        required: [reasoning]
+      contextWindow:
+        minimum: 64000
+```
+
+| Field | Required | Description |
+|---|---|---|
+| `modalities` | no | Open vocabulary; no controlled taxonomy |
+| `capabilities` | no | Open vocabulary; same stance as `spec.capabilities[].tags` |
+| `models.primary` / `models.fallback` | no | Semantic `{provider, family, name}`, not an alias |
+| `requirements.*` | no | What the hosting substrate must support, for agent selection |
+
+> **Declarative by design, not "not enforced yet."** Unlike `spec.loadout` or
+> `spec.allowedRoles`, this is not a gap the runtime intends to close later — PACT itself
+> says a declaration is not proof of capability (PACT §31). The runtime parses and
+> reports it; nothing more is planned or implied.
+
+## `spec.contract`
+
+PACT Core's "Contract" pillar: the basic semantic conditions under which the agent may
+act. Deliberately small, and **not a security control** — `spec.allowedRoles` and
+`spec.guardrails` remain what the runtime actually enforces.
+
+```yaml
+spec:
+  contract:
+    autonomy:
+      level: 2        # 0 passive · 1 assistive · 2 recommending · 3 executing · 4 autonomous
+    permissions: [read_repository]   # claimed, not granted — open vocabulary
+```
+
+| Field | Required | Description |
+|---|---|---|
+| `autonomy.level` | no | Integer `0`-`4`; self-declared, not verified |
+| `permissions` | no | Free-form strings the agent claims to need; no controlled vocabulary |
+
+A capability does not imply permission, and neither does a contract: this is what the
+agent *claims*, not what it is authorized to do. Same declarative status as
+`spec.cognition` above.
+
+The wire format stays the plain integer above — matching PACT's own examples — but
+`AgentSpec.contract().autonomy()` is a typed
+[`Autonomy`](../../agent-core/src/main/java/ai/gargantua/core/pact/Autonomy.java) enum in
+Java, not a raw `int`. `Autonomy.ofLevel(int)`/`Autonomy.level()` convert at the
+parse/serialize boundary.
+
+## `spec.interfaces`
+
+PACT Core's "Interfaces" pillar: how another system may reach this agent, beyond the
+built-in A2A endpoint every agent already exposes at `/.well-known/agent.json`.
+
+```yaml
+spec:
+  interfaces:
+    - protocol: a2a
+      version: "1.0"
+      endpoint: https://agents.internal/customer-agent/.well-known/agent.json
+    - protocol: mcp
+      endpoint: https://agents.internal/customer-agent/mcp
+```
+
+| Field | Required | Description |
+|---|---|---|
+| `protocol` | yes | e.g. `a2a`, `mcp`, `http`; open vocabulary |
+| `endpoint` | yes | URL the protocol is reachable at |
+| `version` | no | Protocol version |
+
+> **Not cross-checked against what the runtime actually serves.** Listing the built-in
+> A2A endpoint here makes it discoverable from the manifest alone, without a live agent
+> to ask — but nothing currently verifies the two agree.
+
 ---
 
 ## Enforcement status
@@ -277,6 +418,9 @@ picture.
 | `spec.memoryLayers` | Reported, not applied — use per-skill declaration |
 | `spec.allowedRoles` | Reported, not applied — use per-skill declaration |
 | `spec.loadout` | Reported, not applied — knowledge bases wired per skill via `metadata.knowledge-base` |
+| `spec.cognition` | Reported — declarative by design (PACT §31), not a gap to close |
+| `spec.contract` | Reported — declarative by design (PACT §31); use `allowedRoles`/`guardrails` to enforce |
+| `spec.interfaces` | Reported; not cross-checked against what the runtime actually serves |
 | `metadata.json` checksum | Applied — a mismatch refuses to load |
 | `metadata.json` signature | Recorded; not verified (needs key distribution) |
 

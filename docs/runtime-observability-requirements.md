@@ -1,5 +1,13 @@
 # Gargantua Runtime Observability — Requirements Specification v1.0
 
+> **Status: proposed, not implemented.** This describes planned work — none of
+> `ai.gargantua.core.event.*`, the recording/replay controllers, or the graph viewer exist
+> in the codebase yet. The execution-trace API that *is* live today
+> (`GET /api/traces`, `ExecutionEvent`/`ExecutionEventPublisher` in `core.execution`) is a
+> smaller, already-shipped increment toward the same goal — see
+> [api-reference.md](api-reference.md) and
+> [platform-handoff.md](architecture/platform-handoff.md) §7 item 5.
+
 ## Scope
 
 Tre feature coerenti che trasformano Gargantua da "framework che esegue agenti" a "runtime che mostra cosa succede dentro un agente":

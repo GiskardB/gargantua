@@ -3,6 +3,9 @@ package ai.gargantua.core.workload;
 import ai.gargantua.core.capability.Capability;
 import ai.gargantua.core.memory.MemoryLayer;
 import ai.gargantua.core.mcp.McpServerSpec;
+import ai.gargantua.core.pact.Cognition;
+import ai.gargantua.core.pact.Contract;
+import ai.gargantua.core.pact.InterfaceEndpoint;
 
 import java.util.List;
 import java.util.Map;
@@ -38,6 +41,13 @@ import java.util.Set;
  * @param loadout        the specific knowledge, memory, skills and resources this agent is
  *                       equipped with; {@link Loadout#empty()} when nothing is explicitly
  *                       provisioned (the agent then relies on what its skills configure)
+ * @param cognition      PACT Core: what kind of reasoning/modalities this agent exposes,
+ *                       vendor-neutrally; {@link Cognition#none()} when undeclared
+ * @param contract       PACT Core: the basic semantic conditions under which this agent
+ *                       may act (autonomy, claimed permissions); declarative only — see
+ *                       {@link Contract}; {@link Contract#none()} when undeclared
+ * @param interfaces     PACT Core: how another system may reach this agent, beyond the
+ *                       built-in A2A endpoint every agent already exposes
  */
 public record AgentSpec(
         RuntimeSpec runtime,
@@ -48,7 +58,10 @@ public record AgentSpec(
         String defaultSkill,
         Map<String, Object> guardrails,
         Set<String> allowedRoles,
-        Loadout loadout
+        Loadout loadout,
+        Cognition cognition,
+        Contract contract,
+        List<InterfaceEndpoint> interfaces
 ) implements WorkloadSpec {
 
     public AgentSpec {
@@ -60,6 +73,9 @@ public record AgentSpec(
         guardrails = guardrails == null ? Map.of() : Map.copyOf(guardrails);
         allowedRoles = allowedRoles == null ? Set.of() : Set.copyOf(allowedRoles);
         loadout = loadout == null ? Loadout.empty() : loadout;
+        cognition = cognition == null ? Cognition.none() : cognition;
+        contract = contract == null ? Contract.none() : contract;
+        interfaces = interfaces == null ? List.of() : List.copyOf(interfaces);
 
         long distinctServers = mcpServers.stream().map(McpServerSpec::name).distinct().count();
         if (distinctServers != mcpServers.size()) {
@@ -69,6 +85,25 @@ public record AgentSpec(
         if (distinctCapabilities != capabilities.size()) {
             throw new IllegalArgumentException("Duplicate capability names in agent spec");
         }
+    }
+
+    /**
+     * Backward-compatible constructor for callers written before PACT Core fields existed;
+     * equivalent to passing {@link Cognition#none()}, {@link Contract#none()} and no
+     * interfaces. Keeps the pre-1.4 9-argument shape source-compatible.
+     */
+    public AgentSpec(
+            RuntimeSpec runtime,
+            List<Capability> capabilities,
+            ModelSpec model,
+            List<McpServerSpec> mcpServers,
+            Set<MemoryLayer> memoryLayers,
+            String defaultSkill,
+            Map<String, Object> guardrails,
+            Set<String> allowedRoles,
+            Loadout loadout) {
+        this(runtime, capabilities, model, mcpServers, memoryLayers, defaultSkill, guardrails,
+                allowedRoles, loadout, Cognition.none(), Contract.none(), List.of());
     }
 
     /**
@@ -91,7 +126,8 @@ public record AgentSpec(
     /** Minimal spec: platform runtime, inherited models, no MCP servers, all memory layers. */
     public static AgentSpec minimal() {
         return new AgentSpec(RuntimeSpec.platformDefault(), List.of(), ModelSpec.inherit(),
-                List.of(), Set.of(), null, Map.of(), Set.of(), Loadout.empty());
+                List.of(), Set.of(), null, Map.of(), Set.of(), Loadout.empty(),
+                Cognition.none(), Contract.none(), List.of());
     }
 
     @Override

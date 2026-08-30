@@ -254,4 +254,32 @@ class ManifestPropertiesTest {
             assertThat(ManifestProperties.unappliedFields(bundle)).isEmpty();
         }
     }
+
+    @Test
+    @DisplayName("declared PACT Core fields are reported as informational, not as gaps")
+    void pactFieldsAreReportedAsInformational(@TempDir Path root) throws IOException {
+        String manifest = """
+                apiVersion: gargantua.ai/v1
+                kind: Agent
+                metadata:
+                  name: a
+                  version: 1.0.0
+                spec:
+                  cognition:
+                    modalities: [text]
+                  contract:
+                    autonomy:
+                      level: 2
+                  interfaces:
+                    - protocol: a2a
+                      endpoint: https://example.com/a2a
+                """;
+        try (LoadedBundle bundle = BundleLoader.load(bundleWith(root, manifest, false))) {
+            assertThat(ManifestProperties.unappliedFields(bundle))
+                    .hasSize(3)
+                    .anySatisfy(w -> assertThat(w).contains("spec.cognition").contains("by design"))
+                    .anySatisfy(w -> assertThat(w).contains("spec.contract").contains("by design"))
+                    .anySatisfy(w -> assertThat(w).contains("spec.interfaces"));
+        }
+    }
 }

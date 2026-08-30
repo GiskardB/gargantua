@@ -241,6 +241,11 @@ Runtime today, enforced by the Control Plane/Policy Manager later — see
   an agent is equipped with.
 - **`metadata.governance`** — cross-cutting ownership/tenant/visibility/status/ACL.
 
+A third addition, `spec.cognition`/`spec.contract`/`spec.interfaces`, implements
+[PACT](../PACT_v0.3_Agent_Contract_Specification.md) Core — also parsed and reported, but
+*not* headed toward future enforcement like the two above: PACT treats these as
+declarations by design (see agent-manifest.md's "Relationship to PACT").
+
 Observability across a run is exposed by the Runtime's **execution trace** API
 (`GET /api/traces`) — see [api-reference.md](api-reference.md).
 

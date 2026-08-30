@@ -60,7 +60,7 @@ on ports, never the reverse.
 
 | Module | Spring? | What it holds |
 |---|---|---|
-| `agent-core` | **No** | Domain model and **ports** (interfaces). 20 packages: orchestrator, tool, memory, guardrail, workload, skill, rag, mcp, hitl, flow, a2a, session, security, secret, audit, llm, cost, capability, bundle, exception. Depends on nothing framework-specific. |
+| `agent-core` | **No** | Domain model and **ports** (interfaces). 23 packages: orchestrator, tool, memory, guardrail, workload, skill, rag, mcp, hitl, flow, a2a, session, security, secret, audit, llm, cost, capability, bundle, exception, governance, execution, pact. Depends on nothing framework-specific. |
 | `agent-engine` | Yes | The **adapters** and Spring auto-configuration. This is where almost all behaviour lives: `ToolRegistry`, `GuardrailPipeline`, `DefaultOrchestratorEngine`, the web controllers. |
 | `agent-memory-sdk` | Partly | Memory and vector store implementations (in-memory, Mongo, Redis, embedded). |
 | `agent-mcp-client` | **No** | Consumes external MCP servers. One `McpToolProvider` per declared server. |
@@ -111,7 +111,7 @@ mode instead. See ADR-003.
 
 ```bash
 mvn -q clean install -DskipTests    # build all 9 modules
-mvn test                            # 842 tests (green on 1.3.0-SNAPSHOT, 2026-08)
+mvn test                            # 869 tests (green on 1.4.0-SNAPSHOT, 2026-08-30)
 ```
 
 The examples live in a **separate repository**,
@@ -122,14 +122,15 @@ you change public behaviour, build the examples against your branch before
 believing it works. Note: each example pins a *released* framework version via
 **JitPack** (`com.github.giskardb.gargantua`, Boot parent 4.0.4); to run them against
 a local build, repoint to `io.github.giskardb:<module>:<version>` and bump the Boot
-parent to match (4.1.0 for 1.3.0-SNAPSHOT).
+parent to match (4.1.0 for 1.4.0-SNAPSHOT).
 
-**Verified against 1.3.0-SNAPSHOT (2026-08):** full suite green (842); the archetype
-generates a project that builds, its context-load test passes, and it boots and answers
-`POST /api/agent/chat` against a local Ollama; representative examples (tool-basics,
-guardrails, output-schema, llm-routing) compile and their test suites pass once repointed.
-The public consumer API is backward-compatible — loadout/governance/execution-event
-additions are all additive.
+**Verified against 1.4.0-SNAPSHOT (2026-08-30):** full suite green (869, up from 842 —
+the PACT Core addition below added 25); the archetype generates a project that builds,
+its context-load test passes, and it boots and answers `POST /api/agent/chat` against a
+local Ollama; representative examples (tool-basics, guardrails, output-schema,
+llm-routing) compile and their test suites pass once repointed. The public consumer API
+is backward-compatible — loadout/governance/execution-event/**PACT Core**
+(`cognition`/`contract`/`interfaces`) additions are all additive.
 
 The `embedded` Spring profile excludes the Mongo and Redis auto-configurations,
 which takes boot from ~41s to ~6.5s. Use it for anything iterative.
@@ -147,9 +148,10 @@ providers.
 
 **Phase 2 (Control Plane)** — registry, catalog, deployment, API — is now an **MVP**
 in the sibling `gargantua-control-plane` repo (publish→index→discovery works, using
-the shared `agent-core`). **Studio** and its **BFF** exist too
-(`gargantua-studio`, `gargantua-studio-backend`), and a **Docker Compose vertical
-slice** (`gargantua-compose`) wires the agent-creation flow end to end. See
+the shared `agent-core`). **Studio** exists too — frontend **and** BFF in one repo/image
+(`gargantua-studio`; the earlier separate `gargantua-studio-backend` was merged in,
+2026-08) — and a **Docker Compose vertical slice** (`gargantua-compose`) wires the
+agent-creation flow end to end. See
 [architecture/platform-handoff.md](architecture/platform-handoff.md) for the full
 cross-repo status and roadmap.
 
@@ -158,8 +160,11 @@ Still open *here* (in the Runtime):
 - bundle **signature** verification (the SHA-256 checksum exists; signatures do not)
 - workload-level enforcement of RBAC and memory layers (see §4)
 - `CatalogRegistrar`, once wired to the Catalog API
-- **Agent Loadout** (`spec.loadout`) once added to `agent-core` — the next decided
-  step (see platform-handoff §7)
+- Studio/Designer support for the new PACT Core fields (`spec.cognition`/`spec.contract`/
+  `spec.interfaces`, `core.pact`) — Studio still depends on `agent-core 1.3.0-SNAPSHOT`
+  and has no UI for them yet (see platform-handoff §7)
+- a live PACT endpoint (`/.well-known/pact.json`) — `PactManifest.from(...)` exists as a
+  Java projection only, nothing serves it yet
 
 Branching: this repo is on **`main`**. (Earlier drafts of this doc referenced a
 `develop` working branch; the repo family now commits to `main` directly.)
@@ -172,8 +177,9 @@ Branching: this repo is on **`main`**. (Earlier drafts of this doc referenced a
 4. [`architecture/ai-operating-system.md`](architecture/ai-operating-system.md) — the wider vision
 5. [`architecture/platform-handoff.md`](architecture/platform-handoff.md) — cross-repo status & roadmap
 6. [`architecture/runtime-decisions.md`](architecture/runtime-decisions.md) — ADR-001..006, the binding decisions
-6. [`architecture/agent-manifest.md`](architecture/agent-manifest.md) — manifest schema and what is actually enforced
-7. [`extending.md`](extending.md) — every port and its default adapter
+7. [`architecture/agent-manifest.md`](architecture/agent-manifest.md) — manifest schema and what is actually enforced
+8. [`../PACT_v0.3_Agent_Contract_Specification.md`](../PACT_v0.3_Agent_Contract_Specification.md) — the agent-description spec this manifest composes with (draft, not yet released)
+9. [`extending.md`](extending.md) — every port and its default adapter
 
 Feature-specific: [`tools-and-annotations.md`](tools-and-annotations.md),
 [`skills-and-routing.md`](skills-and-routing.md),

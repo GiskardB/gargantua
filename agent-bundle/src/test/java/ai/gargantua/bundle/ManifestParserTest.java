@@ -414,6 +414,132 @@ class ManifestParserTest {
     }
 
     @Test
+    @DisplayName("parses spec.cognition (modalities, capabilities, models, requirements)")
+    void parsesCognition() {
+        WorkloadManifest manifest = ManifestParser.parse("""
+                apiVersion: gargantua.ai/v1
+                kind: Agent
+                metadata:
+                  name: cognitive-agent
+                  version: 1.0.0
+                spec:
+                  cognition:
+                    modalities: [text, image]
+                    capabilities: [reasoning, planning]
+                    models:
+                      primary:
+                        provider: anthropic
+                        family: claude
+                      fallback:
+                        provider: openai
+                        family: gpt
+                    requirements:
+                      modalities:
+                        required: [text]
+                      capabilities:
+                        required: [reasoning]
+                      contextWindow:
+                        minimum: 64000
+                """);
+        var cognition = manifest.agentSpec().cognition();
+        assertFalse(cognition.isEmpty());
+        assertEquals(java.util.Set.of("text", "image"), cognition.modalities());
+        assertEquals(java.util.Set.of("reasoning", "planning"), cognition.capabilities());
+        assertEquals("anthropic", cognition.models().primary().provider());
+        assertEquals("claude", cognition.models().primary().family());
+        assertEquals("openai", cognition.models().fallback().provider());
+        assertEquals(java.util.Set.of("text"), cognition.requirements().modalities());
+        assertEquals(java.util.Set.of("reasoning"), cognition.requirements().capabilities());
+        assertEquals(64000, cognition.requirements().contextWindowMinimum());
+    }
+
+    @Test
+    @DisplayName("an absent cognition yields Cognition.none()")
+    void absentCognitionIsNone() {
+        WorkloadManifest manifest = ManifestParser.parse(MINIMAL);
+        assertTrue(manifest.agentSpec().cognition().isEmpty());
+    }
+
+    @Test
+    @DisplayName("parses spec.contract (autonomy level, permissions)")
+    void parsesContract() {
+        WorkloadManifest manifest = ManifestParser.parse("""
+                apiVersion: gargantua.ai/v1
+                kind: Agent
+                metadata:
+                  name: contract-agent
+                  version: 1.0.0
+                spec:
+                  contract:
+                    autonomy:
+                      level: 2
+                    permissions: [read_repository]
+                """);
+        var contract = manifest.agentSpec().contract();
+        assertEquals(ai.gargantua.core.pact.Autonomy.RECOMMENDING, contract.autonomy());
+        assertEquals(java.util.Set.of("read_repository"), contract.permissions());
+    }
+
+    @Test
+    @DisplayName("an out-of-range autonomy level is rejected")
+    void autonomyLevelOutOfRangeRejected() {
+        String manifest = """
+                apiVersion: gargantua.ai/v1
+                kind: Agent
+                metadata:
+                  name: bad-contract-agent
+                  version: 1.0.0
+                spec:
+                  contract:
+                    autonomy:
+                      level: 9
+                """;
+        BundleException ex = assertThrows(BundleException.class, () -> ManifestParser.parse(manifest));
+        assertTrue(ex.getMessage().contains("autonomy level"));
+    }
+
+    @Test
+    @DisplayName("parses spec.interfaces")
+    void parsesInterfaces() {
+        WorkloadManifest manifest = ManifestParser.parse("""
+                apiVersion: gargantua.ai/v1
+                kind: Agent
+                metadata:
+                  name: reachable-agent
+                  version: 1.0.0
+                spec:
+                  interfaces:
+                    - protocol: a2a
+                      version: "1.0"
+                      endpoint: https://example.com/a2a
+                    - protocol: mcp
+                      endpoint: https://example.com/mcp
+                """);
+        var interfaces = manifest.agentSpec().interfaces();
+        assertEquals(2, interfaces.size());
+        assertEquals("a2a", interfaces.get(0).protocol());
+        assertEquals("1.0", interfaces.get(0).version());
+        assertEquals("mcp", interfaces.get(1).protocol());
+        assertNull(interfaces.get(1).version());
+    }
+
+    @Test
+    @DisplayName("an interface without an endpoint is rejected")
+    void interfaceWithoutEndpointRejected() {
+        String manifest = """
+                apiVersion: gargantua.ai/v1
+                kind: Agent
+                metadata:
+                  name: bad-interface-agent
+                  version: 1.0.0
+                spec:
+                  interfaces:
+                    - protocol: a2a
+                """;
+        assertThrows(BundleException.class, () -> ManifestParser.parse(manifest));
+    }
+
+    @Test
     @DisplayName("parses metadata.governance (tenant, visibility, status, access)")
     void parsesGovernance() {
         WorkloadManifest manifest = ManifestParser.parse("""

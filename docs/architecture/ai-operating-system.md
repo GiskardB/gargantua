@@ -324,10 +324,9 @@ mappa completa e lo stato aggiornato).
 | Componente | Repository | Stato |
 |---|---|---|
 | Control Plane (Registry + Catalog + Policy + Deployment) | `gargantua-control-plane` | **MVP** — Spring Boot 4.1 / Java 25, publish→index→discovery funzionante, usa `agent-core` condiviso |
-| Studio (frontend) | `gargantua-studio` | **MVP** — React Flow / Monaco / Zustand, Agent Designer + Skill Designer, collegato al backend, fallback offline |
-| Studio backend (BFF) | `gargantua-studio-backend` | **MVP** — costruisce manifest `gargantua.ai/v1` da form, gateway verso il Control Plane |
-| Modello di dominio condiviso | `agent-core` jar (Maven Central) | **Fatto** — un solo modello canonico Spring-free, dipeso dai componenti JVM |
-| Vertical slice locale | `gargantua-compose` | **Fatto** — Docker Compose Studio→backend→CP + Postgres + MinIO, **senza Kubernetes** |
+| Studio (frontend + BFF, un solo repo/immagine) | `gargantua-studio` | **MVP** — React Flow / Monaco / Zustand + backend Java 25/Boot 4.1 nello stesso repo (il vecchio `gargantua-studio-backend` è stato unito qui, 2026-08); costruisce manifest `gargantua.ai/v1` da form, gateway verso il Control Plane, multi-CP Settings |
+| Modello di dominio condiviso | `agent-core` jar (Maven Central) | **Fatto** — un solo modello canonico Spring-free, dipeso dai componenti JVM; ora include anche i campi PACT Core (`core.pact`, vedi [platform-handoff.md](platform-handoff.md) §3) |
+| Vertical slice locale | `gargantua-compose` | **Fatto** — Docker Compose Studio→CP + Postgres (bundle e stato, MinIO/S3 rimossi) + MongoDB + Redis, **senza Kubernetes** |
 
 ## Da sviluppare
 

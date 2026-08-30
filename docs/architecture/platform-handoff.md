@@ -9,12 +9,19 @@ and what comes next. It complements — does not replace — two narrower docs:
 - [`ai-operating-system.md`](ai-operating-system.md) — the **vision** (the north
   star, not a sprint plan).
 
-**Last updated:** 2026-08-29. If a fact here disagrees with the code, the code wins —
-fix this doc. For changes made in the 2026-08-29 session, see
-[`SESSION_HANDOFF_2026-08-29.md`](SESSION_HANDOFF_2026-08-29.md) (and
+**Last updated:** 2026-08-30. If a fact here disagrees with the code, the code wins —
+fix this doc. For changes made in the 2026-08-30 session, see
+[`SESSION_HANDOFF_2026-08-30.md`](SESSION_HANDOFF_2026-08-30.md) (and
+[`SESSION_HANDOFF_2026-08-29.md`](SESSION_HANDOFF_2026-08-29.md),
 [`SESSION_HANDOFF_2026-08-28.md`](SESSION_HANDOFF_2026-08-28.md) before it).
 
-**Recent progress (most recent first):** **Multi-Control-Plane Settings** — Studio can
+**Recent progress (most recent first):** **PACT Core** — the Runtime's manifest
+(`gargantua.ai/v1`) now covers all seven pillars of [PACT](../../PACT_v0.3_Agent_Contract_Specification.md),
+a small agent-description spec drafted in this repo for eventual submission to AAIF;
+`spec.cognition`/`spec.contract`/`spec.interfaces` are new, `Identity`/`Purpose` are
+derived from existing metadata fields, and `PactManifest.from(...)` projects a standalone
+PACT document — Studio/Designer support and a live endpoint are not started yet →
+**Multi-Control-Plane Settings** — Studio can
 now register several named Control Planes and connect/disconnect/switch between them at
 runtime (no restart), and the CP-optional workflow (create/save locally with the Control
 Plane off; only publish/reads fail, cleanly) has been verified live, not just assumed →
@@ -46,7 +53,7 @@ also mirror to GitHub (`GiskardB`). Sibling repos are checked out side by side u
 
 | Repo | Role | Stack | Status (2026-08) |
 |---|---|---|---|
-| `gargantua` | **Runtime** + execution-side Kernel; **home of all architecture docs**; publishes `agent-core` | Java 25 / Spring Boot 4.1, 9 Maven modules | Phase 1 + loadout + governance parsing; docs hub; on `1.3.0-SNAPSHOT` |
+| `gargantua` | **Runtime** + execution-side Kernel; **home of all architecture docs**; publishes `agent-core`; also home of the draft [PACT spec](../../PACT_v0.3_Agent_Contract_Specification.md) | Java 25 / Spring Boot 4.1, 9 Maven modules | Phase 1 + loadout + governance parsing + PACT Core fields; docs hub; on `1.4.0-SNAPSHOT` |
 | `gargantua-control-plane` | **Control Plane**: Registry + Catalog + Policy + Deployment (now with per-agent port tracking + undeploy) | Java 25 / Boot 4.1, `agent-core` | **MVP** — publish→index→discovery works; Deployment tracks real running instances; 28 tests |
 | `gargantua-studio` | **Studio** — frontend **and** BFF in ONE repo / ONE image (Spring serves the SPA at `/`, API at `/api`). Agent+Skill Designer, radial graph editor, Publish dialog, Playground (multi-agent aware) against real runtimes, Launch button (concurrent, per-agent). | React 18 / Vite 5 / XYFlow (in `frontend/`) + Java 25 / Boot 4.1 BFF (`agent-core`) | **MVP** — merged 2026-08; concurrent multi-agent launch 2026-08-29; 55 backend tests; 8 frontend tests; TypeScript clean |
 | ~~`gargantua-studio-backend`~~ | **Merged into `gargantua-studio`** (2026-08) — no longer a separate repo/image | — | Deprecated |
@@ -60,11 +67,12 @@ The single most important structural decision after the multi-repo split:
 **all JVM components share ONE canonical domain model**, not local mirrors.
 
 - Coordinates: `io.github.giskardb:agent-core` — released versions are **published to
-  Maven Central** (`1.2.20` is the latest released; the working tree is now on
-  **`1.3.0-SNAPSHOT`** locally after the Agent Loadout change — install it to `.m2`, see
-  below). Released versions mean sibling repos and Docker builds resolve it normally; you
-  do **not** need the Runtime checked out to build the Control Plane or Studio backend.
-  A SNAPSHOT, however, is local-only until tagged/released — see roadmap §7.2.
+  Maven Central** (`1.2.20` is the latest released; the working tree went to
+  `1.3.0-SNAPSHOT` locally for the Agent Loadout change, then to **`1.4.0-SNAPSHOT`**
+  for the PACT Core fields below — install it to `.m2`, see below). Released versions
+  mean sibling repos and Docker builds resolve it normally; you do **not** need the
+  Runtime checked out to build the Control Plane or Studio backend. A SNAPSHOT, however,
+  is local-only until tagged/released — see roadmap §7.2.
 - It is a **module of `gargantua-parent`** (which extends `spring-boot-starter-parent
   4.1.0`). Pure domain: **no Spring, no Jackson annotations.** YAML↔record binding
   lives in the Runtime's `agent-bundle/ManifestParser` and in the Studio backend's
@@ -74,12 +82,22 @@ The single most important structural decision after the multi-repo split:
 - Key types: `WorkloadManifest` (apiVersion/kind/metadata/spec; `CURRENT_API_VERSION
   = "gargantua.ai/v1"`), `WorkloadMetadata` (name/version/description/owner/labels +
   **`governance`**, implements `Governed`), `AgentSpec` (runtime, capabilities, model,
-  mcpServers, memoryLayers, defaultSkill, guardrails, allowedRoles, **`loadout`**),
+  mcpServers, memoryLayers, defaultSkill, guardrails, allowedRoles, `loadout`,
+  **`cognition`, `contract`, `interfaces`**),
   `Loadout`/`KnowledgeRef`/`ResourceRef` (`core.workload`),
   `GovernanceEnvelope`/`Visibility`/`Governed` (`core.governance`), `Capability`
   (name, description, version, inputSchema, outputSchema, **`implementedBy`**,
   `Set<String> tags`), `SkillMeta`/`SkillCard`, `RagConfig`, `McpServerSpec`,
   `MemoryLayer`, A2A (`AgentCard`), rag ports (`EmbeddingPort`, `VectorStorePort`).
+- **`core.pact`** (new, 2026-08-30): `Cognition`/`CognitionModels`/`CognitionRequirements`/
+  `ModelDescriptor`, `Contract`/`Autonomy` (enum), `InterfaceEndpoint`, `Identity`,
+  `Purpose`, and `PactManifest` — a projector (`PactManifest.from(WorkloadManifest)`)
+  onto a standalone [PACT](../../PACT_v0.3_Agent_Contract_Specification.md) v1 Core
+  document. `Identity`/`Purpose` have no manifest field of their own; they're derived
+  from `metadata.owner`/`metadata.description`. See
+  [agent-manifest.md](agent-manifest.md#relationship-to-pact) for the full pillar
+  mapping and [`SESSION_HANDOFF_2026-08-30.md`](SESSION_HANDOFF_2026-08-30.md) for how
+  this came about.
 
 See [gargantua-domain-model.md](gargantua-domain-model.md) for the full model.
 
@@ -281,7 +299,7 @@ Full rationale in memory and in the linked docs; the load-bearing ones:
   the **UX layer**: the Skill Designer builds a canonical `SKILL.md`, and "Assign to
   agent" upserts a Capability keyed by `implementedBy = skill.name`. The domain
   decoupling stays (Runtime routing/Catalog depend on it). See
-  [skills-and-routing.md](skills-and-routing.md).
+  [skills-and-routing.md](../skills-and-routing.md).
 - **Shared `agent-core` jar, not mirrored types.** (§3.)
 - **Stack (frozen):** Java 25 LTS + Boot 4.1 + Maven everywhere; Postgres
   (control-plane state + bundle blobs), MongoDB (runtime state), Redis (cache/rate-limit);
@@ -314,7 +332,20 @@ the last two, adopt a standard or component instead of reinventing it.
    (named build context `runtime_src=../gargantua`), so the stack no longer needs `agent-core`
    on Maven Central — publishing `v1.3.0` is still wanted for sibling repos that consume it as
    a released dependency, but it's no longer a blocker for running the compose.
-3. ✅ **Governance envelope (ADAPT, P1)** — first increment done. `core.governance`:
+3. ✅ **PACT Core fields (ADOPT, P1)** — done, 2026-08-30. `spec.cognition`, `spec.contract`
+   (`Autonomy` enum + permissions) and `spec.interfaces` added to `agent-core`
+   (`core.pact`), parsed by the Runtime's `ManifestParser`, and projected onto a
+   standalone [PACT](../../PACT_v0.3_Agent_Contract_Specification.md) v1 Core document by
+   `PactManifest.from(WorkloadManifest)`. All seven PACT pillars are now covered — Identity/
+   Purpose have no dedicated field, derived from `metadata.owner`/`metadata.description`
+   instead. Bumped the shared model to **`1.4.0-SNAPSHOT`**. Unlike Loadout/Governance
+   below, these are *not* "reported, not enforced yet" gaps — PACT's own "Declaration vs
+   Verification" principle (§31) means no enforcement is planned for them, by design.
+   **Not yet done:** Studio/Designer has no UI for these fields (still on `agent-core
+   1.3.0-SNAPSHOT`), and there is no live serialization/endpoint (`PactManifest` is a Java
+   projection only, no `/.well-known/pact.json` yet). See
+   [`SESSION_HANDOFF_2026-08-30.md`](SESSION_HANDOFF_2026-08-30.md).
+4. ✅ **Governance envelope (ADAPT, P1)** — first increment done. `core.governance`:
    `GovernanceEnvelope` (tenant / visibility[PRIVATE·INTERNAL·PUBLIC] / status / access /
    createdAt / updatedAt) + a `Governed` interface (a **shared trait**, *not* a
    `ContextAsset` supertype). Attached additively to `WorkloadMetadata` (`metadata.governance`)
@@ -322,7 +353,7 @@ the last two, adopt a standard or component instead of reinventing it.
    Designer. Timestamps are Control-Plane-assigned (never in a bundle). Reported, not yet
    enforced (Policy Manager owns enforcement). **Follow-on:** apply the same `Governed` trait
    to `Capability` / `SkillMeta` / memory / knowledge (cheap now the trait exists).
-4. **◕ MOSTLY DONE — Execution event model + Trace (ADOPT, P1).** `agent-core`
+5. **◕ MOSTLY DONE — Execution event model + Trace (ADOPT, P1).** `agent-core`
    `core.execution`: `ExecutionEvent` (OTel-friendly: typed + attributes map),
    `ExecutionEventType`, `ExecutionTrace`, and the `ExecutionEventPublisher` **port**
    (noOp default — keeps the NATS/Kafka/none choice open). The **engine now emits** a
@@ -335,11 +366,14 @@ the last two, adopt a standard or component instead of reinventing it.
    (per-agent service — needs a target-runtime selector, or surface traces through a
    central collector); (b) an OTel exporter implementation of the port; (c) finer events
    (guardrail verdicts, memory read/write, per-tool results).
-5. **Runtime supervisor + execution budgets (ADOPT, P1)** — timeout/loop/thrash/cost
+6. **Runtime supervisor + execution budgets (ADOPT, P1)** — timeout/loop/thrash/cost
    caps (partial today via `TokenBudgetManager`/cost tracking).
-6. **Agent lifecycle + evaluation gate (ADAPT, P1)** — DRAFT→…→ACTIVE; no publish
+7. **Agent lifecycle + evaluation gate (ADAPT, P1)** — DRAFT→…→ACTIVE; no publish
    without passing evaluation.
-7. **Phase 4:** agentgateway evaluation spike (§6). **Phase 5:** Operator + CRDs + GitOps.
+8. **Phase 4:** agentgateway evaluation spike (§6). **Phase 5:** Operator + CRDs + GitOps.
+9. **PACT Designer support** — bump Studio's `agent-core` dependency to `1.4.0-SNAPSHOT`
+   and add Cognition/Contract/Interfaces fields to the Studio Agent Designer form; a live
+   `/.well-known/pact.json` endpoint on the Runtime. Not started.
 
 Deferred/optional (keep the model open, don't build yet): Experience→Skill (P2),
 progressive disclosure + per-source context budget, sandbox provider abstraction,
@@ -406,9 +440,10 @@ an `EventPublisher` if events land — NATS-vs-Kafka stays open); a "modular mon
 - Runtime internals & invariants → [`../project-handoff.md`](../project-handoff.md)
 - Vision → [`ai-operating-system.md`](ai-operating-system.md)
 - Binding decisions (ADR-001..006) → [`runtime-decisions.md`](runtime-decisions.md)
+- **Session handoff (2026-08-30)** → [`SESSION_HANDOFF_2026-08-30.md`](SESSION_HANDOFF_2026-08-30.md)
 - **Session handoff (2026-08-29)** → [`SESSION_HANDOFF_2026-08-29.md`](SESSION_HANDOFF_2026-08-29.md)
 - **Session handoff (2026-08-28)** → [`SESSION_HANDOFF_2026-08-28.md`](SESSION_HANDOFF_2026-08-28.md)
 - Domain model → [`gargantua-domain-model.md`](gargantua-domain-model.md)
 - Manifest schema & enforcement → [`agent-manifest.md`](agent-manifest.md)
-- Skills & routing → [`skills-and-routing.md`](skills-and-routing.md)
+- Skills & routing → [`skills-and-routing.md`](../skills-and-routing.md)
 - OSS pattern evaluation & the roadmap rationale → [`13-open-source-patterns.md`](13-open-source-patterns.md)

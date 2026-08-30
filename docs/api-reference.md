@@ -199,6 +199,11 @@ curl http://localhost:8080/.well-known/agent.json
 ```
 
 **Response (200)**
+
+When the workload declares capabilities, `skills` below lists **capabilities**, not
+internal skills — see `spec.capabilities[]` in
+[the manifest reference](architecture/agent-manifest.md).
+
 ```json
 {
   "name": "AI Agent",
@@ -210,8 +215,8 @@ curl http://localhost:8080/.well-known/agent.json
   "defaultInputModes": ["text/plain"],
   "defaultOutputModes": ["text/plain"],
   "skills": [
-    // When the workload declares capabilities, this array lists CAPABILITIES,
-    // not internal skills. See the note below.{ "id": "weather-skill", "name": "weather-skill", "description": "..." }],
+    { "id": "weather-skill", "name": "weather-skill", "description": "..." }
+  ],
   "authSchemes": [{ "scheme": "none", "description": "No authentication required" }]
 }
 ```

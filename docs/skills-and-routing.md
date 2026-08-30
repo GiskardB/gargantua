@@ -47,7 +47,7 @@ Do NOT answer questions unrelated to weather. Politely redirect the user.
 | `metadata.max-tokens` | integer | No | Maximum token budget for the LLM response within this skill. Overrides the global `agent.llm.primary.max-tokens` for this skill only. **Tested** by `agent-example-skill-llm-overrides` (wired through to `ChatRequest.Builder.maxOutputTokens` since v1.2.17). |
 | `metadata.temperature` | float | No | LLM sampling temperature override for this skill. Overrides `agent.llm.primary.temperature` for this skill only. **Tested** by `agent-example-skill-llm-overrides` (wired through to `ChatRequest.Builder.temperature` since v1.2.17). |
 | `metadata.preferred-model` | string | No | Model alias (one of `primary` / `fallback` / a custom alias from `agent.llm.models.*`) to use when this skill is active. Resolved by `LlmRouter` and wins over routing rules. **Tested** by `agent-example-skill-llm-overrides`. |
-| `metadata.knowledge-base` | string | No | Name of a RAG vector store knowledge base (e.g. `hr-docs`). When set, `RagEnricher` auto-injects retrieved documents into the prompt. **Tested** by `agent-example-rag`. The embedded default (v1.2.18+) is `EmbeddingInMemoryVectorStore` with real cosine similarity over the in-process MiniLM model. For production swap in your own `VectorStorePort` — see [`extending.md` → RAG / Vector Store](extending.md#rag--vector-store). |
+| `metadata.knowledge-base` | string | No | Name of a RAG vector store knowledge base (e.g. `hr-docs`). When set, `RagEnricher` auto-injects retrieved documents into the prompt. **Tested** by `RagAutoConfigurationTest`/`RagEnricherTest` (`agent-engine`). The embedded default (v1.2.18+) is `EmbeddingInMemoryVectorStore` with real cosine similarity over the in-process MiniLM model. For production swap in your own `VectorStorePort` — see [`extending.md` → RAG / Vector Store](extending.md#rag--vector-store). |
 | `metadata.rag-max-results` | integer | No | Maximum number of RAG documents to retrieve. Default `5`. |
 | `metadata.rag-min-score` | float | No | Minimum similarity score for RAG results. Default `0.3`. |
 | `metadata.allowed-roles` | list of strings | No | Roles permitted to use this skill (e.g. `[financial-advisor, super-admin]`). If set, `RbacGuardrail` blocks users without a matching role. The `super-admin` role bypasses all restrictions. **Tested** by `agent-example-tool-rbac` (tool-level RBAC, same store). |
@@ -174,14 +174,13 @@ Input → Embedding (all-MiniLM-L6-v2-quantized, in-process, ~2-5ms)
       → Cosine similarity vs pre-computed skill embeddings
       → If score >= threshold (default 0.6): SEMANTIC routing
       → If score <  threshold: LLM routing fallback (~300ms)
-      → If forceSkill provided (header OR body field): FORCED routing (skip all matching)
+      → If X-Force-Skill header provided: FORCED routing (skip all matching)
 ```
 
 > "Forced routing" is triggered when the HTTP request carries an
-> `X-Force-Skill: <skill-name>` header, **or** when the JSON request
-> body includes a `"forceSkill": "<skill-name>"` field (the body field
-> wins if both are present). The header is parsed by
-> `ChatController` / `ChatStreamController` and turned into
+> `X-Force-Skill: <skill-name>` header — there is no equivalent request-body
+> field (see the note under "Force a Specific Skill" below). The header is
+> parsed by `ChatController` / `ChatStreamController` and turned into
 > `AgentRequest.forceSkill` before the orchestrator sees the request.
 
 - **Semantic routing** uses the [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) model running in-process via ONNX Runtime. Skill description embeddings are pre-computed at boot and cached. Typical latency is 2-5ms.

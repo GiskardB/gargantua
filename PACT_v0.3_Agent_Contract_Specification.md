@@ -1,9 +1,18 @@
 # PACT — Agent Contract Specification
 
-**Version:** 0.2 Draft  
+**Version:** 0.3 Draft
 **Status:** Design proposal
 
 > **PACT — the open contract for AI agents.**
+
+**Changes since v0.2:** tightened the Cognition self-declaration vs. Cognition
+Requirements distinction (§11, §13); added a taxonomy disclaimer to `contract.permissions`
+(§14), mirroring the one `capabilities` already had; gave each autonomy level a one-line
+operational meaning and an explicit stopping-authority cross-reference (§15); added a
+Versioning Policy (§34), previously deferred to "future work" with no concrete answer; and
+added a short, non-normative Reference Implementations note (§46). All from validating
+Core against a real implementation, per the v0.2 "Draft Status" call to do exactly that —
+not from speculation.
 
 ## 1. Executive Summary
 
@@ -220,7 +229,7 @@ PACT describes capabilities; MCP can describe tools.
 
 ---
 
-## 11. Cognition
+## 11. Cognition (Self-Declaration)
 
 Cognition is a first-class PACT concept.
 
@@ -242,6 +251,14 @@ cognition:
 Capabilities answer **what the agent does**.
 
 Cognition answers **what kind of AI capabilities it provides**.
+
+**This is a self-declaration**, not a requirement: `cognition.modalities` and
+`cognition.capabilities` describe what *this agent itself* offers, as measured or claimed
+by whoever authored the manifest. This is distinct from `cognition.requirements` (§13),
+which instead constrains what the agent's *hosting substrate* must provide — a
+requirement the agent places on its environment, not a fact about the agent. Confusing
+the two directions has caused real interoperability bugs in early drafts of this
+specification; keep them in separate blocks and never merge them.
 
 ---
 
@@ -272,6 +289,13 @@ Changing the concrete model should not automatically invalidate the agent's iden
 
 PACT uses `models`, not `llm`, because an agent may use LLMs, SLMs, VLMs, multimodal models, specialized models, ensembles, routers or future reasoning systems.
 
+`cognition.models` is a **semantic** declaration, meant for discovery and matching. It is
+deliberately separate from whatever *operational* model reference an implementation's own
+manifest or config uses to actually resolve a deployment (an alias, an endpoint, a
+routing table entry) — that operational reference usually needs environment-specific
+indirection PACT has no reason to standardize. A manifest may keep both, and they are not
+required to name the same string.
+
 ---
 
 ## 13. Cognition Requirements
@@ -297,6 +321,13 @@ cognition:
 
 This enables semantic agent selection without requiring a specific vendor or model.
 
+**This is a requirement, not a declaration** (contrast with §11): it says what the
+agent's hosting cognitive substrate must be able to do, not what the agent itself is
+known to do. A selection/matching system should read `cognition.capabilities` as "the
+agent claims this" and `cognition.requirements.capabilities.required` as "the runtime
+must supply this" — the two lists may overlap, but they answer different questions and
+must not be collapsed into one field.
+
 ---
 
 ## 14. Contract
@@ -318,6 +349,13 @@ An agent may have a `production-deployment` capability without having permission
 
 PACT should not become a complete enterprise governance specification.
 
+**`permissions` has no controlled vocabulary**, by the same reasoning as `capabilities`
+(§10): PACT does not define a universal permission taxonomy, and domain-specific registries
+may standardize one independently. Two implementations declaring `permissions` are not
+guaranteed to mean the same thing by the same string unless they also agree on an external
+taxonomy — this is a known, currently-open interoperability gap (see §47, open question 10),
+not an oversight.
+
 ---
 
 ## 15. Autonomy
@@ -325,11 +363,11 @@ PACT should not become a complete enterprise governance specification.
 PACT proposes a simple conceptual scale:
 
 ```text
-0  Passive
-1  Assistive
-2  Recommending
-3  Executing
-4  Autonomous
+0  Passive       — observes or reports only; takes no independent action
+1  Assistive     — supports a human who remains the actor
+2  Recommending  — proposes actions; a human must approve before they happen
+3  Executing     — carries out approved or narrowly scoped actions itself
+4  Autonomous    — acts and adapts on an ongoing basis without per-action approval
 ```
 
 Example:
@@ -341,6 +379,14 @@ contract:
 ```
 
 This is a semantic declaration, not a security control.
+
+**Levels 3 and 4 are exactly where a stopping-authority mechanism starts to matter**, and
+PACT deliberately declares none: "who can stop it" is Agent Manifest's concern (§16-17),
+not Core's. A manifest describing an `executing` or `autonomous` agent should be read
+alongside whatever governance layer it composes with — PACT's autonomy level is a hint
+for that layer to act on, not a substitute for it.
+
+The five-level scale itself is a proposal, not settled — see open question 4 (§47).
 
 ---
 
@@ -739,7 +785,44 @@ Profiles allow integration with the ecosystem without making Core complex.
 
 ---
 
-## 34. Registry Use
+## 34. Versioning Policy
+
+PACT was published from the start with a fixed `apiVersion: pact/v1` in every example,
+while the specification itself was still a "0.x Draft" — the same immaturity gap found
+and flagged in an early implementation's own manifest format. This section exists so PACT
+does not repeat that mistake once real manifests start citing `pact/v1`.
+
+**Schema versions are `pact/v<major>`.** Only the major number appears in `apiVersion`;
+there is no minor/patch in the wire format.
+
+**Within a major version (`pact/v1`), only additive, non-breaking changes are permitted:**
+
+- adding a new optional Core field;
+- adding a new value to an open vocabulary (`capabilities`, `cognition.capabilities`,
+  `cognition.modalities`, `contract.permissions`, interface `protocol`);
+- adding a new extension or profile;
+- clarifying prose that does not change validation behavior.
+
+**A new major version (`pact/v2`) is required for anything breaking:**
+
+- removing or renaming a Core field;
+- changing a Core field's type or meaning;
+- turning an optional field into a required one;
+- changing what a validator must reject that it previously accepted, or vice versa.
+
+**Implementations should not hard-fail on an unrecognized *optional* field** within a
+version they otherwise understand — this is what lets additive changes actually be
+additive in practice, not just on paper. Implementations **should** hard-fail on an
+unrecognized `apiVersion` major, exactly as they would refuse an unknown `kind`.
+
+**Deprecation:** a field may be marked deprecated in prose (with a suggested replacement)
+for at least one draft cycle before removal in the next major version. PACT v0.x drafts
+are exempt from this — nothing is stable enough yet to owe a deprecation window — but the
+policy takes effect no later than a `1.0` release.
+
+---
+
+## 35. Registry Use
 
 PACT does not define a registry.
 
@@ -758,7 +841,7 @@ PACT supplies the semantic data.
 
 ---
 
-## 35. Agent Selection
+## 36. Agent Selection
 
 PACT enables a conceptual selection pipeline:
 
@@ -785,7 +868,7 @@ PACT does not prescribe the matching algorithm.
 
 ---
 
-## 36. Examples
+## 37. Examples
 
 ### Coding Agent
 
@@ -898,7 +981,7 @@ interfaces:
 
 ---
 
-## 37. Interoperability Strategy
+## 38. Interoperability Strategy
 
 Before adding a concept to PACT Core:
 
@@ -911,7 +994,7 @@ This rule should prevent PACT from becoming another monolithic agent specificati
 
 ---
 
-## 38. Prior-Art Positioning
+## 39. Prior-Art Positioning
 
 | Standard | Primary focus |
 |---|---|
@@ -925,7 +1008,7 @@ The goal is complementarity, not replacement.
 
 ---
 
-## 39. What Makes PACT Different
+## 40. What Makes PACT Different
 
 PACT should differentiate through:
 
@@ -957,7 +1040,7 @@ HTML is one possible authoring implementation, not part of the protocol.
 
 ---
 
-## 40. Core vs Extension Decision Rule
+## 41. Core vs Extension Decision Rule
 
 Before adding a field to Core, ask:
 
@@ -971,7 +1054,7 @@ If the answer is not clearly positive, it should probably not be Core.
 
 ---
 
-## 41. Proposed Repository
+## 42. Proposed Repository
 
 ```text
 pact/
@@ -1007,7 +1090,7 @@ The HTML example is tooling/demo material, not part of Core.
 
 ---
 
-## 42. Development Order
+## 43. Development Order
 
 ```text
 1. Prior-art analysis
@@ -1035,7 +1118,7 @@ The project should not begin with an SDK or runtime.
 
 ---
 
-## 43. Success Criteria
+## 44. Success Criteria
 
 PACT should pass these tests:
 
@@ -1065,7 +1148,7 @@ A simple graphical form can generate a valid PACT manifest without requiring the
 
 ---
 
-## 44. Future Work
+## 45. Future Work
 
 Potential future work:
 
@@ -1087,26 +1170,59 @@ These should not be added to Core without evidence that they belong there.
 
 ---
 
-## 45. Open Questions
+## 46. Reference Implementations
+
+*Non-normative.* Listed here to ground the specification against real usage, per the
+development order in §43 (step 9, community review, benefits from at least one working
+implementation to react to) — not to endorse a vendor or bind Core to one stack's
+choices.
+
+- **Gargantua** (Runtime + Studio) carries `cognition`, `contract` and `interfaces` as
+  additive fields directly on its own agent manifest, which plays the role PACT calls
+  "Agent Manifest" in §17 — authority, operational boundaries and governance — and
+  projects a standalone PACT Core document from it on request. `contract.autonomy` is
+  modeled as a closed, typed enum internally (informing open question 4, §47), while the
+  manifest wire format stays the plain integer this document specifies — the two are
+  independent by design (§34). This was the exercise that produced the
+  §11/§13/§14/§15/§34 clarifications in this revision: every wording ambiguity fixed here
+  came from something that was genuinely unclear while implementing it, not from a
+  hypothetical review.
+
+Further implementations should be added here as they appear, with a one-line description
+of what they compose PACT with — the point of this section is evidence of portability
+(§44, Portability test), which requires more than one entry to actually mean anything.
+
+---
+
+## 47. Open Questions
 
 The following remain intentionally open during v0.x:
 
 1. Should `identity` be Core or optional?
 2. What is the smallest useful Cognition vocabulary?
 3. Should `model.family` have a controlled vocabulary?
-4. Should autonomy use the proposed five-level scale?
+4. Should autonomy use the proposed five-level scale? **Tentatively yes** — the reference
+   implementation (§46) committed to it as a closed, typed enum (not just descriptive
+   prose) and had no trouble expressing every example in §37 with it. Still only one data
+   point; reopen if a second implementation needs a level this scale doesn't have. The
+   wire format stays the plain integer `0`-`4` from §15 either way — the enum is a
+   Java-side implementation detail, not a manifest format change.
 5. How should capabilities reference external taxonomies?
 6. How should PACT map to A2A Agent Cards without duplication?
 7. How should PACT compose with Agent Manifest?
 8. What should the extension namespace mechanism be?
-9. Should `requirements` be Core Cognition or a profile?
-10. Which fields are genuinely required for interoperability?
+9. Should `requirements` be Core Cognition or a profile? (Kept in Core for now — an
+   early implementation needed it immediately for agent selection — but that is one data
+   point, not a resolution.)
+10. Which fields are genuinely required for interoperability? In particular,
+    `contract.permissions` has no agreed taxonomy across implementations (§14) — two
+    manifests can use the same string to mean different things today.
 
 The goal is to answer these through implementation and community feedback rather than speculation.
 
 ---
 
-## 46. Positioning
+## 48. Positioning
 
 Primary tagline:
 
@@ -1122,7 +1238,7 @@ A simpler explanation:
 
 ---
 
-## 47. Final Design Position
+## 49. Final Design Position
 
 PACT should remain deliberately modest.
 
@@ -1158,9 +1274,9 @@ HTML, visual editors, CLI tools and SDKs may make PACT easier to adopt, but they
 
 ---
 
-## 48. Draft Status
+## 50. Draft Status
 
-PACT v0.2 is a design proposal, not a finalized industry standard.
+PACT v0.3 is a design proposal, not a finalized industry standard.
 
 The next activity should be validation against existing specifications and real implementations, especially:
 

@@ -308,15 +308,19 @@ No manual database setup, schema migration, or collection creation is needed. Th
 
 ## Standalone library
 
-The memory layer is published as a separate Maven artifact (`ai.gargantua:agent-memory-sdk`) that you can use in any Spring Boot project without pulling in the full framework.
+The memory layer is published as a separate Maven artifact (`io.github.giskardb:agent-memory-sdk`) that you can use in any Spring Boot project without pulling in the full framework.
 
 ```xml
 <dependency>
-    <groupId>com.github.giskardb.gargantua</groupId>
+    <groupId>io.github.giskardb</groupId>
     <artifactId>agent-memory-sdk</artifactId>
-    <version>v1.2.2</version>
+    <version>1.2.20</version>
 </dependency>
 ```
+
+Snapshots/branch builds aren't on Central — use the JitPack coordinates instead
+(`com.github.giskardb.gargantua:agent-memory-sdk:v1.2.20`); see
+[`getting-started.md`](getting-started.md) for the two-channel explanation.
 
 The SDK auto-configures all three adapters and the `MemoryComposer` via `AgentMemoryAutoConfiguration`. Configuration binds to the `agentkit.memory.*` prefix:
 

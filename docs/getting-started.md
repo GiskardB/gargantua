@@ -382,8 +382,8 @@ SPRING_PROFILES_ACTIVE=embedded mvn spring-boot:run
 
 | Component         | Version              |
 |-------------------|----------------------|
-| Java              | 21 (Virtual Threads) |
-| Spring Boot       | 4.0.4                |
+| Java              | 25 (Virtual Threads) |
+| Spring Boot       | 4.1.0                |
 | Spring Framework  | 7.0.5                |
 | LangChain4j       | 1.12.1               |
 | MongoDB           | 8.0                  |

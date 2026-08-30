@@ -25,6 +25,14 @@ della piattaforma. Il Runtime possiede l'implementazione degli oggetti di
 esecuzione; il Control Plane, lo Studio, il Gateway e l'Operator possiedono i
 propri, ma tutti parlano *questo* vocabolario.
 
+> **Nota di freschezza.** Questo documento è uno "0.1 Draft" scritto quando
+> Control Plane/Studio/Compose erano repository non ancora avviati (badge ⚪).
+> Il *vocabolario* degli oggetti (§1-17) resta accurato ed è stato riverificato;
+> le sezioni §18-20 sul "cosa esiste in quale repo" sono invece datate — oggi
+> Studio, Control Plane e Compose esistono e sono in stato MVP. Per lo stato
+> corrente cross-repo, la fonte di verità è
+> [`platform-handoff.md`](platform-handoff.md), non le sezioni finali qui sotto.
+
 ---
 
 ## 1. Mappa degli oggetti
@@ -116,6 +124,10 @@ AgentSpec
   defaultSkill  : String                // skill di ingresso
   guardrails    : Map<String,Object>    // configurazione guardrail
   allowedRoles  : Set<String>           // RBAC a livello di workload
+  loadout       : Loadout               // knowledge/memoryScopes/skills/resources equipaggiati
+  cognition     : Cognition             // PACT Core — vedi §3.1
+  contract      : Contract              // PACT Core — vedi §3.1
+  interfaces    : List<InterfaceEndpoint> // PACT Core — vedi §3.1
 ```
 
 **Invarianti** (imposti dal costruttore): niente nomi di capability duplicati,
@@ -123,10 +135,31 @@ niente nomi di server MCP duplicati. `memoryLayers` vuoto significa "usa tutti i
 layer" (`usesAllMemoryLayers()`), non "nessuno".
 
 **Nota di enforcement onesta:** non tutto è ancora applicato a runtime.
-`allowedRoles` e `memoryLayers` a livello di workload sono *parsati* ma non
-ancora *enforced* — vedi `ManifestProperties.unappliedFields()` e il
+`allowedRoles`, `memoryLayers` e `loadout` a livello di workload sono *parsati*
+ma non ancora *enforced* — vedi `ManifestProperties.unappliedFields()` e il
 project-handoff §4/§6. Il domain model li definisce; l'enforcement completo è
 lavoro ancora aperto nel Runtime.
+
+### 3.1 Cognition / Contract / Interfaces — 🟢 Implementato (pacchetto `ai.gargantua.core.pact`)
+
+Tre campi aggiuntivi, additivi e opzionali, che implementano i pilastri
+Cognition/Contract/Interfaces di [PACT](../../PACT_v0.3_Agent_Contract_Specification.md)
+(la spec di descrizione agente che questo progetto sta scrivendo — vedi il file
+alla radice del repo). A differenza di `allowedRoles`/`memoryLayers`/`loadout`
+sopra, questi **non sono un gap da chiudere**: PACT stesso dice che una
+dichiarazione non è una prova di capacità (PACT §31) — il runtime li parsa e li
+riporta, senza enforcement previsto.
+
+```
+Cognition        : modalities, capabilities, models, requirements
+Contract         : autonomy (enum Autonomy: PASSIVE..AUTONOMOUS), permissions
+InterfaceEndpoint: protocol, endpoint, version
+```
+
+Gli altri due pilastri PACT (Identity, Purpose) non hanno un campo dedicato:
+`PactManifest.from(WorkloadManifest)` li deriva da `metadata.owner` e
+`metadata.description`, che rispondono già a domande equivalenti — vedi
+`docs/architecture/agent-manifest.md` per la tabella di mappatura completa.
 
 ---
 
@@ -460,12 +493,12 @@ questo modello ma appartiene a repository non ancora avviati.
 
 ---
 
-## 20. Prossimo passo
+## 20. Prossimo passo (storico — vedi la nota di freschezza in cima al documento)
 
-Con il vocabolario fissato, il primo repository da avviare è
-[`gargantua-studio`](../../../gargantua-studio) (Phase 3 nel senso della
-roadmap, ma è il punto di ingresso naturale del ciclo di vita: senza authoring
-non c'è bundle da registrare). Lo Studio produce esattamente gli oggetti 🟢 di
-questo modello (`AgentSpec`, `Capability`, `McpServerSpec`, skill) e ne è quindi
-il primo consumatore. Il formato che deve rispettare è già congelato in
-[`agent-manifest.md`](agent-manifest.md).
+*Questa sezione descrive cosa era pianificato quando il documento è stato
+scritto (0.1 Draft). [`gargantua-studio`](../../../gargantua-studio) è stato
+da allora avviato ed è oggi in stato MVP: produce esattamente gli oggetti 🟢 di
+questo modello (`AgentSpec`, `Capability`, `McpServerSpec`, skill), rispettando
+il formato congelato in [`agent-manifest.md`](agent-manifest.md). Per il
+prossimo passo reale della piattaforma, vedi la roadmap in
+[`platform-handoff.md`](platform-handoff.md) §7.*

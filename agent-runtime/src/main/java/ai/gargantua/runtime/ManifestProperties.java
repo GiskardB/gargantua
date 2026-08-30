@@ -90,6 +90,26 @@ public final class ManifestProperties {
                     + ") but loadout provisioning is not implemented yet; knowledge bases are "
                     + "currently attached per skill via SKILL.md metadata.knowledge-base");
         }
+        // spec.cognition/contract/interfaces are PACT Core fields (gargantua.ai/v1 composed
+        // with PACT — see PACT_v0.2_Agent_Contract_Specification.md). Unlike the fields above,
+        // these are not enforcement gaps: PACT §31 "Declaration vs Verification" says a PACT
+        // manifest declares, it does not prove — so parsing and reporting them without runtime
+        // enforcement is the correct behaviour, not a missing feature.
+        if (!spec.cognition().isEmpty()) {
+            warnings.add("spec.cognition is declared but is informational only by design "
+                    + "(PACT Core: a declaration, not proof of capability); no runtime "
+                    + "enforcement is implied or planned");
+        }
+        if (!spec.contract().isEmpty()) {
+            warnings.add("spec.contract is declared but is informational only by design "
+                    + "(PACT Core: not a security control); use spec.allowedRoles/spec.guardrails "
+                    + "for anything that must actually be enforced");
+        }
+        if (!spec.interfaces().isEmpty()) {
+            warnings.add("spec.interfaces is declared but not cross-checked against what the "
+                    + "runtime actually serves (e.g. the built-in A2A endpoint at "
+                    + "/.well-known/agent.json)");
+        }
         return List.copyOf(warnings);
     }
 
