@@ -173,29 +173,54 @@ section as **"Optional companions"** with that direction made explicit, and soft
 intro paragraph to match. **This framing is the one to keep** — don't re-introduce
 "kernel of a platform" language in future edits.
 
+### 9. Studio: PACT Core in the Agent Designer
+
+Closed the day's last open item: Studio's `agent-core`/`agent-bundle` dependency bumped
+to `1.4.0-SNAPSHOT`, and the Agent Designer gained three new form sections (Cognition,
+Contract, Interfaces) placed after Guardrails, using the exact same "stringly" draft
+convention as the rest of the form (comma-separated text for open vocabularies).
+
+- **Backend**: `AgentDraftRequest` gained `Cognition`/`Contract`/`InterfaceEndpoint`
+  nested records; `ManifestBuilder` wires them through `toManifest()`/`toDraft()`/
+  `toYaml()`/`precheck()`, mirroring the existing Loadout/Governance treatment exactly.
+- **Frontend**: matching TypeScript types (`draft.ts`, `manifest.ts`), offline preview
+  support in `buildManifest.ts`, and `validateDraft()` rules mirroring the backend's
+  (autonomy level 0-4, required interface protocol/endpoint).
+- The new sections reuse the existing `Section`/`Field`/`grid` components verbatim, so
+  they inherited this session's earlier mobile CSS fixes for free — no new CSS needed,
+  confirmed via Playwright at 1440px and 390px, zero overflow, zero console errors.
+- **Verified live, not just unit-tested**: built a real manifest through the deployed
+  Studio backend with all three PACT sections populated (`curl` against
+  `/api/studio/manifest/build`) and got back valid YAML matching the
+  `agent-manifest.md` reference shape exactly.
+- Backend suite run for real (not skipped) inside the Docker build: green. Frontend:
+  12/12 (4 new). `gargantua-studio` commit `8ff658f`.
+
+**Still not done**: a live `/.well-known/pact.json` HTTP endpoint on the Runtime —
+`PactManifest.from(...)` remains reachable only from Java code, nothing serves it over
+the wire yet. This is the one PACT item left across both repos.
+
 ---
 
 ## Current verified state
 
 | Repo | Branch | HEAD after this session | Tests |
 |---|---|---|---|
-| `gargantua` | main | *(pending commit)* | 869 (was 842), all green on `1.4.0-SNAPSHOT` |
+| `gargantua` | main | `edae152` | 869 (was 842), all green on `1.4.0-SNAPSHOT` |
 | `gargantua-control-plane` | main | unchanged | 28 |
-| `gargantua-studio` | main | unchanged | 65 backend / 8 frontend |
+| `gargantua-studio` | main | `8ff658f` | 68 backend (was 65) / 12 frontend (was 8) |
 | `gargantua-compose` | main | unchanged | — |
 
-Nothing from this session is committed yet in `gargantua` — a large diff (17 files
-modified + a new `core.pact` package + this doc), pending the user's go-ahead.
+Both `gargantua` and `gargantua-studio` are committed as of this doc. Neither has been
+pushed to `origin` yet.
 
 ---
 
 ## What's still open / needs review
 
 ### High priority
-1. **Studio/Designer has zero PACT support.** Still depends on `agent-core
-   1.3.0-SNAPSHOT`; the Agent Designer form has no fields for cognition/contract/
-   interfaces. Needs: bump the dependency, add form fields, wire into
-   `ManifestBuilder`.
+1. ✅ ~~Studio/Designer has zero PACT support~~ — done, see §9 above. What remains is
+   entirely the live-endpoint gap (#2 below), not Designer support.
 2. **No live PACT artifact.** `PactManifest.from(...)` is a Java object only — no
    `/.well-known/pact.json` endpoint, no YAML/JSON serializer. Following the existing
    `AgentCardService`/`ManifestProperties` pattern (project onto `agent.*` Spring

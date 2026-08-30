@@ -15,13 +15,14 @@ fix this doc. For changes made in the 2026-08-30 session, see
 [`SESSION_HANDOFF_2026-08-29.md`](SESSION_HANDOFF_2026-08-29.md),
 [`SESSION_HANDOFF_2026-08-28.md`](SESSION_HANDOFF_2026-08-28.md) before it).
 
-**Recent progress (most recent first):** **PACT Core** — the Runtime's manifest
-(`gargantua.ai/v1`) now covers all seven pillars of [PACT](../../PACT_v0.3_Agent_Contract_Specification.md),
-a small agent-description spec drafted in this repo for eventual submission to AAIF;
-`spec.cognition`/`spec.contract`/`spec.interfaces` are new, `Identity`/`Purpose` are
-derived from existing metadata fields, and `PactManifest.from(...)` projects a standalone
-PACT document — Studio/Designer support and a live endpoint are not started yet →
-**Multi-Control-Plane Settings** — Studio can
+**Recent progress (most recent first):** **PACT Core, end to end** — the Runtime's
+manifest (`gargantua.ai/v1`) covers all seven pillars of
+[PACT](../../PACT_v0.3_Agent_Contract_Specification.md), a small agent-description spec
+drafted in this repo for eventual submission to AAIF, *and* the Studio Agent Designer can
+now author `spec.cognition`/`spec.contract`/`spec.interfaces` through real form sections
+(`Identity`/`Purpose` are derived from existing metadata fields, no dedicated field) —
+only a live `/.well-known/pact.json` endpoint remains unbuilt → **Multi-Control-Plane
+Settings** — Studio can
 now register several named Control Planes and connect/disconnect/switch between them at
 runtime (no restart), and the CP-optional workflow (create/save locally with the Control
 Plane off; only publish/reads fail, cleanly) has been verified live, not just assumed →
@@ -371,9 +372,13 @@ the last two, adopt a standard or component instead of reinventing it.
 7. **Agent lifecycle + evaluation gate (ADAPT, P1)** — DRAFT→…→ACTIVE; no publish
    without passing evaluation.
 8. **Phase 4:** agentgateway evaluation spike (§6). **Phase 5:** Operator + CRDs + GitOps.
-9. **PACT Designer support** — bump Studio's `agent-core` dependency to `1.4.0-SNAPSHOT`
-   and add Cognition/Contract/Interfaces fields to the Studio Agent Designer form; a live
-   `/.well-known/pact.json` endpoint on the Runtime. Not started.
+9. ✅ **PACT Designer support** — done, 2026-08-30. Studio's `agent-core`/`agent-bundle`
+   bumped to `1.4.0-SNAPSHOT`; the Agent Designer has new Cognition/Contract/Interfaces
+   sections (`AgentDraftRequest`/`ManifestBuilder` wire them through build/validate/
+   toDraft, matching the Loadout/Governance pattern). Verified live: built a real
+   manifest through the deployed backend with all three sections populated. **Still not
+   done:** a live `/.well-known/pact.json` endpoint on the Runtime — `PactManifest.from`
+   remains a Java-only projection, nothing serves it over HTTP yet.
 
 Deferred/optional (keep the model open, don't build yet): Experience→Skill (P2),
 progressive disclosure + per-source context budget, sandbox provider abstraction,
