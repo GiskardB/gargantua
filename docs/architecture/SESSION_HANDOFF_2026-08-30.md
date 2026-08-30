@@ -196,9 +196,41 @@ convention as the rest of the form (comma-separated text for open vocabularies).
 - Backend suite run for real (not skipped) inside the Docker build: green. Frontend:
   12/12 (4 new). `gargantua-studio` commit `8ff658f`.
 
-**Still not done**: a live `/.well-known/pact.json` HTTP endpoint on the Runtime —
-`PactManifest.from(...)` remains reachable only from Java code, nothing serves it over
-the wire yet. This is the one PACT item left across both repos.
+### 10. The live `/.well-known/pact.json` endpoint (the last open item, now closed)
+
+User said "procedi pure" (go ahead) after the push, so this continued straight into the
+one remaining gap: no HTTP endpoint served a PACT document.
+
+- **`PactManifest.toWireMap()`** (agent-core) — deliberately *not* left to a generic
+  object mapper. Returning `PactManifest` straight to Jackson would serialize `Autonomy`
+  as its enum name (`"RECOMMENDING"`) instead of PACT's actual wire format
+  (`{"level": 2}`), and would leave `CognitionRequirements` flattened Java-side instead of
+  nested under `modalities.required`/`capabilities.required`/`contextWindow.minimum`.
+  `toWireMap()` builds the correct `LinkedHashMap`/`ArrayList` tree by hand — no Jackson
+  dependency, matching agent-core's existing "no Spring, no Jackson annotations" rule, and
+  mirroring the same manual-tree pattern Studio's `ManifestBuilder.toYaml()` already uses.
+- **`PactController`** (new, `agent-runtime`, package `ai.gargantua.runtime`) — serves
+  `GET /.well-known/pact.json`. Lives in agent-runtime rather than agent-engine (where
+  the sibling `/.well-known/agent.json` lives) because **agent-engine does not depend on
+  agent-bundle** — `LoadedBundle` (which the controller needs for the full
+  `WorkloadManifest`, not just properties) simply isn't importable there. This is also
+  why the endpoint is inherently Runtime-mode-only: Library-mode apps have no
+  `gargantua.ai/v1` manifest to project from at all.
+- Confirmed `LoadedBundle` is already retained as a Spring singleton bean
+  (`registerSingleton("loadedBundle", bundle)` in `GargantuaRuntime.installBundle`) and
+  already consumed the same way by `RuntimeConfiguration.capabilityRegistry(LoadedBundle)`
+  — the controller is a two-line consumer of an existing pattern, not a new one.
+- **Verified live, for real**: rebuilt `gargantua-runtime:local` from source, booted a
+  container against a hand-authored bundle with all three PACT fields populated
+  (`SPRING_PROFILES_ACTIVE=embedded`, no Mongo/Redis/Ollama needed), connected it to the
+  `cave` Docker network to reach it from the shell, and curled the endpoint. Response
+  matched exactly: `contract.autonomy.level: 2` (an integer, not `"RECOMMENDING"`),
+  `cognition.models.primary` correctly nested, `Cache-Control: max-age=60`, and
+  `/.well-known/agent.json` still answering correctly on the same container (no
+  regression). Full reactor: **874 tests** (was 869), all green, verified via
+  `mvn test` inside a real Docker build, not skipped.
+
+**Nothing PACT-related is open in either repo anymore.**
 
 ---
 
@@ -206,30 +238,28 @@ the wire yet. This is the one PACT item left across both repos.
 
 | Repo | Branch | HEAD after this session | Tests |
 |---|---|---|---|
-| `gargantua` | main | `edae152` | 869 (was 842), all green on `1.4.0-SNAPSHOT` |
+| `gargantua` | main | `4e0d5d8` + this endpoint work (pending commit) | 874 (was 842), all green on `1.4.0-SNAPSHOT` |
 | `gargantua-control-plane` | main | unchanged | 28 |
 | `gargantua-studio` | main | `8ff658f` | 68 backend (was 65) / 12 frontend (was 8) |
 | `gargantua-compose` | main | unchanged | — |
 
-Both `gargantua` and `gargantua-studio` are committed as of this doc. Neither has been
-pushed to `origin` yet.
+`gargantua` (`edae152`, `4e0d5d8`) and `gargantua-studio` (`8ff658f`) were pushed to
+`origin` mid-session. The live-endpoint work (§10) is committed locally as of this doc
+revision; push pending.
 
 ---
 
 ## What's still open / needs review
 
 ### High priority
-1. ✅ ~~Studio/Designer has zero PACT support~~ — done, see §9 above. What remains is
-   entirely the live-endpoint gap (#2 below), not Designer support.
-2. **No live PACT artifact.** `PactManifest.from(...)` is a Java object only — no
-   `/.well-known/pact.json` endpoint, no YAML/JSON serializer. Following the existing
-   `AgentCardService`/`ManifestProperties` pattern (project onto `agent.*` Spring
-   properties, serve via a controller) is the natural next step, deferred because it
-   touches `agent-engine` Spring wiring, out of scope for "the minimum in gargantua."
+1. ✅ ~~Studio/Designer has zero PACT support~~ — done, see §9.
+2. ✅ ~~No live PACT artifact~~ — done, see §10. `PactController` serves
+   `GET /.well-known/pact.json`, verified against a real running container.
 3. **PACT itself has no JSON Schema or reference validator yet** (`pact validate` is
    aspirational syntax in the spec, matching Gargantua's own `gargantua validate` CLI in
    spirit, not yet in existence for PACT). This is a PACT-ecosystem gap, not
-   Gargantua-specific.
+   Gargantua-specific — the only PACT-shaped work left, and it isn't Gargantua's to do
+   alone (it's about the spec, not this implementation of it).
 
 ### Medium priority (carried over from 2026-08-29, still true)
 4. Undeploy is bookkeeping-only (Studio); stale deployment records on same-agent relaunch;
@@ -241,6 +271,11 @@ pushed to `origin` yet.
 6. `contract.permissions` has no agreed cross-implementation taxonomy (documented as an
    open question in PACT §47 item 10, not a bug — just worth remembering next time two
    systems need to agree on a permission string).
+7. `spec.interfaces` is still not cross-checked against what the runtime actually serves
+   (a manifest could declare an `a2a` interface pointing anywhere; nothing verifies it
+   matches this agent's real `/.well-known/agent.json`). Noted in `ManifestProperties`'s
+   own warning text; not fixed, since fixing it means deciding what "verify" would even
+   mean for a URL that might point at a different host entirely.
 
 ---
 
@@ -262,3 +297,14 @@ pushed to `origin` yet.
 5. **`gargantua-domain-model.md`'s historical sections are pointed at `platform-handoff.md`
    rather than re-audited line-by-line** — proportionate scope for a vocabulary-reference
    doc whose actual contract (the object shapes) was fully re-verified.
+6. **PACT's own wire shape is never left to a generic object mapper.** `PactManifest`
+   holds Java-ergonomic domain types (an `Autonomy` enum, flattened `CognitionRequirements`
+   fields); `toWireMap()` is a separate, explicit step that reshapes them into what the
+   spec actually says. This follows the codebase's existing rule that agent-core stays
+   Jackson-annotation-free and a dedicated mapper owns wire format — never assume a
+   record's natural Java shape matches its serialized form.
+7. **New Runtime-only HTTP surface goes in `agent-runtime`, not `agent-engine`,** whenever
+   it needs the full `WorkloadManifest`/`LoadedBundle` rather than a Spring-property
+   projection — agent-engine has no dependency on agent-bundle by design (Library mode
+   has no manifest at all), so anything needing the raw parsed manifest can only live
+   where that dependency already exists.

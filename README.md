@@ -551,12 +551,11 @@ under, how it can be *reached* — is being factored out into
 drafted in this repo with the eventual goal of proposing it to AAIF.
 
 PACT is a **draft, not a released standard** — version 0.3, unpublished elsewhere. This
-repo is its first reference implementation: `spec.cognition`, `spec.contract` and
-`spec.interfaces` are real, tested manifest fields today (`core.pact` in `agent-core`),
-and `PactManifest.from(...)` projects a standalone PACT document from any manifest — all
-of it usable with just this repo, no companion project involved. What's *not* there yet:
-a UI for these fields in Studio (optional, see above), and a live endpoint serving a PACT
-document over HTTP. Read the spec itself for the full rationale, or
+repo is its first reference implementation, usable with just this repo, no companion
+project involved: `spec.cognition`, `spec.contract` and `spec.interfaces` are real,
+tested manifest fields (`core.pact` in `agent-core`); every running agent serves its own
+PACT document live at `GET /.well-known/pact.json`, the standalone counterpart to the A2A
+Agent Card at `/.well-known/agent.json`. Read the spec itself for the full rationale, or
 [`docs/architecture/agent-manifest.md`](docs/architecture/agent-manifest.md) for exactly
 how Gargantua's manifest maps onto it, field by field.
 

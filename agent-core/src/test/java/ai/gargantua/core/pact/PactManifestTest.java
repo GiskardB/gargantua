@@ -8,6 +8,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -87,5 +88,75 @@ class PactManifestTest {
 
         assertNull(pact.identity());
         assertNull(pact.purpose());
+    }
+
+    @Test
+    @DisplayName("toWireMap emits autonomy as {level: N}, not the enum name")
+    void toWireMapEmitsAutonomyAsWireFormatLevel() {
+        AgentSpec spec = new AgentSpec(
+                null, List.of(), null, null, null, null, null, null, null,
+                Cognition.none(),
+                new Contract(Autonomy.EXECUTING, Set.of("deploy_production")),
+                List.of());
+        WorkloadManifest manifest = WorkloadManifest.agent(new WorkloadMetadata("a", "1.0.0"), spec);
+
+        Map<String, Object> wire = PactManifest.from(manifest).toWireMap();
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> contract = (Map<String, Object>) wire.get("contract");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> autonomy = (Map<String, Object>) contract.get("autonomy");
+        assertEquals(3, autonomy.get("level"));
+        assertEquals(List.of("deploy_production"), contract.get("permissions"));
+    }
+
+    @Test
+    @DisplayName("toWireMap nests cognition.requirements under modalities.required/capabilities.required/contextWindow.minimum")
+    void toWireMapNestsCognitionRequirementsCorrectly() {
+        AgentSpec spec = new AgentSpec(
+                null, List.of(), null, null, null, null, null, null, null,
+                new Cognition(Set.of("text"), Set.of("reasoning"),
+                        new CognitionModels(new ModelDescriptor("anthropic", "claude", null), null),
+                        new CognitionRequirements(Set.of("text"), Set.of("reasoning"), 64000)),
+                Contract.none(),
+                List.of());
+        WorkloadManifest manifest = WorkloadManifest.agent(new WorkloadMetadata("a", "1.0.0"), spec);
+
+        Map<String, Object> wire = PactManifest.from(manifest).toWireMap();
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> cognition = (Map<String, Object>) wire.get("cognition");
+        assertEquals(List.of("text"), cognition.get("modalities"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> models = (Map<String, Object>) cognition.get("models");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> primary = (Map<String, Object>) models.get("primary");
+        assertEquals("anthropic", primary.get("provider"));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> requirements = (Map<String, Object>) cognition.get("requirements");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> requiredModalities = (Map<String, Object>) requirements.get("modalities");
+        assertEquals(List.of("text"), requiredModalities.get("required"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> contextWindow = (Map<String, Object>) requirements.get("contextWindow");
+        assertEquals(64000, contextWindow.get("minimum"));
+    }
+
+    @Test
+    @DisplayName("toWireMap omits cognition/contract/identity/purpose/interfaces entirely when undeclared")
+    void toWireMapOmitsUndeclaredSections() {
+        WorkloadManifest manifest = WorkloadManifest.agent(
+                new WorkloadMetadata("minimal-agent", "1.0.0"), AgentSpec.minimal());
+
+        Map<String, Object> wire = PactManifest.from(manifest).toWireMap();
+
+        assertFalse(wire.containsKey("cognition"));
+        assertFalse(wire.containsKey("contract"));
+        assertFalse(wire.containsKey("interfaces"));
+        assertFalse(wire.containsKey("identity"));
+        assertFalse(wire.containsKey("purpose"));
+        assertFalse(wire.containsKey("capabilities"));
+        assertEquals(PactManifest.CURRENT_API_VERSION, wire.get("apiVersion"));
     }
 }
