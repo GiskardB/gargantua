@@ -9,29 +9,46 @@ and what comes next. It complements — does not replace — two narrower docs:
 - [`ai-operating-system.md`](ai-operating-system.md) — the **vision** (the north
   star, not a sprint plan).
 
-**Last updated:** 2026-08-30. If a fact here disagrees with the code, the code wins —
-fix this doc. For changes made in the 2026-08-30 session, see
-[`SESSION_HANDOFF_2026-08-30.md`](SESSION_HANDOFF_2026-08-30.md) (and
+**Last updated:** 2026-09-04. If a fact here disagrees with the code, the code wins —
+fix this doc. For changes made in the 2026-09-04 session, see
+[`SESSION_HANDOFF_2026-09-04.md`](SESSION_HANDOFF_2026-09-04.md) (and
+[`SESSION_HANDOFF_2026-08-31.md`](SESSION_HANDOFF_2026-08-31.md),
+[`SESSION_HANDOFF_2026-08-30.md`](SESSION_HANDOFF_2026-08-30.md),
 [`SESSION_HANDOFF_2026-08-29.md`](SESSION_HANDOFF_2026-08-29.md),
 [`SESSION_HANDOFF_2026-08-28.md`](SESSION_HANDOFF_2026-08-28.md) before it).
 
-**Recent progress (most recent first):** **PACT Core, fully closed** — the Runtime's
-manifest (`gargantua.ai/v1`) covers all seven pillars of
+**Recent progress (most recent first):** **Agent Designer UX overhaul + memory-layers
+moved to agent-level** — a live walkthrough of the Studio Agent Designer found real
+confusion (duplicated fields, controls that did nothing, PACT declarations nobody
+wanted to fill in) and, separately, that memory-layer selection is more useful as an
+agent-wide decision than a per-skill one. Studio's form now only asks for what the
+Runtime actually applies, plus a couple of harmless-to-declare exceptions (§7); **PACT
+authoring was removed from the Studio form** — Cognition and Contract are gone
+(`spec.cognition`/`spec.contract` remain fully supported by the manifest schema and
+`PactManifest`/`GET /.well-known/pact.json`, just not authored via this form anymore),
+Interfaces stayed but as a fixed checkbox pair (A2A, MCP) instead of free text; and
+**`spec.memoryLayers` went from reported-only to actually applied**, agent-wide,
+superseding the old per-skill `SKILL.md` mechanism (`ManifestProperties` →
+`AgentProperties.Memory#getEnabledLayers()` → `MemoryComposer`, verified live). Two
+unrelated bugs found and fixed along the way: an MCP server with `authType: none` on a
+remote transport warned nowhere in Studio, and deleting a Registry bundle left a
+dangling Catalog entry forever. See the "2026-09-04" entry in §7 below for the full
+writeup → **PACT Core, fully
+closed** — the Runtime's manifest (`gargantua.ai/v1`) covers all seven pillars of
 [PACT](../../PACT_v0.3_Agent_Contract_Specification.md), a small agent-description spec
-drafted in this repo for eventual submission to AAIF; the Studio Agent Designer authors
-`spec.cognition`/`spec.contract`/`spec.interfaces` through real form sections
-(`Identity`/`Purpose` are derived from existing metadata fields, no dedicated field);
-and every running agent now serves its own PACT document live at
-`GET /.well-known/pact.json` (`PactController` in `agent-runtime`, verified against a
-real running container) — the standalone counterpart to the A2A Agent Card. Nothing
-PACT-related is left open in either repo → **Multi-Control-Plane Settings** — Studio can
-now register several named Control Planes and connect/disconnect/switch between them at
-runtime (no restart), and the CP-optional workflow (create/save locally with the Control
-Plane off; only publish/reads fail, cleanly) has been verified live, not just assumed →
-**Real concurrent multi-agent hosting** — the Studio Launch button gives every agent its
-own container + host port instead of one shared slot that got replaced on every launch,
-and the Control Plane's Deployment subsystem tracks each one's port (§3.1, §8) → a chain
-of Playground bugs fixed (insecure-context crash, hardcoded-localhost runtime URL, CORS
+drafted in this repo for eventual submission to AAIF, and every running agent serves its
+own PACT document live at `GET /.well-known/pact.json` (`PactController` in
+`agent-runtime`, verified against a real running container) — the standalone
+counterpart to the A2A Agent Card. Authoring cognition/contract through the Studio form
+was later removed (above), but nothing about the manifest schema or the live endpoint
+changed → **Multi-Control-Plane Settings** — Studio can now register several named
+Control Planes and connect/disconnect/switch between them at runtime (no restart), and
+the CP-optional workflow (create/save locally with the Control Plane off; only
+publish/reads fail, cleanly) has been verified live, not just assumed → **Real
+concurrent multi-agent hosting** — the Studio Launch button gives every agent its own
+container + host port instead of one shared slot that got replaced on every launch, and
+the Control Plane's Deployment subsystem tracks each one's port (§3.1, §8) → a chain of
+Playground bugs fixed (insecure-context crash, hardcoded-localhost runtime URL, CORS
 pinned to one origin) → Agent Graph rewritten as a connected radial layout →
 Postgres-only bundle storage (MinIO/S3 removed) → Studio merged into one repo/image
 (SPA + BFF). See §7 for the roadmap and what's next.
@@ -397,8 +414,85 @@ an `EventPublisher` if events land — NATS-vs-Kafka stays open); a "modular mon
 (contradicts the distributed multi-repo architecture — decision stands); generating all
 13 arch docs up front.
 
+### 2026-08-31: Compose bring-up + version drift fix + Designer Model/Cognition sync
+
+A full `docker compose up -d --build --wait` from `gargantua-compose/` revealed two issues:
+
+1. **Control Plane version drift** — `gargantua-control-plane/pom.xml` still referenced `agent-core:1.3.0-SNAPSHOT` while `gargantua` was already on `1.4.0-SNAPSHOT` (post-PACT Core bump, 2026-08-30). Existing images worked (built at `1.3.0`); fresh rebuild failed. **Fixed:** `pom.xml:38` → `1.4.0-SNAPSHOT`. Rebuild now passes.
+
+2. **Agent Designer Model ↔ Cognition overlap** — users had to type the same model twice (operational `model.primary/fallback` + semantic `cognition.models.primaryModel/fallbackModel`). **Fixed in Studio Designer** (see `SESSION_HANDOFF_2026-08-31.md`):
+   - Heuristic parser derives `provider`/`family` from the model string (`"gpt-4o"` → `openai`/`gpt`, `"claude-sonnet-4"` → `anthropic`/`claude`, etc.).
+   - Typing in the **Model** section now auto-fills the **Cognition** section instantly.
+   - Explicit hints in both sections explain the relationship.
+   - Users can still override manually if the heuristic is wrong.
+
+Both fixes committed (`gargantua-control-plane@074ca4b`, `gargantua-studio@938cd79`).
+
+### 2026-09-04: Agent Designer UX overhaul + memory-layers moved to agent-level
+
+A user walkthrough of the Agent Designer surfaced real confusion — not just unclear
+copy, several fields either duplicated each other, didn't do anything, or belonged
+somewhere else entirely. Full session: iterative review → restructure → simplify,
+each round verified live against the running compose stack (build → publish →
+Registry → Catalog → downloadable bundle), landing on:
+
+1. **Two real Studio bugs found and fixed, unrelated to layout:**
+   - `validateDraft()` never warned when an MCP server's `authType` was `none` on a
+     remote (`http`/`sse`) transport — a network-facing tool with zero authentication
+     passed silently at every layer. Verified live by publishing exactly such an
+     agent before the fix. Now warns (not blocks — matches the severity of the
+     existing "auth type needs a value" check).
+   - `RegistryService.delete()` removed a bundle from the Registry but the Catalog
+     had no matching deindex — deleted bundles kept appearing as capability
+     providers indefinitely (`Catalog.deindexProvider`, wired in both
+     `InMemoryCatalog` and `JdbcCatalog`; `gargantua-control-plane`).
+2. **PACT dropped from the Agent Designer form entirely** (not from the platform —
+   `PactManifest`/`GET /.well-known/pact.json`/the manifest schema are untouched).
+   Cognition and Contract were "declarative by design, never enforced" (PACT §31);
+   after live walkthrough they read as confusing duplication rather than useful
+   declaration, so Studio stopped asking for them. Interfaces stayed (useful on its
+   own merits) but as a checkbox pair against the two protocols gargantua actually
+   serves as an interface (A2A, MCP-server-mode) instead of free-text protocol/URL —
+   `PACT_v0.3` calls the protocol an open vocabulary, so it's a `<datalist>`-suggested
+   checkbox set, not a hard enum.
+3. **Removed every Designer field `ManifestProperties.unappliedFields()` confirms the
+   Runtime ignores at workload level** (Loadout as a whole, `allowedRoles`,
+   `runtime.minVersion`) — a control that visibly does nothing is worse than none.
+   Kept two unapplied-but-still-worth-declaring exceptions on request: Interfaces,
+   and (initially) Resources — Resources was cut again on a later pass as genuinely
+   not worth it. `Capability.inputSchema`/`.tags` were briefly added as editable
+   Designer fields, then removed again — the call was that editing/JSON-authoring
+   belongs to the Skill Designer only, Capabilities stays a pure reference.
+4. **Memory layers moved from per-skill to agent-level enforcement — a real Runtime
+   behavior change, not just a Studio fix.** `spec.memoryLayers` was previously
+   reported-only (`ManifestProperties.unappliedFields()`); the live toggle was
+   `metadata.memory-layers` per skill in `SKILL.md`, consumed by
+   `MemoryComposer` via `SkillCard.enabledMemoryLayers()`. Changed so
+   `DefaultOrchestratorEngine` and `ChatStreamController` both read
+   `AgentProperties.Memory#getEnabledLayers()` (projected from `spec.memoryLayers`
+   by `ManifestProperties`) instead — memory is a property of who's talking to the
+   agent, not of which skill happens to answer a given turn. `SkillCard`'s field and
+   `SKILL.md`'s frontmatter parsing are untouched (still round-trip; agent-core has
+   no breaking API change) — the engine just stopped reading them. Verified live: ran
+   `agent-example-memory-layers` with `agent.memory.layers=working`, forced routing to
+   `assistant-skill` (which declares no per-skill override — would previously default
+   to all three), and the composer log showed `layers=[WORKING]`, confirming the
+   agent-level setting fully superseded the skill default. `agent-example-memory-layers`
+   (README, `application.yml`, both skill files) updated to describe the new model.
+   `docs/architecture/agent-manifest.md` `spec.memoryLayers` section and enforcement
+   table corrected to match.
+
+Verified throughout: `tsc --noEmit` + 14/14 Studio tests, 27/27 `agent-runtime` +
+265/265 `agent-engine` + 10/10 `agent-example-memory-layers` tests, and three live
+round-trips through the actual running compose stack (unauthenticated MCP, full
+manifest with every remaining Designer field, agent-level memory-layer override).
+
 ## 8. Known gaps & honest caveats
 
+- **Version drift risk is recurring** — every time `gargantua` bumps `agent-core` (e.g. Loadout → `1.3.0`, PACT Core → `1.4.0`), sibling repos (`gargantua-control-plane`, `gargantua-studio`) must follow or their builds fail. Two patterns have caused this:
+  1. A sibling's `pom.xml` hardcodes a version the parent no longer publishes.
+  2. An image was built before the parent version bumped, and stays cached.
+  **RULE:** When bumping `agent-core` in `gargantua`, update all `gargantua-*/pom.xml` references in the same commit or immediately after. Add a CI check if it happens a third time. Run `docker compose build --no-cache` to bust stale image layers when in doubt.
 - **Not everything in the manifest is enforced yet** — see the Runtime's
   `ManifestProperties.unappliedFields()` and `project-handoff.md` §4. In particular
   `spec.loadout` and `metadata.governance` are **parsed and reported, not enforced**:
@@ -453,6 +547,8 @@ an `EventPublisher` if events land — NATS-vs-Kafka stays open); a "modular mon
 - Runtime internals & invariants → [`../project-handoff.md`](../project-handoff.md)
 - Vision → [`ai-operating-system.md`](ai-operating-system.md)
 - Binding decisions (ADR-001..006) → [`runtime-decisions.md`](runtime-decisions.md)
+- **Session handoff (2026-09-04)** → [`SESSION_HANDOFF_2026-09-04.md`](SESSION_HANDOFF_2026-09-04.md)
+- **Session handoff (2026-08-31)** → [`SESSION_HANDOFF_2026-08-31.md`](SESSION_HANDOFF_2026-08-31.md)
 - **Session handoff (2026-08-30)** → [`SESSION_HANDOFF_2026-08-30.md`](SESSION_HANDOFF_2026-08-30.md)
 - **Session handoff (2026-08-29)** → [`SESSION_HANDOFF_2026-08-29.md`](SESSION_HANDOFF_2026-08-29.md)
 - **Session handoff (2026-08-28)** → [`SESSION_HANDOFF_2026-08-28.md`](SESSION_HANDOFF_2026-08-28.md)

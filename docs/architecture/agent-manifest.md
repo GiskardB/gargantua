@@ -251,9 +251,14 @@ server without a `url`, rejects the manifest rather than failing on first tool c
 
 Subset of `WORKING`, `EPISODIC`, `KNOWLEDGE`. Omit or leave empty for all three.
 
-> **Not enforced at workload level yet.** Memory-layer selection is currently a per-skill
-> decision, made through `metadata.memory-layers` in `SKILL.md`. A manifest-level
-> declaration is accepted and reported at startup, but does not restrict anything.
+> **Applied, agent-wide (2026-09).** Projected by `ManifestProperties` onto
+> `agent.memory.layers`, the one input `MemoryComposer` reads for every request this
+> agent serves — see `AgentProperties.Memory#getEnabledLayers()`. This used to be a
+> per-skill decision via `metadata.memory-layers` in `SKILL.md`; that field still parses
+> (`SkillCard.enabledMemoryLayers`), but the engine no longer reads it. Memory is a
+> property of who's talking to the agent, not of which skill answers a given turn — a
+> conversation can route across multiple skills, and per-skill restriction meant the same
+> user's context silently changed shape mid-conversation depending on routing.
 
 ## `spec.allowedRoles`
 
@@ -415,7 +420,7 @@ picture.
 | `spec.mcp.servers` | Applied — connected at startup, tools discovered |
 | `spec.defaultSkill` | Applied — binds onto `agent.routing.fallback-skill` |
 | `spec.guardrails` | Applied — binds onto `agent.guardrail.*` |
-| `spec.memoryLayers` | Reported, not applied — use per-skill declaration |
+| `spec.memoryLayers` | Applied (2026-09) — binds onto `agent.memory.layers`, agent-wide; supersedes the old per-skill `metadata.memory-layers` |
 | `spec.allowedRoles` | Reported, not applied — use per-skill declaration |
 | `spec.loadout` | Reported, not applied — knowledge bases wired per skill via `metadata.knowledge-base` |
 | `spec.cognition` | Reported — declarative by design (PACT §31), not a gap to close |
