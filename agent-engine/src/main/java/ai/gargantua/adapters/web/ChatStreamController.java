@@ -242,7 +242,9 @@ public class ChatStreamController {
                     skillCard = new SkillCard(meta, "", List.of(), null, List.of(), null, null, null, null);
                 }
 
-                // Compose memory
+                // Compose memory from the agent's enabled layers (spec.memoryLayers,
+                // workload-level — SKILL.md's per-skill memory-layers is no longer
+                // consulted here; see AgentProperties.Memory#getEnabledLayers)
                 String effectiveSessionId = (securityContext != null && securityContext.isMultiTenant())
                         ? securityContext.tenantId() + ":" + sessionId
                         : sessionId;
@@ -252,7 +254,7 @@ public class ChatStreamController {
                     try {
                         memory = memoryComposer.compose(userId, effectiveSessionId,
                                 properties.getMemory().getComposer().getMaxContextTokens(),
-                                skillCard.enabledMemoryLayers());
+                                properties.getMemory().getEnabledLayers());
                     } catch (Exception e) {
                         memory = new ComposedMemory(List.of(), List.of(), List.of(), 0);
                     }

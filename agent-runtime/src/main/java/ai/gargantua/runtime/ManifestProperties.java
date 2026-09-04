@@ -51,6 +51,7 @@ public final class ManifestProperties {
         model(properties, spec);
         mcpServers(properties, spec.mcpServers());
         guardrails(properties, spec.guardrails());
+        memoryLayers(properties, spec);
 
         return Map.copyOf(properties);
     }
@@ -66,11 +67,6 @@ public final class ManifestProperties {
         AgentSpec spec = bundle.manifest().agentSpec();
         List<String> warnings = new java.util.ArrayList<>();
 
-        if (!spec.usesAllMemoryLayers()) {
-            warnings.add("spec.memoryLayers is declared (" + spec.memoryLayers()
-                    + ") but workload-level memory restriction is not implemented; "
-                    + "declare memory-layers per skill in SKILL.md instead");
-        }
         if (!spec.allowedRoles().isEmpty()) {
             warnings.add("spec.allowedRoles is declared (" + spec.allowedRoles()
                     + ") but workload-level RBAC is not implemented; "
@@ -159,6 +155,21 @@ public final class ManifestProperties {
      */
     private static void guardrails(Map<String, Object> properties, Map<String, Object> guardrails) {
         flatten("agent.guardrail", guardrails, properties);
+    }
+
+    /**
+     * Projects {@code spec.memoryLayers} onto {@code agent.memory.layers} — the sole
+     * input MemoryComposer reads for a live chat request (see
+     * AgentProperties.Memory#getEnabledLayers). Empty (the default) is left unset,
+     * which AgentProperties.Memory also defaults to empty — both ends agree that
+     * means "all three layers", so there's nothing to project.
+     */
+    private static void memoryLayers(Map<String, Object> properties, AgentSpec spec) {
+        if (spec.usesAllMemoryLayers()) {
+            return;
+        }
+        indexed(properties, "agent.memory.layers",
+                spec.memoryLayers().stream().map(Enum::name).toList());
     }
 
     private static void flatten(String prefix, Map<String, Object> source, Map<String, Object> target) {

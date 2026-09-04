@@ -1,11 +1,17 @@
 package ai.gargantua.autoconfigure;
 
+import ai.gargantua.core.memory.MemoryLayer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Master configuration properties for the Gargantua Agent Framework,
@@ -333,10 +339,18 @@ public class AgentProperties {
     }
 
     public static class Memory {
+        private static final Logger log = LoggerFactory.getLogger(Memory.class);
+
         private Working working = new Working();
         private Episodic episodic = new Episodic();
         private Knowledge knowledge = new Knowledge();
         private Composer composer = new Composer();
+        /** Workload-level layer restriction, projected from spec.memoryLayers by
+         *  ManifestProperties; empty (default) means all three layers. This is the
+         *  sole input to MemoryComposer — SkillCard.enabledMemoryLayers() from
+         *  SKILL.md is no longer consulted for live requests (agent-level decision,
+         *  2026-09). */
+        private List<String> layers = new ArrayList<>();
 
         public Working getWorking() { return working; }
         public void setWorking(Working working) { this.working = working; }
@@ -349,6 +363,26 @@ public class AgentProperties {
 
         public Composer getComposer() { return composer; }
         public void setComposer(Composer composer) { this.composer = composer; }
+
+        public List<String> getLayers() { return layers; }
+        public void setLayers(List<String> layers) { this.layers = layers; }
+
+        /**
+         * Parses {@link #layers} into {@link MemoryLayer}s for MemoryComposer#compose;
+         * empty is passed through as-is — the composer itself treats null/empty as "all
+         * three", so there's no need to expand the default here too.
+         */
+        public Set<MemoryLayer> getEnabledLayers() {
+            var result = EnumSet.noneOf(MemoryLayer.class);
+            for (String raw : layers) {
+                try {
+                    result.add(MemoryLayer.valueOf(raw.trim().toUpperCase(Locale.ROOT)));
+                } catch (IllegalArgumentException e) {
+                    log.warn("Unknown agent.memory.layers value '{}' — ignoring", raw);
+                }
+            }
+            return result;
+        }
 
         public static class Working {
             private int maxMessages = 20;

@@ -233,17 +233,47 @@ class ManifestPropertiesTest {
                   name: a
                   version: 1.0.0
                 spec:
-                  memoryLayers: [working]
                   allowedRoles: [support]
                   runtime:
                     minVersion: "9.9"
                 """;
         try (LoadedBundle bundle = BundleLoader.load(bundleWith(root, manifest, false))) {
             assertThat(ManifestProperties.unappliedFields(bundle))
-                    .hasSize(3)
-                    .anySatisfy(w -> assertThat(w).contains("memoryLayers"))
+                    .hasSize(2)
                     .anySatisfy(w -> assertThat(w).contains("allowedRoles"))
                     .anySatisfy(w -> assertThat(w).contains("minVersion"));
+        }
+    }
+
+    @Test
+    @DisplayName("spec.memoryLayers is applied — it binds onto agent.memory.layers, not reported as a gap")
+    void memoryLayersIsApplied(@TempDir Path root) throws IOException {
+        String manifest = """
+                apiVersion: gargantua.ai/v1
+                kind: Agent
+                metadata:
+                  name: a
+                  version: 1.0.0
+                spec:
+                  memoryLayers: [working, episodic]
+                """;
+        try (LoadedBundle bundle = BundleLoader.load(bundleWith(root, manifest, false))) {
+            AgentProperties properties = bind(ManifestProperties.from(bundle));
+
+            assertThat(properties.getMemory().getEnabledLayers())
+                    .containsExactlyInAnyOrder(
+                            ai.gargantua.core.memory.MemoryLayer.WORKING,
+                            ai.gargantua.core.memory.MemoryLayer.EPISODIC);
+            assertThat(ManifestProperties.unappliedFields(bundle))
+                    .noneMatch(w -> w.contains("memoryLayers"));
+        }
+    }
+
+    @Test
+    @DisplayName("an unrestricted spec.memoryLayers leaves agent.memory.layers unset — the composer default is already \"all three\"")
+    void memoryLayersDefaultIsNotProjected(@TempDir Path root) throws IOException {
+        try (LoadedBundle bundle = BundleLoader.load(bundleWith(root, FULL_MANIFEST, false))) {
+            assertThat(ManifestProperties.from(bundle)).doesNotContainKey("agent.memory.layers[0]");
         }
     }
 

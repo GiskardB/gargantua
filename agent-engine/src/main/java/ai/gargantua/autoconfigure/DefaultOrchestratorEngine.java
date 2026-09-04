@@ -319,7 +319,9 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
         }
         log.debug("[Pipeline] Step 5b — Post-routing RBAC passed for skill '{}'", routingResult.skillName());
 
-        // 6. Compose memory from layers the skill needs
+        // 6. Compose memory from the agent's enabled layers (spec.memoryLayers,
+        //    workload-level — SKILL.md's per-skill memory-layers is no longer
+        //    consulted here; see AgentProperties.Memory#getEnabledLayers)
         ComposedMemory memory;
         if (memoryComposer != null) {
             try {
@@ -327,7 +329,7 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
                         request.userId(),
                         effectiveSessionId,
                         properties.getMemory().getComposer().getMaxContextTokens(),
-                        skillCard.enabledMemoryLayers()
+                        properties.getMemory().getEnabledLayers()
                 );
             } catch (Exception e) {
                 log.warn("Memory composition failed, using empty memory: {}", e.getMessage());
