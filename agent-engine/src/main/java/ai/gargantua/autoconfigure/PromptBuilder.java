@@ -22,6 +22,11 @@ public class PromptBuilder {
             sb.append(skillCard.systemPrompt());
         }
 
+        if (skillCard != null && skillCard.references() != null && !skillCard.references().isEmpty()) {
+            sb.append("\n\n## Reference material\n");
+            skillCard.references().forEach(r -> sb.append(r).append("\n"));
+        }
+
         if (enricherContext != null && enricherContext.attributes() != null) {
             enricherContext.attributes().forEach((key, value) -> {
                 if (value != null && !value.isBlank()) {

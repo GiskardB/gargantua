@@ -35,6 +35,12 @@ class PromptBuilderTest {
         return new SkillCard(meta, systemPrompt, List.of(), null, List.of(), null, null, null, null);
     }
 
+    private SkillCard skillCardWithReferences(String systemPrompt, List<String> references) {
+        SkillMeta meta = new SkillMeta("test", "desc", "1.0.0", true, false, "test",
+                SkillSource.FILESYSTEM, Set.of());
+        return new SkillCard(meta, systemPrompt, List.of(), null, references, null, null, null, null);
+    }
+
     // --- Skill system prompt ---
 
     @Test
@@ -56,6 +62,36 @@ class PromptBuilderTest {
     void build_handlesNullSystemPrompt() {
         String result = promptBuilder.build(skillCard(null), null, null);
         assertThat(result).isEmpty();
+    }
+
+    // --- References (SkillCard.references(), e.g. bundled skills/<name>/references/*) ---
+
+    @Test
+    @DisplayName("build() includes reference material")
+    void build_includesReferences() {
+        SkillCard card = skillCardWithReferences("Base prompt.",
+                List.of("Refunds are processed within 5 business days.", "Support hours are 9am-5pm CET."));
+
+        String result = promptBuilder.build(card, null, null);
+
+        assertThat(result).contains("## Reference material");
+        assertThat(result).contains("Refunds are processed within 5 business days.");
+        assertThat(result).contains("Support hours are 9am-5pm CET.");
+    }
+
+    @Test
+    @DisplayName("build() skips reference section when references list is empty")
+    void build_skipsReferencesWhenEmpty() {
+        String result = promptBuilder.build(skillCardWithReferences("Base.", List.of()), null, null);
+        assertThat(result).doesNotContain("Reference material");
+    }
+
+    @Test
+    @DisplayName("build() skips reference section when references list is null")
+    void build_skipsReferencesWhenNull() {
+        String result = promptBuilder.build(skillCardWithReferences("Base.", null), null, null);
+        assertThat(result).doesNotContain("Reference material");
+        assertThat(result).isEqualTo("Base.");
     }
 
     // --- Enricher context ---
@@ -190,9 +226,12 @@ class PromptBuilderTest {
                 Instant.now(), "user");
         ComposedMemory memory = new ComposedMemory(List.of(), List.of(summary), List.of(knowledge), 50);
 
-        String result = promptBuilder.build(skillCard("You are FitCoach."), memory, enricher);
+        SkillCard card = skillCardWithReferences("You are FitCoach.", List.of("Gym opens at 6am."));
+        String result = promptBuilder.build(card, memory, enricher);
 
         assertThat(result).startsWith("You are FitCoach.");
+        assertThat(result).contains("## Reference material");
+        assertThat(result).contains("Gym opens at 6am.");
         assertThat(result).contains("## Context");
         assertThat(result).contains("Morning session");
         assertThat(result).contains("## Previous Conversations");

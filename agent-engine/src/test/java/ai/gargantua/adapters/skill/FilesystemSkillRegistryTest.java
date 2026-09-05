@@ -257,4 +257,50 @@ class FilesystemSkillRegistryTest {
             verify(resourcePatternResolver, times(2)).getResources(anyString());
         }
     }
+
+    /**
+     * Every test above mocks {@link ResourcePatternResolver} directly, so none of them
+     * ever exercise real Ant-style path matching against real files — the exact thing
+     * {@code appendFolderReferences} depends on. These use a real
+     * {@link org.springframework.core.io.support.PathMatchingResourcePatternResolver}
+     * against a real {@code @TempDir}, matching exactly how ManifestProperties/the
+     * bundle loader construct {@code agent.skill.path} in production
+     * ({@code "file:" + absolutePath}).
+     */
+    @Nested
+    @DisplayName("appendFolderReferences (real filesystem, no mocks)")
+    class AppendFolderReferencesRealFs {
+
+        private final SkillMdParser realParser = new SkillMdParser();
+        private final org.springframework.core.io.support.PathMatchingResourcePatternResolver realResolver =
+                new org.springframework.core.io.support.PathMatchingResourcePatternResolver();
+
+        @Test
+        @DisplayName("a real references/ folder is merged into SkillCard.references()")
+        void mergesRealReferenceFile(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) throws IOException {
+            java.nio.file.Path skillDir = tempDir.resolve("skills/billing-skill");
+            java.nio.file.Path refDir = skillDir.resolve("references");
+            java.nio.file.Files.createDirectories(refDir);
+            java.nio.file.Files.writeString(skillDir.resolve("SKILL.md"), """
+                    ---
+                    name: billing-skill
+                    description: test
+                    version: 1.0.0
+                    allowed-tools: []
+                    ---
+                    You are a billing agent.
+                    """);
+            java.nio.file.Files.writeString(refDir.resolve("billing-policy.md"),
+                    "Refunds are processed within 5 business days.");
+
+            String skillPath = "file:" + tempDir.toAbsolutePath().normalize() + "/skills";
+            var realRegistry = new FilesystemSkillRegistry(skillPath, realParser, realResolver);
+
+            SkillCard card = realRegistry.load("billing-skill");
+
+            assertThat(card.references())
+                    .as("bundled references/*.md content must reach SkillCard.references()")
+                    .anyMatch(ref -> ref.contains("Refunds are processed within 5 business days"));
+        }
+    }
 }
