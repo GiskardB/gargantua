@@ -3,12 +3,15 @@ package ai.gargantua.mcp;
 import ai.gargantua.core.orchestrator.OrchestratorEngine;
 import ai.gargantua.mcp.gateway.ChatMcpTool;
 import ai.gargantua.mcp.resources.CapabilitiesMcpResource;
+import io.modelcontextprotocol.server.transport.WebMvcSseServerTransportProvider;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.function.RouterFunction;
+import org.springframework.web.servlet.function.ServerResponse;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -65,6 +68,23 @@ class AgentMcpServerAutoConfigurationTest {
     }
 
     @Test
+    @DisplayName("The real MCP transport is wired: transport provider + router function beans exist")
+    void wiresRealTransport() {
+        contextRunner
+                .withPropertyValues("agent.mcp.enabled=true", "agent.mcp.transport.path=/mcp")
+                .run(ctx -> {
+                    assertThat(ctx).hasSingleBean(WebMvcSseServerTransportProvider.class);
+                    assertThat(ctx).hasSingleBean(RouterFunction.class);
+                    // The router function is what Spring MVC actually dispatches requests
+                    // through — its absence is exactly the pre-fix bug (agent.mcp.enabled=true
+                    // logged a startup message but /mcp always 404'd, since nothing ever called
+                    // WebMvcSseServerTransportProvider#getRouterFunction()).
+                    RouterFunction<ServerResponse> router = ctx.getBean(RouterFunction.class);
+                    assertThat(router).isNotNull();
+                });
+    }
+
+    @Test
     @DisplayName("AgentMcpProperties binds the full agent.mcp.* property tree")
     void propertiesBindFromConfig() {
         contextRunner
@@ -107,6 +127,12 @@ class AgentMcpServerAutoConfigurationTest {
                 .run(ctx -> assertThat(ctx.getBean(ChatMcpTool.class)).isSameAs(override));
     }
 
+    // Deliberately does NOT provide an ObjectMapper bean: a plain @SpringBootApplication
+    // with agent.mcp.enabled=true (e.g. via the archetype, without spring-boot-starter-web
+    // pulling in JacksonAutoConfiguration first) may not have one either. mcpTransportProvider
+    // and mcpServerRouterFunction fall back to ObjectProvider<ObjectMapper>::getIfAvailable
+    // precisely so this isn't a hard requirement — wiresRealTransport below is what actually
+    // proves that fallback works, by running with no ObjectMapper bean anywhere in the context.
     @Configuration
     static class StubOrchestratorEngineConfig {
         @Bean
