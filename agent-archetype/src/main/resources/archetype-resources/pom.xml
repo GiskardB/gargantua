@@ -23,37 +23,24 @@
 
   <properties>
     <java.version>25</java.version>
-    <gargantua.version>v1.2.2</gargantua.version>
+    <!-- Latest release on Maven Central — bump when a newer version ships.
+         Need a snapshot or branch build instead? See "Try it in 60 seconds"
+         in the Gargantua README for the JitPack (com.github.giskardb.gargantua)
+         coordinates and repository block. -->
+    <gargantua.version>1.2.20</gargantua.version>
   </properties>
-
-  <!-- ═══════════════════════════════════════════════════════════════════
-       JitPack repository — no authentication needed
-       Builds Gargantua directly from the GitHub repository
-       ═══════════════════════════════════════════════════════════════════ -->
-  <repositories>
-    <repository>
-      <id>jitpack.io</id>
-      <url>https://jitpack.io</url>
-    </repository>
-  </repositories>
-  <pluginRepositories>
-    <pluginRepository>
-      <id>jitpack.io</id>
-      <url>https://jitpack.io</url>
-    </pluginRepository>
-  </pluginRepositories>
 
   <dependencies>
     <!-- Gargantua Agent Engine — orchestrator, guardrails, routing, memory, REST API, admin endpoints, skill registries -->
     <dependency>
-      <groupId>com.github.giskardb.gargantua</groupId>
+      <groupId>io.github.giskardb</groupId>
       <artifactId>agent-engine</artifactId>
       <version>${symbol_dollar}{gargantua.version}</version>
     </dependency>
 
     <!-- MCP Server (optional — expose agent via MCP protocol) -->
     <dependency>
-      <groupId>com.github.giskardb.gargantua</groupId>
+      <groupId>io.github.giskardb</groupId>
       <artifactId>agent-mcp-server</artifactId>
       <version>${symbol_dollar}{gargantua.version}</version>
     </dependency>
@@ -92,7 +79,7 @@
       </plugin>
       <!-- SKILL.md linter — validates skills at build time -->
       <plugin>
-        <groupId>com.github.giskardb.gargantua</groupId>
+        <groupId>io.github.giskardb</groupId>
         <artifactId>agent-skill-linter-maven-plugin</artifactId>
         <version>${symbol_dollar}{gargantua.version}</version>
         <executions>
