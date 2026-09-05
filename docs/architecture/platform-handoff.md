@@ -9,15 +9,33 @@ and what comes next. It complements — does not replace — two narrower docs:
 - [`ai-operating-system.md`](ai-operating-system.md) — the **vision** (the north
   star, not a sprint plan).
 
-**Last updated:** 2026-09-04. If a fact here disagrees with the code, the code wins —
-fix this doc. For changes made in the 2026-09-04 session, see
-[`SESSION_HANDOFF_2026-09-04.md`](SESSION_HANDOFF_2026-09-04.md) (and
+**Last updated:** 2026-09-05. If a fact here disagrees with the code, the code wins —
+fix this doc. For changes made in the 2026-09-05 session, see
+[`SESSION_HANDOFF_2026-09-05.md`](SESSION_HANDOFF_2026-09-05.md) (and
+[`SESSION_HANDOFF_2026-09-04.md`](SESSION_HANDOFF_2026-09-04.md),
 [`SESSION_HANDOFF_2026-08-31.md`](SESSION_HANDOFF_2026-08-31.md),
 [`SESSION_HANDOFF_2026-08-30.md`](SESSION_HANDOFF_2026-08-30.md),
 [`SESSION_HANDOFF_2026-08-29.md`](SESSION_HANDOFF_2026-08-29.md),
 [`SESSION_HANDOFF_2026-08-28.md`](SESSION_HANDOFF_2026-08-28.md) before it).
 
-**Recent progress (most recent first):** **Agent Designer UX overhaul + memory-layers
+**Recent progress (most recent first):** **Three real bugs found and fixed via a
+genuinely live end-to-end test** — a multi-skill bundle with memory, bundled
+reference content and an unauthenticated external MCP tool, run against the real
+Runtime and separately against a freshly-generated `agent-archetype` project, because
+declaring success from a build log isn't the same as watching it work. Found: (1)
+`PromptBuilder` never read `skillCard.references()` — bundled reference files were
+silently dropped from every prompt, full stop; (2) `agent-mcp-server`'s MCP transport
+was never actually wired to Spring MVC — `agent.mcp.enabled=true` logged a convincing
+message while every request 404'd, apparently since the feature was introduced; (3)
+`agent-archetype`'s template pinned JitPack coordinates at a years-stale `v1.2.2` tag,
+and its own integration test had been disabled specifically because of it — fixed the
+version (now Maven Central `1.2.20`) and re-enabled the test, which then caught a
+second, independent bug in the test itself (`goal.txt` requested an invalid Maven
+lifecycle phase — the test had apparently never run successfully even once). All
+three verified with a direct broken-vs-fixed comparison, not just a green test suite.
+See §7 for the full writeup, including a real, separate gap found and *not* fixed
+(token-budget allocation is computed but never fed back into the actual prompt) →
+**Agent Designer UX overhaul + memory-layers
 moved to agent-level** — a live walkthrough of the Studio Agent Designer found real
 confusion (duplicated fields, controls that did nothing, PACT declarations nobody
 wanted to fill in) and, separately, that memory-layer selection is more useful as an
@@ -487,6 +505,46 @@ Verified throughout: `tsc --noEmit` + 14/14 Studio tests, 27/27 `agent-runtime` 
 round-trips through the actual running compose stack (unauthenticated MCP, full
 manifest with every remaining Designer field, agent-level memory-layer override).
 
+### 2026-09-05: Three real bugs found via a genuinely complete live test
+
+Asked to prove a multi-skill bundle (memory + bundled reference content + an
+unauthenticated external MCP tool) really works against the real Runtime — and to
+verify it identically in both delivery modes (bundle/Runtime, Maven-archetype/Library),
+since "the core of gargantua must work the same way in both." It didn't, in three
+independent ways:
+
+1. **Bundled reference files (`skills/<name>/references/*`) never reached the LLM.**
+   `FilesystemSkillRegistry` loaded them correctly into `SkillCard.references()`
+   (confirmed with a new real-filesystem test — every existing test mocked the
+   resource resolver and never exercised real path matching); `PromptBuilder.build()`
+   simply never read that field. Fixed: `PromptBuilder` now appends a "Reference
+   material" section. A distinct, larger, *not yet fixed* finding surfaced alongside
+   it: `TokenBudgetManager`'s truncation is computed but never fed back into the
+   prompt that was already built one step earlier — episodic summaries are even
+   passed into the budget request as a hardcoded empty list. Flagged, not fixed —
+   see §8.
+2. **`agent-mcp-server` never actually served MCP over the network.**
+   `agent.mcp.enabled=true` logged "MCP Server initialized" but nothing ever
+   constructed the real `McpSyncServer` or exposed its transport as a Spring route —
+   `/mcp` 404'd unconditionally, apparently since the feature was introduced. Fixed
+   by wiring `WebMvcSseServerTransportProvider` + `McpSyncServer` for real. Verified
+   with a genuine two-container round trip: real MCP protocol handshake, the gateway
+   tool actually invoked, a real response returned.
+3. **`agent-archetype` scaffolds projects on a years-stale dependency.** The template
+   hardcoded JitPack coordinates pinned to `v1.2.2` — every generated project silently
+   missed everything shipped since, including both fixes above. Its own integration
+   test had been disabled specifically because of JitPack's CI unreliability; fixed
+   the version (now Maven Central `1.2.20`, matching what the README already
+   documents as the recommended path) and re-enabled the test, which then caught a
+   second, independent, previously-unnoticed bug in itself (`goal.txt` named an
+   invalid Maven lifecycle phase — this test had apparently never passed even once).
+
+All three verified with a direct fabricated-vs-exact comparison on live LLM output,
+not just a passing test suite. 668 tests, 0 failures across
+`agent-core`/`agent-memory-sdk`/`agent-bundle`/`agent-engine`/`agent-mcp-server`/
+`agent-runtime`, plus the archetype's integration test green for what may be the
+first time. See `SESSION_HANDOFF_2026-09-05.md` for the full writeup.
+
 ## 8. Known gaps & honest caveats
 
 - **Version drift risk is recurring** — every time `gargantua` bumps `agent-core` (e.g. Loadout → `1.3.0`, PACT Core → `1.4.0`), sibling repos (`gargantua-control-plane`, `gargantua-studio`) must follow or their builds fail. Two patterns have caused this:
@@ -541,12 +599,29 @@ manifest with every remaining Designer field, agent-level memory-layer override)
   it works now (verified, §4) but treat it as environment-dependent, not guaranteed.
   Java/Maven may also be missing after a re-provision — restore a portable toolchain
   (§4 build note) if `mvn`/`java` vanish.
+- **`TokenBudgetManager`'s allocation never reaches the actual prompt** (found 2026-09-05).
+  `DefaultOrchestratorEngine`/`ChatStreamController` build the real system prompt via
+  `PromptBuilder.build()` *before* calling `tokenBudgetManager.allocate(...)`, and never
+  use the (possibly-truncated) allocation afterward — episodic summaries are even passed
+  into the `BudgetRequest` as a hardcoded empty list, independent of what
+  `PromptBuilder` actually included. A skill with a very large reference file, or a long
+  episodic/knowledge history, has no real protection against blowing the context window
+  today, despite the budget machinery existing and running on every request. Properly
+  fixing this means reordering pipeline steps in both call sites so the prompt is built
+  *from* the allocation's output, not before it — real work, not folded into the
+  reference-file fix that surfaced it (`SESSION_HANDOFF_2026-09-05.md`).
+- **`agent.mcp.security.auth-required` does nothing** (found 2026-09-05, same session as
+  the MCP transport fix). The property binds and logs correctly but nothing checks it —
+  an MCP server declared with `auth-required: true` doesn't actually require anything.
+  Same class of gap as the two fixed that session (a config knob computed, never
+  enforced); not fixed yet.
 
 ## 9. Where to go next in the docs
 
 - Runtime internals & invariants → [`../project-handoff.md`](../project-handoff.md)
 - Vision → [`ai-operating-system.md`](ai-operating-system.md)
 - Binding decisions (ADR-001..006) → [`runtime-decisions.md`](runtime-decisions.md)
+- **Session handoff (2026-09-05)** → [`SESSION_HANDOFF_2026-09-05.md`](SESSION_HANDOFF_2026-09-05.md)
 - **Session handoff (2026-09-04)** → [`SESSION_HANDOFF_2026-09-04.md`](SESSION_HANDOFF_2026-09-04.md)
 - **Session handoff (2026-08-31)** → [`SESSION_HANDOFF_2026-08-31.md`](SESSION_HANDOFF_2026-08-31.md)
 - **Session handoff (2026-08-30)** → [`SESSION_HANDOFF_2026-08-30.md`](SESSION_HANDOFF_2026-08-30.md)
