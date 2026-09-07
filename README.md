@@ -17,7 +17,7 @@ tracking, A2A interoperability. No Java required to build one.
 This is **Runtime mode** — a generic executor that loads a declarative bundle (no code,
 just YAML + Markdown) at startup. It's the primary, recommended way to use Gargantua and
 the fastest path from zero to a running agent: [Try it in 60 seconds](#try-it-in-60-seconds)
-below builds it from this repo with one command, no separate image to pull.
+below downloads it — a released jar or a `docker run`, no build required.
 
 Need tools that call your own services, a database, or an existing domain model instead?
 The same engine runs as a **Java library**: add `agent-engine` as a Maven dependency,
@@ -28,10 +28,9 @@ original way to use Gargantua and still fully supported — see
 
 Built on Java 25, Spring Boot 4.1.0, and LangChain4j.
 
-**This repository is complete and self-contained.** Build the runtime image or jar (one
-command, no other repo required) and run a hand-written bundle, or add the library
-dependency and write Java — either way nothing else to install. The manifest
-(`gargantua.ai/v1`) also composes with
+**This repository is complete and self-contained.** Download the runtime jar or image
+and run a hand-written bundle, or add the library dependency and write Java — either way
+nothing else to install. The manifest (`gargantua.ai/v1`) also composes with
 [PACT](PACT_v0.4_Agent_Contract_Specification.md), an open, implementation-neutral
 agent-description spec this project is drafting.
 
@@ -44,17 +43,15 @@ here. Otherwise, the quickstart is next.
 
 ## Try it in 60 seconds
 
-> Requires: Java 25+, Maven, an OpenAI-compatible API key.
+> Requires: Java 25+ (or Docker), an OpenAI-compatible API key. No clone, no build.
 
 ### Option A — Runtime mode: a bundle, no Java code (recommended first look)
 
-`agent-runtime` isn't on Maven Central yet (see the [artifact table](#framework-libraries-maven-coordinates)
-below) — building it is one Maven command against this repo, no other repo required:
+Download the released runtime jar — no clone, no Maven build, every tagged release
+attaches it:
 
 ```bash
-git clone https://github.com/GiskardB/gargantua.git && cd gargantua
-mvn -q -pl agent-core,agent-memory-sdk,agent-mcp-client,agent-bundle,agent-engine,agent-runtime \
-    -am package -DskipTests
+curl -LO https://github.com/GiskardB/gargantua/releases/latest/download/gargantua-runtime.jar
 ```
 
 Hand-write a bundle — two files, no build step of their own, no authoring tool needed:
@@ -85,11 +82,11 @@ You are a friendly demo agent.
 EOF
 ```
 
-Run it — a plain JVM process, no Docker needed for this step:
+Run it — the jar bundles everything, params on the command line:
 
 ```bash
 LLM_PRIMARY_PROVIDER=openai LLM_PRIMARY_MODEL=gpt-4o LLM_PRIMARY_API_KEY=sk-your-key \
-java -jar agent-runtime/target/agent-runtime-*.jar run my-agent --spring.profiles.active=embedded
+java -jar gargantua-runtime.jar run my-agent --spring.profiles.active=embedded
 ```
 
 ```bash
@@ -100,21 +97,22 @@ curl -X POST http://localhost:8080/api/agent/chat \
 ```
 
 That's a running agent — skill routing, guardrails, memory, streaming, a REST API —
-described entirely in two files, zero Java. `java -jar agent-runtime/target/agent-runtime-*.jar
-validate my-agent` parses it, verifies integrity and reports which manifest fields the
-runtime won't act on, without starting anything — a good pre-deploy CI gate.
+described entirely in two files, zero Java. `java -jar gargantua-runtime.jar validate
+my-agent` parses it, verifies integrity and reports which manifest fields the runtime
+won't act on, without starting anything — a good pre-deploy CI gate.
 
-Prefer a container? Same jar, one more command, still no external image to pull:
+Prefer a container? Same image every release publishes, nothing to build:
 
 ```bash
-docker build -f agent-runtime/Dockerfile -t gargantua-runtime:1.0 .
 docker run -p 8080:8080 -v ./my-agent:/bundle:ro \
-           -e LLM_PRIMARY_API_KEY=sk-your-key gargantua-runtime:1.0
+           -e LLM_PRIMARY_API_KEY=sk-your-key ghcr.io/giskardb/gargantua-runtime:latest
 ```
 
 Real tools instead of a demo skill come from **MCP servers** named in the manifest, not
 Java — see [Runtime mode](#two-ways-to-ship-an-agent) below for a tool-bearing example and
-[Agent Manifest](docs/architecture/agent-manifest.md) for the full schema.
+[Agent Manifest](docs/architecture/agent-manifest.md) for the full schema. Building from
+source instead (e.g. to track `main` between releases) still works exactly as before —
+see [Repository Structure](#repository-structure-for-framework-contributors).
 
 ### Option B — Library mode: add Gargantua to a Java project
 
@@ -126,7 +124,7 @@ Central — no `settings.xml` edit, no extra repository.
 <dependency>
   <groupId>io.github.giskardb</groupId>
   <artifactId>agent-engine</artifactId>
-  <version>1.2.20</version>
+  <version>1.4.0</version>
 </dependency>
 ```
 
@@ -137,7 +135,7 @@ Or scaffold a fresh project:
 mvn archetype:generate \
   -DarchetypeGroupId=io.github.giskardb \
   -DarchetypeArtifactId=agent-archetype \
-  -DarchetypeVersion=1.2.20 \
+  -DarchetypeVersion=1.4.0 \
   -DgroupId=com.mycompany -DartifactId=my-agent \
   -Dversion=1.0.0 -DagentName=MyAgent -DinteractiveMode=false
 
@@ -191,7 +189,7 @@ Then generate with the JitPack coordinates (note the `v` prefix on the version):
 mvn archetype:generate \
   -DarchetypeGroupId=com.github.giskardb.gargantua \
   -DarchetypeArtifactId=agent-archetype \
-  -DarchetypeVersion=v1.2.20 \
+  -DarchetypeVersion=v1.4.0 \
   -DgroupId=com.mycompany -DartifactId=my-agent \
   -Dversion=1.0.0 -DagentName=MyAgent -DinteractiveMode=false
 ```
@@ -386,7 +384,7 @@ The archetype lives on Maven Central along with the rest of the framework — no
 mvn archetype:generate \
   -DarchetypeGroupId=io.github.giskardb \
   -DarchetypeArtifactId=agent-archetype \
-  -DarchetypeVersion=1.2.20 \
+  -DarchetypeVersion=1.4.0 \
   -DgroupId=com.mycompany \
   -DartifactId=my-agent \
   -Dversion=1.0.0 \
@@ -577,21 +575,26 @@ the right choice once tools need to call your own code.
 | Start with | [Try it in 60 seconds, Option A](#try-it-in-60-seconds) | `mvn archetype:generate` (Option B above) |
 
 **Runtime mode** separates the executor from the payload. A generic runtime image loads a
-bundle at startup — build the image from this repo (no separate registry to pull from
-yet, see the [artifact table](#framework-libraries-maven-coordinates)):
+bundle at startup — every tagged release publishes it, nothing to build:
 
 ```bash
-docker build -f agent-runtime/Dockerfile -t gargantua-runtime:1.0 .
 docker run -p 8080:8080 -v ./customer-agent.gbundle:/bundle:ro \
-           -e LLM_PRIMARY_API_KEY=sk-... gargantua-runtime:1.0
+           -e LLM_PRIMARY_API_KEY=sk-... ghcr.io/giskardb/gargantua-runtime:latest
 ```
 
-Or skip Docker entirely — the runtime is a plain executable jar once built:
+Or skip Docker entirely — the runtime is a plain executable jar, downloaded once:
 
 ```bash
-java -jar agent-runtime/target/agent-runtime-*.jar validate my-agent.gbundle   # parse, verify integrity, report unapplied fields
-java -jar agent-runtime/target/agent-runtime-*.jar run       my-agent.gbundle   # execute
+curl -LO https://github.com/GiskardB/gargantua/releases/latest/download/gargantua-runtime.jar
+java -jar gargantua-runtime.jar validate my-agent.gbundle   # parse, verify integrity, report unapplied fields
+java -jar gargantua-runtime.jar run       my-agent.gbundle   # execute
 ```
+
+Pin a specific version instead of `latest` with `ghcr.io/giskardb/gargantua-runtime:1.4.0`
+or `.../releases/download/v1.4.0/gargantua-runtime.jar`. Building from source works too
+(`docker build -f agent-runtime/Dockerfile -t gargantua-runtime:local .` from the repo
+root, or `mvn -pl agent-core,agent-memory-sdk,agent-mcp-client,agent-bundle,agent-engine,agent-runtime
+-am package -DskipTests`) — useful for tracking `main` between releases.
 
 Image and bundle version independently: roll a bundle forward without rebuilding the
 image, patch the image without republishing bundles. Bundles never contain executable
@@ -663,42 +666,38 @@ projection end to end, are folded into the spec's own [§46](PACT_v0.4_Agent_Con
 
 ## Framework Libraries (Maven coordinates)
 
-Library mode is distributed as a set of Maven libraries — for that mode you don't clone
-this repo, you add dependencies. **Runtime mode currently requires cloning and building**
-(see [Try it in 60 seconds, Option A](#try-it-in-60-seconds)): three of the modules below
-were added after the last tagged release and aren't on Maven Central yet.
+All nine modules publish to Maven Central — Library mode is just Maven dependencies, no
+clone required. (Runtime mode doesn't need Central at all: it's a jar/image download, see
+[Two ways to ship an agent](#two-ways-to-ship-an-agent).)
 
-| Artifact | Maven Central | JitPack groupId | Description |
+| Artifact | Maven Central groupId | JitPack groupId | Description |
 |----------|------------------------|------------------|-------------|
-| `agent-core` | ✅ `io.github.giskardb` | `com.github.giskardb.gargantua` | Pure domain: records, interfaces, annotations. Zero Spring deps. |
-| `agent-memory-sdk` | ✅ `io.github.giskardb` | `com.github.giskardb.gargantua` | Standalone 3-layer memory (Redis + MongoDB). Reusable in any project. |
-| `agent-mcp-client` | 🚧 not yet — build from source | `com.github.giskardb.gargantua` | Consumes external MCP servers and exposes their tools as agent tools. Zero Spring deps. |
-| `agent-bundle` | 🚧 not yet — build from source | `com.github.giskardb.gargantua` | Agent bundle format: manifest parsing, loading, integrity verification. Zero Spring deps. |
-| `agent-engine` | ✅ `io.github.giskardb` | `com.github.giskardb.gargantua` | Auto-configuration, guardrails, routing, orchestrator, tool registry, REST controllers, skill registries, admin endpoints. |
-| `agent-runtime` | 🚧 not yet — build from source | `com.github.giskardb.gargantua` | Standalone runtime that loads and executes an agent bundle — see [Two ways to ship an agent](#two-ways-to-ship-an-agent) for the one-command build. |
-| `agent-mcp-server` | ✅ `io.github.giskardb` | `com.github.giskardb.gargantua` | MCP Server gateway (optional). |
-| `agent-skill-linter-maven-plugin` | ✅ `io.github.giskardb` | `com.github.giskardb.gargantua` | Build-time SKILL.md validation. |
-| `agent-archetype` | ✅ `io.github.giskardb` | `com.github.giskardb.gargantua` | Maven archetype to scaffold new agent projects. |
+| `agent-core` | `io.github.giskardb` | `com.github.giskardb.gargantua` | Pure domain: records, interfaces, annotations. Zero Spring deps. |
+| `agent-memory-sdk` | `io.github.giskardb` | `com.github.giskardb.gargantua` | Standalone 3-layer memory (Redis + MongoDB). Reusable in any project. |
+| `agent-mcp-client` | `io.github.giskardb` | `com.github.giskardb.gargantua` | Consumes external MCP servers and exposes their tools as agent tools. Zero Spring deps. |
+| `agent-bundle` | `io.github.giskardb` | `com.github.giskardb.gargantua` | Agent bundle format: manifest parsing, loading, integrity verification. Zero Spring deps. |
+| `agent-engine` | `io.github.giskardb` | `com.github.giskardb.gargantua` | Auto-configuration, guardrails, routing, orchestrator, tool registry, REST controllers, skill registries, admin endpoints. |
+| `agent-runtime` | `io.github.giskardb` | `com.github.giskardb.gargantua` | Standalone runtime that loads and executes an agent bundle. Also published pre-built — see [Try it in 60 seconds](#try-it-in-60-seconds). |
+| `agent-mcp-server` | `io.github.giskardb` | `com.github.giskardb.gargantua` | MCP Server gateway (optional). |
+| `agent-skill-linter-maven-plugin` | `io.github.giskardb` | `com.github.giskardb.gargantua` | Build-time SKILL.md validation. |
+| `agent-archetype` | `io.github.giskardb` | `com.github.giskardb.gargantua` | Maven archetype to scaffold new agent projects. |
 
-The three 🚧 modules are what Runtime mode is built from — they were added to the
-reactor after `1.2.20` (the latest Central release, published before Runtime mode
-existed) and haven't been part of a tagged release since. `1.2.20`'s published
-`agent-engine` therefore doesn't pull them in transitively either. Building this repo
-(`mvn -pl ... -am package -DskipTests`, [above](#try-it-in-60-seconds)) is the current
-way to get them — a new tag will put all nine on Maven Central together.
+`agent-bundle`, `agent-mcp-client` and `agent-runtime` — the modules Runtime mode is
+built from — joined Central as of `1.4.0`; earlier releases (e.g. `1.2.20`) predate them,
+so an app depending on an older `agent-engine` doesn't pull them in transitively.
 
-Two distribution channels for the rest, same source code:
+Two distribution channels, same source code:
 
 | Channel | When to use | Versioning |
 |---------|-------------|------------|
-| **Maven Central** *(default)* | Tagged releases — signed, immutable, queried by default. No `settings.xml` needed. | semver, no prefix (`1.2.20`) |
-| **JitPack** | Snapshots, intermediate tags, `develop-SNAPSHOT`, branch builds — built on-demand. | mirrors Git tags (`v1.2.20`) |
+| **Maven Central** *(default)* | Tagged releases — signed, immutable, queried by default. No `settings.xml` needed. | semver, no prefix (`1.4.0`) |
+| **JitPack** | Snapshots, intermediate tags, `develop-SNAPSHOT`, branch builds — built on-demand. | mirrors Git tags (`v1.4.0`) |
 
 ### Maven Central (recommended)
 
 ```xml
 <properties>
-    <gargantua.version>1.2.20</gargantua.version>
+    <gargantua.version>1.4.0</gargantua.version>
 </properties>
 
 <dependencies>
@@ -726,7 +725,7 @@ No `<repositories>` block needed — Maven Central is in the default Maven repos
 
 ```xml
 <properties>
-    <gargantua.version>v1.2.20</gargantua.version>
+    <gargantua.version>v1.4.0</gargantua.version>
 </properties>
 
 <repositories>

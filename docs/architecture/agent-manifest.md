@@ -63,8 +63,8 @@ spec:
   # Which runtime image this bundle needs. Omit to accept the platform default.
   # Name a custom image when the agent requires Java tools built in library mode.
   runtime:
-    image: ghcr.io/giskardb/gargantua-runtime:1.0
-    minVersion: "1.0"
+    image: ghcr.io/giskardb/gargantua-runtime:1.4.0
+    minVersion: "1.4.0"
 
   # Contracts advertised to the Catalog. Callers route on these, not on the agent name.
   capabilities:

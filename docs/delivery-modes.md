@@ -82,19 +82,21 @@ Start here: [Try it in 60 seconds](../README.md#try-it-in-60-seconds).
 
 **Gargantua is a process. The agent is a bundle it loads.**
 
-A generic runtime image executes a declarative bundle handed to it at startup:
+A generic runtime image executes a declarative bundle handed to it at startup — every
+tagged release publishes it, nothing to build:
 
 ```bash
 docker run -v ./customer-agent.gbundle:/bundle:ro \
            -e LLM_PRIMARY_API_KEY=sk-... \
-           ghcr.io/giskardb/gargantua-runtime:1.0
+           ghcr.io/giskardb/gargantua-runtime:latest
 ```
 
-Or locally:
+Or as a plain jar, downloaded once:
 
 ```bash
-gargantua validate my-agent.gbundle   # parse, verify integrity, report unapplied fields
-gargantua run       my-agent.gbundle
+curl -LO https://github.com/GiskardB/gargantua/releases/latest/download/gargantua-runtime.jar
+java -jar gargantua-runtime.jar validate my-agent.gbundle   # parse, verify integrity, report unapplied fields
+java -jar gargantua-runtime.jar run       my-agent.gbundle
 ```
 
 The bundle is a directory or archive:
@@ -132,9 +134,9 @@ therefore come from MCP servers declared in the manifest. See
 The runtime image is the executor; the bundle is the payload. They are separate artifacts:
 
 ```
-gargantua-runtime:1.0        + customer-agent.gbundle v1.2   → running agent
-gargantua-runtime:1.1        + customer-agent.gbundle v1.2   → patched engine, same agent
-gargantua-runtime:1.0        + customer-agent.gbundle v1.3   → new agent, same engine
+gargantua-runtime:1.4.0      + customer-agent.gbundle v1.2   → running agent
+gargantua-runtime:1.4.1      + customer-agent.gbundle v1.2   → patched engine, same agent
+gargantua-runtime:1.4.0      + customer-agent.gbundle v1.3   → new agent, same engine
 ```
 
 Roll a bundle forward without rebuilding the image; patch the image without republishing
@@ -143,7 +145,7 @@ bundles. A manifest may pin the image it needs:
 ```yaml
 spec:
   runtime:
-    image: ghcr.io/giskardb/gargantua-runtime:1.0
+    image: ghcr.io/giskardb/gargantua-runtime:1.4.0
 ```
 
 ---
@@ -163,7 +165,7 @@ public class AcmeRuntime {
 ```
 
 ```dockerfile
-FROM ghcr.io/giskardb/gargantua-runtime:1.0
+FROM ghcr.io/giskardb/gargantua-runtime:1.4.0
 COPY target/acme-runtime.jar /app/runtime.jar
 ```
 

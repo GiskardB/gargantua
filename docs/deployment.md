@@ -79,20 +79,21 @@ See [Delivery Modes](delivery-modes.md) for how to choose.
 
 ## Runtime mode — the bundle-executing image
 
-The runtime image is the executor; the bundle is the payload. Build it from the repository
-root (the Dockerfile needs the whole reactor):
-
-```bash
-docker build -f agent-runtime/Dockerfile -t gargantua-runtime:1.0 .
-```
-
-Run it with a bundle mounted read-only:
+The runtime image is the executor; the bundle is the payload. Every tagged release
+publishes it to GHCR — pull it, no build needed:
 
 ```bash
 docker run -p 8080:8080 \
   -v ./customer-agent.gbundle:/bundle:ro \
   -e LLM_PRIMARY_API_KEY=sk-... \
-  gargantua-runtime:1.0
+  ghcr.io/giskardb/gargantua-runtime:latest
+```
+
+Building it yourself instead (e.g. to track `main` between releases) is one command from
+the repository root — the Dockerfile needs the whole reactor as its build context:
+
+```bash
+docker build -f agent-runtime/Dockerfile -t gargantua-runtime:local .
 ```
 
 The image is non-root, exposes 8080, and has a `HEALTHCHECK` against
