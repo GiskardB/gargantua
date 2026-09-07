@@ -96,7 +96,10 @@
     <maven-source-plugin.version>3.3.1</maven-source-plugin.version>
     <maven-javadoc-plugin.version>3.11.2</maven-javadoc-plugin.version>
     <maven-gpg-plugin.version>3.2.7</maven-gpg-plugin.version>
-    <central-publishing-maven-plugin.version>0.7.0</central-publishing-maven-plugin.version>
+    <!-- 0.7.0 fails to deserialize a "warnings" field the Central Portal API added to its
+         deployment response (UnrecognizedPropertyException) — a real successful publish
+         reported as a build failure. Bumped after hitting this on the v1.4.0 release. -->
+    <central-publishing-maven-plugin.version>0.11.0</central-publishing-maven-plugin.version>
   </properties>
 
   <dependencyManagement>
