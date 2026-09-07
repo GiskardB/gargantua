@@ -640,13 +640,14 @@ piece of that optional layer (Gateway + Operator) — never a requirement, here 
 Gargantua's manifest (`gargantua.ai/v1`) already covers governance, deployment and
 runtime concerns on its own. What it didn't have a portable, vendor-neutral way to
 express — what an agent's *cognition* looks like, what basic *contract* it operates
-under, how it can be *reached* — is being factored out into
-**[PACT](https://github.com/GiskardB/PACT/blob/main/SPECIFICATION.md)**, a small companion specification
-drafted in this repo with the eventual goal of proposing it to AAIF.
+under, how it can be *reached* — is expressed instead through
+**[PACT](https://github.com/GiskardB/PACT)**, a small, independent specification with
+its own repository. Gargantua doesn't own PACT and PACT doesn't require Gargantua —
+this is one implementation among however many end up existing.
 
-PACT is a **draft, not a released standard** — version 0.4, unpublished elsewhere. This
-repo is its reference implementation, usable with just this repo, no companion project
-involved: `spec.cognition`, `spec.contract` and `spec.interfaces` are real, tested
+PACT is a **draft, not a released standard** — version 0.4. Gargantua is one of its
+reference implementations (see the spec's own §46), usable on its own, no companion
+project involved: `spec.cognition`, `spec.contract` and `spec.interfaces` are real, tested
 manifest fields (`core.pact` in `agent-core`); every running agent serves its own PACT
 document live at `GET /.well-known/pact.json` (cached 60s, verified against a real
 running container), the standalone counterpart to the A2A Agent Card at

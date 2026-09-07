@@ -59,9 +59,9 @@ remote transport warned nowhere in Studio, and deleting a Registry bundle left a
 dangling Catalog entry forever. See the "2026-09-04" entry in §7 below for the full
 writeup → **PACT Core, fully
 closed** — the Runtime's manifest (`gargantua.ai/v1`) covers all seven pillars of
-[PACT](https://github.com/GiskardB/PACT/blob/main/SPECIFICATION.md), a small agent-description spec
-drafted in this repo for eventual submission to AAIF, and every running agent serves its
-own PACT document live at `GET /.well-known/pact.json` (`PactController` in
+[PACT](https://github.com/GiskardB/PACT), a small, independent agent-description spec
+(own repository, not owned by or specific to this platform), and every running agent
+serves its own PACT document live at `GET /.well-known/pact.json` (`PactController` in
 `agent-runtime`, verified against a real running container) — the standalone
 counterpart to the A2A Agent Card. Authoring cognition/contract through the Studio form
 was later removed (above), but nothing about the manifest schema or the live endpoint
