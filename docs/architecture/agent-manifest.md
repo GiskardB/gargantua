@@ -40,7 +40,7 @@ add the field speculatively before it does.
 
 `PactManifest.from(WorkloadManifest)` projects a manifest onto a standalone PACT v1 Core
 document, for anyone who wants the portable subset without the rest. See
-[PACT_v0.3_Agent_Contract_Specification.md](../../PACT_v0.3_Agent_Contract_Specification.md).
+[PACT_v0.4_Agent_Contract_Specification.md](../../PACT_v0.4_Agent_Contract_Specification.md).
 
 ---
 

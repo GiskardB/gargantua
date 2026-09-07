@@ -1,4 +1,4 @@
-# Gargantua -- AI Agent Framework & Runtime
+# Gargantua -- AI Agent Runtime & Framework
 
 [![License](https://img.shields.io/github/license/GiskardB/gargantua?style=flat-square&color=blue)](LICENSE)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.giskardb/agent-engine?style=flat-square&label=Maven%20Central&color=blue&logo=apachemaven&logoColor=white)](https://central.sonatype.com/artifact/io.github.giskardb/agent-engine)
@@ -9,18 +9,30 @@
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.0-6DB33F?style=flat-square&logo=spring&logoColor=white)](https://spring.io/projects/spring-boot)
 [![LangChain4j](https://img.shields.io/badge/LangChain4j-1.12-ff6b35?style=flat-square)](https://docs.langchain4j.dev/)
 
-**AI agents as a service, in Java.** Write a skill file and a tool class — Gargantua gives you a deployable REST API with streaming, persistent memory, guardrails, and multi-agent orchestration.
+**Declare an agent in YAML and Markdown — Gargantua runs it.** Write a `manifest.yaml`
+and a `SKILL.md`, point at an MCP server for tools, and a generic runtime executes it:
+skill routing, 3-layer memory, input/output guardrails, human-in-the-loop approvals, cost
+tracking, A2A interoperability. No Java required to build one.
 
-Define what your agent can do in a `SKILL.md` file (or a Java `@AgentSkill` annotation), implement actions as `@AgentTool` methods, and chain them into multi-step `@AgentsFlow` pipelines. The framework handles everything else: skill routing, 3-layer memory, input/output guardrails, human-in-the-loop approvals, cost tracking, A2A interoperability, and Kubernetes deployment.
+This is **Runtime mode** — a generic executor that loads a declarative bundle (no code,
+just YAML + Markdown) at startup. It's the primary, recommended way to use Gargantua and
+the fastest path from zero to a running agent: [Try it in 60 seconds](#try-it-in-60-seconds)
+below builds it from this repo with one command, no separate image to pull.
+
+Need tools that call your own services, a database, or an existing domain model instead?
+The same engine runs as a **Java library**: add `agent-engine` as a Maven dependency,
+annotate methods `@AgentTool`, and your Spring Boot application *is* the agent — routing,
+memory, guardrails and streaming behave identically. This is **Library mode**, the
+original way to use Gargantua and still fully supported — see
+[Two ways to ship an agent](#two-ways-to-ship-an-agent).
 
 Built on Java 25, Spring Boot 4.1.0, and LangChain4j.
 
-**This repository is complete and self-contained.** Add the dependency, or generate a
-project from the archetype, and you have a running agent — nothing else to install, no
-other repo required. Hand-write a `manifest.yaml` per
-[the spec](docs/architecture/agent-manifest.md) and a `.gbundle`, and `gargantua run` it —
-no authoring tool needed either. Its manifest (`gargantua.ai/v1`) also composes with
-[PACT](PACT_v0.3_Agent_Contract_Specification.md), an open, implementation-neutral
+**This repository is complete and self-contained.** Build the runtime image or jar (one
+command, no other repo required) and run a hand-written bundle, or add the library
+dependency and write Java — either way nothing else to install. The manifest
+(`gargantua.ai/v1`) also composes with
+[PACT](PACT_v0.4_Agent_Contract_Specification.md), an open, implementation-neutral
 agent-description spec this project is drafting.
 
 Separately, and entirely optionally, a few companion projects build **on top of** this
@@ -32,11 +44,83 @@ here. Otherwise, the quickstart is next.
 
 ## Try it in 60 seconds
 
-> Requires: Java 25+, Maven, an OpenAI-compatible API key. No Docker needed.
+> Requires: Java 25+, Maven, an OpenAI-compatible API key.
 
-### Option A — add Gargantua to an existing project (Maven Central)
+### Option A — Runtime mode: a bundle, no Java code (recommended first look)
 
-This is the recommended path. No `settings.xml` changes, no extra `<repository>` block: Maven Central is queried by default.
+`agent-runtime` isn't on Maven Central yet (see the [artifact table](#framework-libraries-maven-coordinates)
+below) — building it is one Maven command against this repo, no other repo required:
+
+```bash
+git clone https://github.com/GiskardB/gargantua.git && cd gargantua
+mvn -q -pl agent-core,agent-memory-sdk,agent-mcp-client,agent-bundle,agent-engine,agent-runtime \
+    -am package -DskipTests
+```
+
+Hand-write a bundle — two files, no build step of their own, no authoring tool needed:
+
+```bash
+mkdir -p my-agent/skills/greeter-skill
+cat > my-agent/manifest.yaml <<'EOF'
+apiVersion: gargantua.ai/v1
+kind: Agent
+metadata:
+  name: my-agent
+  version: 1.0.0
+spec:
+  capabilities:
+    - name: greet
+      description: Greets the user
+      implementedBy: greeter-skill
+  defaultSkill: greeter-skill
+EOF
+cat > my-agent/skills/greeter-skill/SKILL.md <<'EOF'
+---
+name: greeter-skill
+description: Greets the user.
+version: 1.0.0
+---
+## Role
+You are a friendly demo agent.
+EOF
+```
+
+Run it — a plain JVM process, no Docker needed for this step:
+
+```bash
+LLM_PRIMARY_PROVIDER=openai LLM_PRIMARY_MODEL=gpt-4o LLM_PRIMARY_API_KEY=sk-your-key \
+java -jar agent-runtime/target/agent-runtime-*.jar run my-agent --spring.profiles.active=embedded
+```
+
+```bash
+curl -X POST http://localhost:8080/api/agent/chat \
+  -H "Content-Type: application/json" \
+  -H "X-User-Id: me" -H "X-Session-Id: s1" \
+  -d '{"message": "Hello, what can you do?"}'
+```
+
+That's a running agent — skill routing, guardrails, memory, streaming, a REST API —
+described entirely in two files, zero Java. `java -jar agent-runtime/target/agent-runtime-*.jar
+validate my-agent` parses it, verifies integrity and reports which manifest fields the
+runtime won't act on, without starting anything — a good pre-deploy CI gate.
+
+Prefer a container? Same jar, one more command, still no external image to pull:
+
+```bash
+docker build -f agent-runtime/Dockerfile -t gargantua-runtime:1.0 .
+docker run -p 8080:8080 -v ./my-agent:/bundle:ro \
+           -e LLM_PRIMARY_API_KEY=sk-your-key gargantua-runtime:1.0
+```
+
+Real tools instead of a demo skill come from **MCP servers** named in the manifest, not
+Java — see [Runtime mode](#two-ways-to-ship-an-agent) below for a tool-bearing example and
+[Agent Manifest](docs/architecture/agent-manifest.md) for the full schema.
+
+### Option B — Library mode: add Gargantua to a Java project
+
+For tools that need to call your own services, or when the agent is a feature inside a
+larger application. Both the framework jars **and the Maven archetype** are on Maven
+Central — no `settings.xml` edit, no extra repository.
 
 ```xml
 <dependency>
@@ -46,9 +130,7 @@ This is the recommended path. No `settings.xml` changes, no extra `<repository>`
 </dependency>
 ```
 
-### Option B — generate a fresh project from the Maven archetype (Maven Central)
-
-Both the framework jars **and the archetype itself** are published to Maven Central. No `settings.xml` edit, no extra repository — Central is queried by default.
+Or scaffold a fresh project:
 
 ```bash
 # 1. Generate a new agent project
@@ -67,31 +149,19 @@ LLM_PRIMARY_API_KEY=sk-your-key \
 LLM_PRIMARY_ENDPOINT=https://api.openai.com/v1 \
 SPRING_PROFILES_ACTIVE=embedded \
 mvn spring-boot:run
-#
-# Provider: openai (also works for Ollama, LiteLLM, vLLM, any OpenAI-compatible)
-#           anthropic | azure-openai
-#           Add more via LangChain4j modules (see docs/llm-configuration.md)
-#
-# OpenAI-compatible examples:
-#   Azure OpenAI: LLM_PRIMARY_PROVIDER=azure-openai  LLM_PRIMARY_ENDPOINT=https://your-resource.openai.azure.com
-#   Ollama local: LLM_PRIMARY_PROVIDER=ollama        LLM_PRIMARY_ENDPOINT=http://localhost:11434
-#   LiteLLM:      LLM_PRIMARY_PROVIDER=openai        LLM_PRIMARY_ENDPOINT=http://localhost:4000
-#   vLLM:         LLM_PRIMARY_PROVIDER=openai        LLM_PRIMARY_ENDPOINT=http://localhost:8000
 
-# 3. Talk to your agent (pick one)
-
-#    Option A — curl
+# 3. Talk to your agent
 curl -X POST http://localhost:8080/api/agent/chat \
   -H "Content-Type: application/json" \
   -H "X-User-Id: me" -H "X-Session-Id: s1" -H "X-Tenant-Id: acme" \
   -d '{"message": "Hello, what can you do?"}'
-
-#    You: Hello, what can you do?
-#    Agent: I can help you with...
-#    You: \exit
 ```
 
-That's a running agent with skill routing, guardrails, memory, streaming, and a REST API. Read on to add your own tools and skills.
+Provider is `openai` (also works for Ollama, LiteLLM, vLLM, any OpenAI-compatible
+endpoint), `anthropic`, or `azure-openai` — add more via LangChain4j modules, see
+[LLM Configuration](docs/llm-configuration.md). That's a running agent with skill
+routing, guardrails, memory, streaming, and a REST API. Read on to add your own tools
+and skills.
 
 <details>
 <summary>Need a snapshot or branch build? Use JitPack (optional)</summary>
@@ -186,6 +256,11 @@ Every feature has dedicated documentation — click the link to dive deeper.
 ---
 
 ## How it works
+
+The pipeline below is the shared engine both delivery modes run. This is what authoring
+it looks like in **Library mode** (Java); in **Runtime mode** the equivalent is a
+`manifest.yaml` + `SKILL.md` bundle with tools coming from MCP servers instead of
+`@AgentTool` methods — see [Two ways to ship an agent](#two-ways-to-ship-an-agent).
 
 **You write:**
 
@@ -290,7 +365,12 @@ Each step is a pluggable component — replace any part by declaring your own `@
 
 ## Full Setup Guide
 
-The "60 seconds" quickstart uses **embedded mode** (everything in-memory, no Docker). For production use with persistent memory, chat history, and local routing model, follow this full setup.
+This is the **Library mode** production setup — persistent memory, chat history, and a
+local routing model, continuing from Option B above. (Runtime mode's equivalent is
+[Agent Manifest](docs/architecture/agent-manifest.md) plus
+[Deployment](docs/deployment.md#runtime-mode--the-bundle-executing-image).) The "60
+seconds" quickstart used **embedded mode** (everything in-memory, no Docker); this
+section replaces that with persistent MongoDB/Redis and a local Ollama routing model.
 
 ### Prerequisites
 
@@ -422,7 +502,7 @@ open http://localhost:8080/swagger-ui
 
 ---
 
-## How It Works -- Add a Tool, Add a Skill
+## Add a Tool, Add a Skill (Library mode)
 
 ### Write a Tool
 
@@ -483,38 +563,49 @@ That's it. The framework handles routing, memory, guardrails, streaming, and eve
 ## Two ways to ship an agent
 
 Gargantua runs the same engine in two delivery modes. They differ only in who writes the
-agent and where its tools come from.
+agent and where its tools come from — routing, memory, guardrails, HITL, RAG, streaming,
+cost tracking and A2A behave identically in both. **Runtime mode is the primary,
+recommended path** — the one [Try it in 60 seconds, Option A](#try-it-in-60-seconds)
+above walks through; Library mode is the original experience, still fully supported, and
+the right choice once tools need to call your own code.
 
-| | **Library mode** | **Runtime mode** |
+| | **Runtime mode** (primary) | **Library mode** |
 |---|---|---|
-| You write | Java, in your own Spring Boot app | A declarative bundle |
-| Tools come from | Compiled `@AgentTool` methods | MCP servers named in the manifest |
-| Artifact | Your application | A signed, versioned `.gbundle` |
-| Start with | `mvn archetype:generate` (above) | `gargantua run my-agent.gbundle` |
-
-**Library mode** is the original experience and is unchanged — add the dependency, write
-tools in Java, run your app.
+| You write | A declarative bundle — `manifest.yaml` + `SKILL.md` | Java, in your own Spring Boot app |
+| Tools come from | MCP servers named in the manifest | Compiled `@AgentTool` methods |
+| Artifact | A signed, versioned `.gbundle` | Your application |
+| Start with | [Try it in 60 seconds, Option A](#try-it-in-60-seconds) | `mvn archetype:generate` (Option B above) |
 
 **Runtime mode** separates the executor from the payload. A generic runtime image loads a
-bundle at startup:
+bundle at startup — build the image from this repo (no separate registry to pull from
+yet, see the [artifact table](#framework-libraries-maven-coordinates)):
 
 ```bash
-docker run -v ./customer-agent.gbundle:/bundle:ro \
-           -e LLM_PRIMARY_API_KEY=sk-... \
-           ghcr.io/giskardb/gargantua-runtime:1.0
+docker build -f agent-runtime/Dockerfile -t gargantua-runtime:1.0 .
+docker run -p 8080:8080 -v ./customer-agent.gbundle:/bundle:ro \
+           -e LLM_PRIMARY_API_KEY=sk-... gargantua-runtime:1.0
+```
+
+Or skip Docker entirely — the runtime is a plain executable jar once built:
+
+```bash
+java -jar agent-runtime/target/agent-runtime-*.jar validate my-agent.gbundle   # parse, verify integrity, report unapplied fields
+java -jar agent-runtime/target/agent-runtime-*.jar run       my-agent.gbundle   # execute
 ```
 
 Image and bundle version independently: roll a bundle forward without rebuilding the
 image, patch the image without republishing bundles. Bundles never contain executable
 code, which is what makes signing them meaningful — teams needing bespoke Java tools build
-a custom runtime image in library mode and name it in the manifest.
+a custom runtime image in library mode (`FROM` the image above, add compiled
+`@AgentTool` beans) and name it in the manifest.
 
-```bash
-gargantua validate my-agent.gbundle   # parse, verify integrity, report unapplied fields
-gargantua run       my-agent.gbundle   # execute
-```
+**Library mode** is the original experience and is unchanged — add the dependency, write
+tools in Java, run your app. Use it when tools need to call your own services or an
+existing domain model, when the agent is a feature of a larger application, or when you
+want the shortest path from an idea to a running agent without touching YAML at all.
 
-See [AI Operating System](docs/architecture/ai-operating-system.md) for where this is
+See [Delivery Modes](docs/delivery-modes.md) for the in-depth comparison,
+[AI Operating System](docs/architecture/ai-operating-system.md) for where this is
 heading, [Agent Manifest](docs/architecture/agent-manifest.md) for the bundle schema, and
 [Runtime Decisions](docs/architecture/runtime-decisions.md) for why it is built this way.
 
@@ -547,37 +638,56 @@ Gargantua's manifest (`gargantua.ai/v1`) already covers governance, deployment a
 runtime concerns on its own. What it didn't have a portable, vendor-neutral way to
 express — what an agent's *cognition* looks like, what basic *contract* it operates
 under, how it can be *reached* — is being factored out into
-**[PACT](PACT_v0.3_Agent_Contract_Specification.md)**, a small companion specification
+**[PACT](PACT_v0.4_Agent_Contract_Specification.md)**, a small companion specification
 drafted in this repo with the eventual goal of proposing it to AAIF.
 
-PACT is a **draft, not a released standard** — version 0.3, unpublished elsewhere. This
-repo is its first reference implementation, usable with just this repo, no companion
-project involved: `spec.cognition`, `spec.contract` and `spec.interfaces` are real,
-tested manifest fields (`core.pact` in `agent-core`); every running agent serves its own
-PACT document live at `GET /.well-known/pact.json`, the standalone counterpart to the A2A
-Agent Card at `/.well-known/agent.json`. Read the spec itself for the full rationale, or
+PACT is a **draft, not a released standard** — version 0.4, unpublished elsewhere. This
+repo is its reference implementation, usable with just this repo, no companion project
+involved: `spec.cognition`, `spec.contract` and `spec.interfaces` are real, tested
+manifest fields (`core.pact` in `agent-core`); every running agent serves its own PACT
+document live at `GET /.well-known/pact.json` (cached 60s, verified against a real
+running container), the standalone counterpart to the A2A Agent Card at
+`/.well-known/agent.json`. Read the spec itself for the full rationale, or
 [`docs/architecture/agent-manifest.md`](docs/architecture/agent-manifest.md) for exactly
 how Gargantua's manifest maps onto it, field by field.
+
+Building this took an implementation-informed revision of PACT itself, not just of
+Gargantua: authoring `cognition`/`contract` through a real visual designer (Studio)
+turned out to read as confusing duplication to real users, since PACT deliberately never
+enforces those fields (Declaration vs Verification, PACT §31) — Studio now surfaces only
+`interfaces` in its form, while the manifest schema, parser and live endpoint keep all
+three fields fully intact. That lesson, and others from wiring the full seven-pillar
+projection end to end, are folded into the spec's own [§46](PACT_v0.4_Agent_Contract_Specification.md#46-reference-implementations).
 
 ---
 
 ## Framework Libraries (Maven coordinates)
 
-Gargantua is distributed as a set of Maven libraries. You don't clone this repo -- you add dependencies.
+Library mode is distributed as a set of Maven libraries — for that mode you don't clone
+this repo, you add dependencies. **Runtime mode currently requires cloning and building**
+(see [Try it in 60 seconds, Option A](#try-it-in-60-seconds)): three of the modules below
+were added after the last tagged release and aren't on Maven Central yet.
 
-| Artifact | Maven Central groupId | JitPack groupId | Description |
+| Artifact | Maven Central | JitPack groupId | Description |
 |----------|------------------------|------------------|-------------|
-| `agent-core` | `io.github.giskardb` | `com.github.giskardb.gargantua` | Pure domain: records, interfaces, annotations. Zero Spring deps. |
-| `agent-memory-sdk` | `io.github.giskardb` | `com.github.giskardb.gargantua` | Standalone 3-layer memory (Redis + MongoDB). Reusable in any project. |
-| `agent-mcp-client` | `io.github.giskardb` | `com.github.giskardb.gargantua` | Consumes external MCP servers and exposes their tools as agent tools. Zero Spring deps. |
-| `agent-bundle` | `io.github.giskardb` | `com.github.giskardb.gargantua` | Agent bundle format: manifest parsing, loading, integrity verification. Zero Spring deps. |
-| `agent-engine` | `io.github.giskardb` | `com.github.giskardb.gargantua` | Auto-configuration, guardrails, routing, orchestrator, tool registry, REST controllers, skill registries, admin endpoints. |
-| `agent-runtime` | `io.github.giskardb` | `com.github.giskardb.gargantua` | Standalone runtime that loads and executes an agent bundle. Shipped as a container image. |
-| `agent-mcp-server` | `io.github.giskardb` | `com.github.giskardb.gargantua` | MCP Server gateway (optional). |
-| `agent-skill-linter-maven-plugin` | `io.github.giskardb` | `com.github.giskardb.gargantua` | Build-time SKILL.md validation. |
-| `agent-archetype` | `io.github.giskardb` | `com.github.giskardb.gargantua` | Maven archetype to scaffold new agent projects. |
+| `agent-core` | ✅ `io.github.giskardb` | `com.github.giskardb.gargantua` | Pure domain: records, interfaces, annotations. Zero Spring deps. |
+| `agent-memory-sdk` | ✅ `io.github.giskardb` | `com.github.giskardb.gargantua` | Standalone 3-layer memory (Redis + MongoDB). Reusable in any project. |
+| `agent-mcp-client` | 🚧 not yet — build from source | `com.github.giskardb.gargantua` | Consumes external MCP servers and exposes their tools as agent tools. Zero Spring deps. |
+| `agent-bundle` | 🚧 not yet — build from source | `com.github.giskardb.gargantua` | Agent bundle format: manifest parsing, loading, integrity verification. Zero Spring deps. |
+| `agent-engine` | ✅ `io.github.giskardb` | `com.github.giskardb.gargantua` | Auto-configuration, guardrails, routing, orchestrator, tool registry, REST controllers, skill registries, admin endpoints. |
+| `agent-runtime` | 🚧 not yet — build from source | `com.github.giskardb.gargantua` | Standalone runtime that loads and executes an agent bundle — see [Two ways to ship an agent](#two-ways-to-ship-an-agent) for the one-command build. |
+| `agent-mcp-server` | ✅ `io.github.giskardb` | `com.github.giskardb.gargantua` | MCP Server gateway (optional). |
+| `agent-skill-linter-maven-plugin` | ✅ `io.github.giskardb` | `com.github.giskardb.gargantua` | Build-time SKILL.md validation. |
+| `agent-archetype` | ✅ `io.github.giskardb` | `com.github.giskardb.gargantua` | Maven archetype to scaffold new agent projects. |
 
-Two distribution channels, same source code:
+The three 🚧 modules are what Runtime mode is built from — they were added to the
+reactor after `1.2.20` (the latest Central release, published before Runtime mode
+existed) and haven't been part of a tagged release since. `1.2.20`'s published
+`agent-engine` therefore doesn't pull them in transitively either. Building this repo
+(`mvn -pl ... -am package -DskipTests`, [above](#try-it-in-60-seconds)) is the current
+way to get them — a new tag will put all nine on Maven Central together.
+
+Two distribution channels for the rest, same source code:
 
 | Channel | When to use | Versioning |
 |---------|-------------|------------|
@@ -708,7 +818,7 @@ break, and a reading order for everything below.
 | AI Operating System — vision | [docs/architecture/ai-operating-system.md](docs/architecture/ai-operating-system.md) |
 | Gargantua Domain Model — shared object vocabulary | [docs/architecture/gargantua-domain-model.md](docs/architecture/gargantua-domain-model.md) |
 | Agent Manifest — bundle schema (+ PACT field mapping) | [docs/architecture/agent-manifest.md](docs/architecture/agent-manifest.md) |
-| **PACT** — the open agent-description spec drafted here (v0.3, unreleased) | [PACT_v0.3_Agent_Contract_Specification.md](PACT_v0.3_Agent_Contract_Specification.md) |
+| **PACT** — the open agent-description spec drafted here (v0.4, unreleased) | [PACT_v0.4_Agent_Contract_Specification.md](PACT_v0.4_Agent_Contract_Specification.md) |
 | Runtime Decisions — ADR log | [docs/architecture/runtime-decisions.md](docs/architecture/runtime-decisions.md) |
 | Runtime Observability — requirements (proposed, not implemented) | [docs/runtime-observability-requirements.md](docs/runtime-observability-requirements.md) |
 

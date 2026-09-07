@@ -4,7 +4,7 @@ import java.util.Set;
 
 /**
  * PACT's "Contract" pillar: the basic semantic conditions under which the agent may act
- * (see {@code PACT_v0.3_Agent_Contract_Specification.md} §14-15).
+ * (see {@code PACT_v0.4_Agent_Contract_Specification.md} §14-15).
  *
  * <p>Deliberately small and <strong>declarative</strong> — not a security control and not
  * a substitute for {@link ai.gargantua.core.workload.AgentSpec#allowedRoles()} /

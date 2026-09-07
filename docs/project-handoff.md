@@ -178,7 +178,7 @@ Branching: this repo is on **`main`**. (Earlier drafts of this doc referenced a
 5. [`architecture/platform-handoff.md`](architecture/platform-handoff.md) — cross-repo status & roadmap
 6. [`architecture/runtime-decisions.md`](architecture/runtime-decisions.md) — ADR-001..006, the binding decisions
 7. [`architecture/agent-manifest.md`](architecture/agent-manifest.md) — manifest schema and what is actually enforced
-8. [`../PACT_v0.3_Agent_Contract_Specification.md`](../PACT_v0.3_Agent_Contract_Specification.md) — the agent-description spec this manifest composes with (draft, not yet released)
+8. [`../PACT_v0.4_Agent_Contract_Specification.md`](../PACT_v0.4_Agent_Contract_Specification.md) — the agent-description spec this manifest composes with (draft, not yet released)
 9. [`extending.md`](extending.md) — every port and its default adapter
 
 Feature-specific: [`tools-and-annotations.md`](tools-and-annotations.md),

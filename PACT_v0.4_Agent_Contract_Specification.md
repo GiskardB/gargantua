@@ -1,18 +1,21 @@
 # PACT — Agent Contract Specification
 
-**Version:** 0.3 Draft
+**Version:** 0.4 Draft
 **Status:** Design proposal
 
 > **PACT — the open contract for AI agents.**
 
-**Changes since v0.2:** tightened the Cognition self-declaration vs. Cognition
-Requirements distinction (§11, §13); added a taxonomy disclaimer to `contract.permissions`
-(§14), mirroring the one `capabilities` already had; gave each autonomy level a one-line
-operational meaning and an explicit stopping-authority cross-reference (§15); added a
-Versioning Policy (§34), previously deferred to "future work" with no concrete answer; and
-added a short, non-normative Reference Implementations note (§46). All from validating
-Core against a real implementation, per the v0.2 "Draft Status" call to do exactly that —
-not from speculation.
+**Changes since v0.3:** substantially expanded §46 (Reference Implementations) with
+specifics from carrying the reference implementation from "Java projection only" to a
+live, running system — a real `/.well-known/pact.json` endpoint, a hand-written wire
+serializer, and a visual authoring tool built and then partly walked back. Two concrete
+findings came out of that work: Identity/Purpose derivation from adjacent fields is a
+viable pattern, not just a stopgap, which informs open question 1 (§47) with a second
+data point beyond speculation; and a general-purpose authoring form is not the same
+audience as a manifest author reading this spec directly — declaration-only fields read
+as broken controls to the former even when they are working exactly as designed for the
+latter. The second finding produced a new authoring guideline in §29. Everything else is
+unchanged from v0.3; no Core field, example or section number moved.
 
 ## 1. Executive Summary
 
@@ -695,6 +698,18 @@ The same experience could be implemented with a desktop UI, CLI, IDE extension o
 
 The HTML tool must consume the PACT schema rather than define a second schema.
 
+**A field's Core validity does not obligate every authoring surface to expose it.** A
+general-purpose visual designer aimed at non-experts is a different audience than someone
+reading this specification directly, and the difference matters specifically for
+declaration-only fields (§31): a form control that visibly does nothing reads as broken to
+the former, even while doing exactly what PACT designed it to do for the latter. An
+authoring tool **may** surface only the fields its host platform gives operational meaning
+to, and defer purely declarative fields — `cognition`, `contract` are the common case — to
+an advanced or secondary section, or omit them from the form while leaving them fully
+readable/writable in the underlying document. This is a tooling choice, not a schema
+change: the omitted fields remain first-class Core, still validated, still round-tripped.
+See §46 for where this guidance came from.
+
 ---
 
 ## 30. Machine Validation
@@ -1180,13 +1195,53 @@ choices.
 - **Gargantua** (Runtime + Studio) carries `cognition`, `contract` and `interfaces` as
   additive fields directly on its own agent manifest, which plays the role PACT calls
   "Agent Manifest" in §17 — authority, operational boundaries and governance — and
-  projects a standalone PACT Core document from it on request. `contract.autonomy` is
-  modeled as a closed, typed enum internally (informing open question 4, §47), while the
-  manifest wire format stays the plain integer this document specifies — the two are
-  independent by design (§34). This was the exercise that produced the
-  §11/§13/§14/§15/§34 clarifications in this revision: every wording ambiguity fixed here
+  projects a standalone PACT Core document from it. `contract.autonomy` is modeled as a
+  closed, typed enum internally (informing open question 4, §47), while the manifest wire
+  format stays the plain integer this document specifies — the two are independent by
+  design (§34). This was the exercise that produced the §11/§13/§14/§15/§34
+  clarifications first added in the v0.3 revision: every wording ambiguity fixed there
   came from something that was genuinely unclear while implementing it, not from a
-  hypothetical review.
+  hypothetical review. This revision adds what changed since: the projection went from a
+  Java-side data structure to a live, deployed system, and two further things became
+  concrete enough to write down.
+
+  - **The endpoint is real, not a plan.** Every running agent serves its PACT Core
+    projection at `GET /.well-known/pact.json`, cache-controlled, verified against an
+    actual running container rather than only unit-tested. Serializing it exposed a
+    concrete risk worth naming for any implementer in a typed language: a generic
+    object-mapper serialization of the internal model would have silently produced a
+    non-conformant document — the `Autonomy` enum would serialize as its Java name
+    (`"RECOMMENDING"`) instead of this spec's wire format (`{"level": 2}`), and the
+    internal `CognitionRequirements` shape (flattened for Java ergonomics) doesn't match
+    the nested wire shape (`modalities.required`, `contextWindow.minimum`) this document
+    specifies. The fix was a small hand-written serializer at the wire boundary, not a
+    schema change — but the failure mode is exactly the kind a validator (§30) should
+    catch, and exactly the kind that stays invisible until something actually reads the
+    document over the wire instead of asserting against the in-process object.
+  - **Identity and Purpose turned out to be cheap to derive, not fields worth adding.**
+    This implementation carries no dedicated storage for either — `identity.provider` is
+    projected from the same field that already answers "who owns this" for unrelated
+    reasons (operational alerting), and `purpose.description` is projected from the same
+    field that already answers "what is this" (§24). Both are `null` in the projected
+    document when the source field is unset, exactly as if they had never been declared.
+    This is a real, working answer to "do these need to be Core fields" for at least one
+    system — with an honestly-kept gap: a manifest that genuinely needs "what is it" and
+    "what is it for" to read differently has nowhere to put the second answer, because
+    only one free-text field exists to derive both from. Nothing forced that gap to stay
+    open; it stays open because no real manifest has needed it closed yet, which is
+    itself informative for open question 1 (§47).
+  - **A visual authoring form is a different audience than this document's reader, and
+    that difference has UX consequences.** A general-purpose designer surfaced
+    `cognition` and `contract` as form fields, then removed them after real users found
+    controls that visibly do nothing — because they are declaration-only by design (§31)
+    — confusing rather than useful, in a tool aimed at people who had not read this
+    specification and had no reason to expect that. `interfaces` stayed, because
+    declaring how to reach an already-live agent has a visible, checkable referent even
+    without enforcement. Nothing about the schema, parser or live endpoint changed:
+    `cognition`/`contract` remain fully readable and writable in the underlying document,
+    just not offered as a primary-form field. This produced the authoring guideline now
+    in §29 — the lesson generalizes past this one implementation, which is why it moved
+    up into Core-adjacent guidance rather than staying here as an anecdote.
 
 Further implementations should be added here as they appear, with a one-line description
 of what they compose PACT with — the point of this section is evidence of portability
@@ -1198,7 +1253,15 @@ of what they compose PACT with — the point of this section is evidence of port
 
 The following remain intentionally open during v0.x:
 
-1. Should `identity` be Core or optional?
+1. Should `identity` be Core or optional? **Leaning toward: optional, and cheap to
+   derive rather than requiring dedicated storage.** The reference implementation (§46)
+   carries no dedicated identity/purpose fields at all — both are derived from adjacent
+   metadata that exists for unrelated reasons, and that derivation has been adequate for
+   one real system's needs, with an explicitly acknowledged limit: a manifest wanting
+   "what is it" and "what is it for" to diverge has nowhere to put the second answer
+   today. One data point, not a resolution — reopen if a second implementation needs the
+   two answers to genuinely diverge, at which point Core may need an explicit (but still
+   optional) `purpose` field distinct from `metadata.description`.
 2. What is the smallest useful Cognition vocabulary?
 3. Should `model.family` have a controlled vocabulary?
 4. Should autonomy use the proposed five-level scale? **Tentatively yes** — the reference
@@ -1276,7 +1339,7 @@ HTML, visual editors, CLI tools and SDKs may make PACT easier to adopt, but they
 
 ## 50. Draft Status
 
-PACT v0.3 is a design proposal, not a finalized industry standard.
+PACT v0.4 is a design proposal, not a finalized industry standard.
 
 The next activity should be validation against existing specifications and real implementations, especially:
 

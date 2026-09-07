@@ -59,7 +59,7 @@ remote transport warned nowhere in Studio, and deleting a Registry bundle left a
 dangling Catalog entry forever. See the "2026-09-04" entry in §7 below for the full
 writeup → **PACT Core, fully
 closed** — the Runtime's manifest (`gargantua.ai/v1`) covers all seven pillars of
-[PACT](../../PACT_v0.3_Agent_Contract_Specification.md), a small agent-description spec
+[PACT](../../PACT_v0.4_Agent_Contract_Specification.md), a small agent-description spec
 drafted in this repo for eventual submission to AAIF, and every running agent serves its
 own PACT document live at `GET /.well-known/pact.json` (`PactController` in
 `agent-runtime`, verified against a real running container) — the standalone
@@ -97,7 +97,7 @@ also mirror to GitHub (`GiskardB`). Sibling repos are checked out side by side u
 
 | Repo | Role | Stack | Status (2026-08) |
 |---|---|---|---|
-| `gargantua` | **Runtime** + execution-side Kernel; **home of all architecture docs**; publishes `agent-core`; also home of the draft [PACT spec](../../PACT_v0.3_Agent_Contract_Specification.md) | Java 25 / Spring Boot 4.1, 9 Maven modules | Phase 1 + loadout + governance parsing + PACT Core fields; docs hub; on `1.4.0-SNAPSHOT` |
+| `gargantua` | **Runtime** + execution-side Kernel; **home of all architecture docs**; publishes `agent-core`; also home of the draft [PACT spec](../../PACT_v0.4_Agent_Contract_Specification.md) | Java 25 / Spring Boot 4.1, 9 Maven modules | Phase 1 + loadout + governance parsing + PACT Core fields; docs hub; on `1.4.0-SNAPSHOT` |
 | `gargantua-control-plane` | **Control Plane**: Registry + Catalog + Policy + Deployment (now with per-agent port tracking + undeploy) | Java 25 / Boot 4.1, `agent-core` | **MVP** — publish→index→discovery works; Deployment tracks real running instances; 28 tests |
 | `gargantua-studio` | **Studio** — frontend **and** BFF in ONE repo / ONE image (Spring serves the SPA at `/`, API at `/api`). Agent+Skill Designer, radial graph editor, Publish dialog, Playground (multi-agent aware) against real runtimes, Launch button (concurrent, per-agent). | React 18 / Vite 5 / XYFlow (in `frontend/`) + Java 25 / Boot 4.1 BFF (`agent-core`) | **MVP** — merged 2026-08; concurrent multi-agent launch 2026-08-29; 55 backend tests; 8 frontend tests; TypeScript clean |
 | ~~`gargantua-studio-backend`~~ | **Merged into `gargantua-studio`** (2026-08) — no longer a separate repo/image | — | Deprecated |
@@ -136,7 +136,7 @@ The single most important structural decision after the multi-repo split:
 - **`core.pact`** (new, 2026-08-30): `Cognition`/`CognitionModels`/`CognitionRequirements`/
   `ModelDescriptor`, `Contract`/`Autonomy` (enum), `InterfaceEndpoint`, `Identity`,
   `Purpose`, and `PactManifest` — a projector (`PactManifest.from(WorkloadManifest)`)
-  onto a standalone [PACT](../../PACT_v0.3_Agent_Contract_Specification.md) v1 Core
+  onto a standalone [PACT](../../PACT_v0.4_Agent_Contract_Specification.md) v1 Core
   document, plus `PactManifest.toWireMap()` (the actual wire shape — `Autonomy` as
   `{level: N}`, not its enum name). `Identity`/`Purpose` have no manifest field of their
   own; they're derived from `metadata.owner`/`metadata.description`. `agent-runtime`'s
@@ -381,7 +381,7 @@ the last two, adopt a standard or component instead of reinventing it.
 3. ✅ **PACT Core fields (ADOPT, P1)** — done, 2026-08-30. `spec.cognition`, `spec.contract`
    (`Autonomy` enum + permissions) and `spec.interfaces` added to `agent-core`
    (`core.pact`), parsed by the Runtime's `ManifestParser`, and projected onto a
-   standalone [PACT](../../PACT_v0.3_Agent_Contract_Specification.md) v1 Core document by
+   standalone [PACT](../../PACT_v0.4_Agent_Contract_Specification.md) v1 Core document by
    `PactManifest.from(WorkloadManifest)`. All seven PACT pillars are now covered — Identity/
    Purpose have no dedicated field, derived from `metadata.owner`/`metadata.description`
    instead. Bumped the shared model to **`1.4.0-SNAPSHOT`**. Unlike Loadout/Governance
