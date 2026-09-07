@@ -8,11 +8,17 @@
 # What it does:
 #   1. Builds all modules
 #   2. Runs all tests
-#   3. Creates a GitHub Release with changelog
+#   3. Attaches the Runtime-mode executable jar to the GitHub Release
+#      (java -jar it directly — no clone, no Maven build)
+#   4. Builds and pushes the Runtime image to GHCR (ghcr.io/giskardb/gargantua-runtime)
+#   5. Creates a GitHub Release with changelog
 #
-# Distribution: JitPack is the canonical consumer channel. It builds the
-# tag on demand the first time a consumer resolves it — no upload step
-# from this workflow is required. See README.md for consumer setup.
+# Distribution: JitPack is the canonical consumer channel for the library
+# jars. It builds the tag on demand the first time a consumer resolves it —
+# no upload step from this workflow is required. Runtime mode's artifacts
+# (the jar and the image) are published directly by this workflow instead,
+# since they're meant to be downloaded and run, not depended on. See
+# README.md for consumer setup.
 # ══════════════════════════════════════════════════════════════════════════════
 
 name: Release
@@ -35,6 +41,7 @@ on:
 
 permissions:
   contents: write    # For creating GitHub Releases
+  packages: write    # For pushing the Runtime image to GHCR
 
 env:
   MAVEN_OPTS: -Xmx1024m
@@ -96,6 +103,45 @@ jobs:
           mvn test
           --batch-mode --no-transfer-progress
 
+      # ── Prepare the Runtime-mode executable jar as a release asset ──────────
+      # Two copies: one pinned to the version (for reproducible references),
+      # one under a fixed name so /releases/latest/download/gargantua-runtime.jar
+      # always resolves to whatever the newest release is.
+      - name: Prepare Runtime jar artifact
+        if: startsWith(github.ref, 'refs/tags/') && !inputs.dry_run
+        run: |
+          mkdir -p dist
+          JAR=$(ls agent-runtime/target/agent-runtime-*.jar | grep -v sources | grep -v javadoc | head -1)
+          cp "$JAR" "dist/gargantua-runtime-${{ steps.version.outputs.version }}.jar"
+          cp "$JAR" "dist/gargantua-runtime.jar"
+          ls -la dist/
+
+      # ── Build and push the Runtime image to GHCR ─────────────────────────────
+      # Self-contained build (agent-runtime/Dockerfile), same recipe documented
+      # in the README — this just runs it in CI and publishes the result.
+      - name: Set up Docker Buildx
+        if: startsWith(github.ref, 'refs/tags/') && !inputs.dry_run
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: startsWith(github.ref, 'refs/tags/') && !inputs.dry_run
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Runtime image
+        if: startsWith(github.ref, 'refs/tags/') && !inputs.dry_run
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: agent-runtime/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/giskardb/gargantua-runtime:${{ steps.version.outputs.version }}
+            ghcr.io/giskardb/gargantua-runtime:latest
+
       # ── Generate changelog ─────────────────────────────────────────────────
       - name: Generate changelog
         id: changelog
@@ -152,6 +198,9 @@ jobs:
           body_path: changelog.md
           draft: false
           prerelease: ${{ contains(steps.version.outputs.version, '-') }}
+          files: |
+            dist/gargantua-runtime-${{ steps.version.outputs.version }}.jar
+            dist/gargantua-runtime.jar
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -164,5 +213,13 @@ jobs:
           echo "**Dry run:** ${{ inputs.dry_run || 'false' }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Distribution" >> $GITHUB_STEP_SUMMARY
-          echo "Consumers resolve via JitPack on first request. See:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Runtime mode** — download and run, no build:" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "curl -LO https://github.com/${{ github.repository }}/releases/latest/download/gargantua-runtime.jar" >> $GITHUB_STEP_SUMMARY
+          echo 'java -jar gargantua-runtime.jar run my-agent.gbundle' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "Or: \`docker run ghcr.io/giskardb/gargantua-runtime:latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Library mode** — Maven Central (\`io.github.giskardb\`) and JitPack. Consumers resolve via JitPack on first request:" >> $GITHUB_STEP_SUMMARY
           echo "https://jitpack.io/#${{ github.repository }}/${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
