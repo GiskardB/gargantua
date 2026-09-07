@@ -87,7 +87,7 @@ public final class ManifestProperties {
                     + "currently attached per skill via SKILL.md metadata.knowledge-base");
         }
         // spec.cognition/contract/interfaces are PACT Core fields (gargantua.ai/v1 composed
-        // with PACT — see PACT_v0.4_Agent_Contract_Specification.md). Unlike the fields above,
+        // with PACT — see github.com/GiskardB/PACT). Unlike the fields above,
         // these are not enforcement gaps: PACT §31 "Declaration vs Verification" says a PACT
         // manifest declares, it does not prove — so parsing and reporting them without runtime
         // enforcement is the correct behaviour, not a missing feature.

@@ -4,7 +4,7 @@ import java.util.Set;
 
 /**
  * Semantic description of an agent's reasoning system — PACT's "Cognition" pillar
- * (see {@code PACT_v0.4_Agent_Contract_Specification.md} §11-13 at the repository root).
+ * (see the <a href="https://github.com/GiskardB/PACT">PACT specification</a> §11-13).
  *
  * <p>Distinct from {@link ai.gargantua.core.workload.ModelSpec}: {@code ModelSpec} names
  * the <em>operational</em> model alias the runtime resolves via environment (e.g.

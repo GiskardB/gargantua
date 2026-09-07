@@ -2,8 +2,8 @@ package ai.gargantua.core.pact;
 
 /**
  * PACT's "Interfaces" pillar: how another system may reach this agent (see
- * {@code PACT_v0.4_Agent_Contract_Specification.md} §22). PACT does not define the
- * protocols themselves.
+ * the <a href="https://github.com/GiskardB/PACT">PACT specification</a> §22). PACT does
+ * not define the protocols themselves.
  *
  * <p>Every Gargantua agent already exposes an A2A endpoint at
  * {@code /.well-known/agent.json} ({@link ai.gargantua.core.a2a.AgentCard}); listing it

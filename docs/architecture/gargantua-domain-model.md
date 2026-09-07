@@ -143,7 +143,7 @@ lavoro ancora aperto nel Runtime.
 ### 3.1 Cognition / Contract / Interfaces — 🟢 Implementato (pacchetto `ai.gargantua.core.pact`)
 
 Tre campi aggiuntivi, additivi e opzionali, che implementano i pilastri
-Cognition/Contract/Interfaces di [PACT](../../PACT_v0.4_Agent_Contract_Specification.md)
+Cognition/Contract/Interfaces di [PACT](https://github.com/GiskardB/PACT/blob/main/SPECIFICATION.md)
 (la spec di descrizione agente che questo progetto sta scrivendo — vedi il file
 alla radice del repo). A differenza di `allowedRoles`/`memoryLayers`/`loadout`
 sopra, questi **non sono un gap da chiudere**: PACT stesso dice che una

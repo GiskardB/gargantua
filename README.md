@@ -31,7 +31,7 @@ Built on Java 25, Spring Boot 4.1.0, and LangChain4j.
 **This repository is complete and self-contained.** Download the runtime jar or image
 and run a hand-written bundle, or add the library dependency and write Java — either way
 nothing else to install. The manifest (`gargantua.ai/v1`) also composes with
-[PACT](PACT_v0.4_Agent_Contract_Specification.md), an open, implementation-neutral
+[PACT](https://github.com/GiskardB/PACT/blob/main/SPECIFICATION.md), an open, implementation-neutral
 agent-description spec this project is drafting.
 
 Separately, and entirely optionally, a few companion projects build **on top of** this
@@ -641,7 +641,7 @@ Gargantua's manifest (`gargantua.ai/v1`) already covers governance, deployment a
 runtime concerns on its own. What it didn't have a portable, vendor-neutral way to
 express — what an agent's *cognition* looks like, what basic *contract* it operates
 under, how it can be *reached* — is being factored out into
-**[PACT](PACT_v0.4_Agent_Contract_Specification.md)**, a small companion specification
+**[PACT](https://github.com/GiskardB/PACT/blob/main/SPECIFICATION.md)**, a small companion specification
 drafted in this repo with the eventual goal of proposing it to AAIF.
 
 PACT is a **draft, not a released standard** — version 0.4, unpublished elsewhere. This
@@ -660,7 +660,7 @@ turned out to read as confusing duplication to real users, since PACT deliberate
 enforces those fields (Declaration vs Verification, PACT §31) — Studio now surfaces only
 `interfaces` in its form, while the manifest schema, parser and live endpoint keep all
 three fields fully intact. That lesson, and others from wiring the full seven-pillar
-projection end to end, are folded into the spec's own [§46](PACT_v0.4_Agent_Contract_Specification.md#46-reference-implementations).
+projection end to end, are folded into the spec's own [§46](https://github.com/GiskardB/PACT/blob/main/SPECIFICATION.md#46-reference-implementations).
 
 ---
 
@@ -817,7 +817,7 @@ break, and a reading order for everything below.
 | AI Operating System — vision | [docs/architecture/ai-operating-system.md](docs/architecture/ai-operating-system.md) |
 | Gargantua Domain Model — shared object vocabulary | [docs/architecture/gargantua-domain-model.md](docs/architecture/gargantua-domain-model.md) |
 | Agent Manifest — bundle schema (+ PACT field mapping) | [docs/architecture/agent-manifest.md](docs/architecture/agent-manifest.md) |
-| **PACT** — the open agent-description spec drafted here (v0.4, unreleased) | [PACT_v0.4_Agent_Contract_Specification.md](PACT_v0.4_Agent_Contract_Specification.md) |
+| **PACT** — the open agent-description spec this manifest composes with (v0.4, unreleased) | [GiskardB/PACT](https://github.com/GiskardB/PACT) |
 | Runtime Decisions — ADR log | [docs/architecture/runtime-decisions.md](docs/architecture/runtime-decisions.md) |
 | Runtime Observability — requirements (proposed, not implemented) | [docs/runtime-observability-requirements.md](docs/runtime-observability-requirements.md) |
 

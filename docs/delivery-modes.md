@@ -244,7 +244,7 @@ Runtime today, enforced by the Control Plane/Policy Manager later — see
 - **`metadata.governance`** — cross-cutting ownership/tenant/visibility/status/ACL.
 
 A third addition, `spec.cognition`/`spec.contract`/`spec.interfaces`, implements
-[PACT](../PACT_v0.4_Agent_Contract_Specification.md) Core — also parsed and reported, but
+[PACT](https://github.com/GiskardB/PACT/blob/main/SPECIFICATION.md) Core — also parsed and reported, but
 *not* headed toward future enforcement like the two above: PACT treats these as
 declarations by design (see agent-manifest.md's "Relationship to PACT").
 
