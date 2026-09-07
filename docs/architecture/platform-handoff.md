@@ -9,7 +9,7 @@ and what comes next. It complements — does not replace — two narrower docs:
 - [`ai-operating-system.md`](ai-operating-system.md) — the **vision** (the north
   star, not a sprint plan).
 
-**Last updated:** 2026-09-05. If a fact here disagrees with the code, the code wins —
+**Last updated:** 2026-09-07. If a fact here disagrees with the code, the code wins —
 fix this doc. For changes made in the 2026-09-05 session, see
 [`SESSION_HANDOFF_2026-09-05.md`](SESSION_HANDOFF_2026-09-05.md) (and
 [`SESSION_HANDOFF_2026-09-04.md`](SESSION_HANDOFF_2026-09-04.md),
@@ -18,7 +18,13 @@ fix this doc. For changes made in the 2026-09-05 session, see
 [`SESSION_HANDOFF_2026-08-29.md`](SESSION_HANDOFF_2026-08-29.md),
 [`SESSION_HANDOFF_2026-08-28.md`](SESSION_HANDOFF_2026-08-28.md) before it).
 
-**Recent progress (most recent first):** **Three real bugs found and fixed via a
+**Recent progress (most recent first):** **CDS-optimized `gargantua-runtime:local`
+image** — a `trainer` build stage in `gargantua-compose/runtime.Dockerfile` bakes a
+dynamic CDS archive into the image at build time (Spring Boot's documented
+`spring.context.exit=onRefresh` training-run hook against the bundled demo agent, no
+network needed); verified live across 6 real container launches, ~13% faster
+"Started GargantuaRuntime" consistently, chat unaffected. See the "2026-09-07" entry
+in §7 → **Three real bugs found and fixed via a
 genuinely live end-to-end test** — a multi-skill bundle with memory, bundled
 reference content and an unauthenticated external MCP tool, run against the real
 Runtime and separately against a freshly-generated `agent-archetype` project, because
@@ -544,6 +550,46 @@ not just a passing test suite. 668 tests, 0 failures across
 `agent-core`/`agent-memory-sdk`/`agent-bundle`/`agent-engine`/`agent-mcp-server`/
 `agent-runtime`, plus the archetype's integration test green for what may be the
 first time. See `SESSION_HANDOFF_2026-09-05.md` for the full writeup.
+
+### 2026-09-07: CDS-optimized `gargantua-runtime:local` image (startup speed)
+
+Follow-on to a "what if N agents shared one container" architecture question (§8's
+container-per-agent decision restated and re-confirmed): GraalVM native-image was
+evaluated first and shelved — no groundwork exists in this codebase, and the
+reflection/JNI compatibility rework (ONNX/DJL native libs, Jackson) wasn't worth the
+risk for an unstarted spike. Tried the lower-risk alternative instead: JVM-native
+Class Data Sharing (dynamic CDS; the newer JEP 483 AOT Cache infrastructure is also
+present as a production `{product}` flag in the installed JDK 25, not just
+experimental).
+
+Added a `trainer` stage to `gargantua-compose/runtime.Dockerfile`: boots the built
+jar against the repo's own `examples/hello-agent` bundle in the `embedded` Spring
+profile (no Mongo/Redis, no network) and exits right after context refresh via
+`-Dspring.context.exit=onRefresh` — Spring Boot's own documented CDS training-run
+hook — producing `/app/app-cds.jsa`. The final image copies that archive in and adds
+`-XX:SharedArchiveFile=/app/app-cds.jsa` to the entrypoint. This fits the platform
+better than a typical app: the runtime image is generic (the bundle is fetched by
+URL at container start, so the class graph loaded is the same regardless of which
+agent it ends up running), so the archive only needs training **once, at
+image-build time** — every agent launched from the image benefits, no per-agent
+training tax.
+
+Verified live, not assumed: the boot log shows `[cds] Mapped dynamic region #0/#1/#2`
+— the archive is genuinely mapped, not silently skipped for a version/config
+mismatch. Timed 6 real container launches against the real Control-Plane-served
+`hello-agent` bundle (3 with the archive, 3 without, the same launch command Studio
+uses) — a consistent **~13% faster "Started GargantuaRuntime"** (10.02s avg vs
+11.49s avg; every CDS run beat every non-CDS run, not just on average) — and
+confirmed chat still answers correctly. **One claim from the original pitch was
+*not* verified and is flagged rather than reported as proven:** the read-only
+archive file being shared page-cache-backed across multiple containers on the same
+host (the same OS mechanism containers already get for shared base-image layers)
+is architecturally sound but wasn't directly measurable here — the Docker daemon is
+remote (`DOCKER_HOST=tcp://socket-proxy:2375`), so there's no host `/proc` access to
+compute real cross-process PSS. A single-container RSS comparison (459 MiB with the
+archive mapped vs 302 MiB without) is not evidence either way: mmap'd archive pages
+count toward a process's own RSS regardless of whether the kernel is deduplicating
+them with sibling containers.
 
 ## 8. Known gaps & honest caveats
 
