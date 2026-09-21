@@ -915,6 +915,7 @@ All storage uses in-memory ConcurrentHashMaps. Data is lost on restart.
 | `LLM_PRIMARY_DEPLOYMENT_NAME` | Azure OpenAI deployment name; defaults to `LLM_PRIMARY_MODEL` when blank. Required if deployment id differs from model id. | *(empty)* |
 | `LLM_PRIMARY_TEMPERATURE` | Sampling temperature (0.0 -- 1.0) | `0.7` |
 | `LLM_PRIMARY_MAX_TOKENS` | Max tokens in LLM response | `1000` |
+| `LLM_PRIMARY_MAX_COMPLETION_TOKENS` | Azure OpenAI only — newer models (e.g. `gpt-5.1`) require `max_completion_tokens` instead of the legacy `max_tokens`. Takes precedence over `LLM_PRIMARY_MAX_TOKENS` for `azure-openai`. | *(empty)* |
 | **Fallback LLM** | Used automatically when primary provider fails | |
 | `LLM_FALLBACK_PROVIDER` | Fallback provider (must be OpenAI-compatible) | *(optional)* |
 | `LLM_FALLBACK_MODEL` | Fallback model | *(optional)* |

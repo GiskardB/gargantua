@@ -187,7 +187,8 @@ set LLM_PRIMARY_DEPLOYMENT_NAME=gpt-5.1
 
 > **Common pitfalls:**  
 > - 404 "Resource not found" — usually the endpoint still contains `/openai/responses?...` or the deployment name differs from the model id.  
-> - Gargantua's built-in Azure provider uses the **Chat Completions** endpoint (`/openai/deployments/{deployment}/chat/completions`), not the Responses API. If your Foundry deployment exposes only the Responses API, provide a custom `ChatModel` bean instead.
+> - Gargantua's built-in Azure provider uses the **Chat Completions** endpoint (`/openai/deployments/{deployment}/chat/completions`), not the Responses API. If your Foundry deployment exposes only the Responses API, provide a custom `ChatModel` bean instead.  
+> - 400 "Unsupported parameter: 'max_tokens'" — newer Azure models (e.g. `gpt-5.1`) require `max_completion_tokens` instead of the legacy `max_tokens`. Set `LLM_PRIMARY_MAX_COMPLETION_TOKENS` (or `agent.llm.primary.max-completion-tokens`) to switch.
 
 ### Rate limiting
 

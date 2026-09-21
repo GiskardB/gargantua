@@ -248,6 +248,12 @@ public class AgentProperties {
         private double temperature = 0.7;
         private int maxTokens = 4096;
         /**
+         * Azure OpenAI max completion tokens (for models like gpt-5.1 that don't
+         * support the legacy {@code max_tokens} parameter). When set, this takes
+         * precedence over {@code maxTokens} for {@code azure-openai} provider.
+         */
+        private Integer maxCompletionTokens = null;
+        /**
          * Azure OpenAI service version (e.g. {@code 2024-08-01-preview}). Required
          * when {@code provider=azure-openai}; ignored for every other provider.
          * Maps to {@code AzureOpenAiChatModel.builder().serviceVersion(...)}.
@@ -277,6 +283,9 @@ public class AgentProperties {
 
         public int getMaxTokens() { return maxTokens; }
         public void setMaxTokens(int maxTokens) { this.maxTokens = maxTokens; }
+
+        public Integer getMaxCompletionTokens() { return maxCompletionTokens; }
+        public void setMaxCompletionTokens(Integer maxCompletionTokens) { this.maxCompletionTokens = maxCompletionTokens; }
 
         public String getApiVersion() { return apiVersion; }
         public void setApiVersion(String apiVersion) { this.apiVersion = apiVersion; }
