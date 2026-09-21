@@ -22,7 +22,7 @@
   <description>AI Agent powered by Gargantua framework</description>
 
   <properties>
-    <java.version>25</java.version>
+    <java.version>21</java.version>
     <!-- Latest release on Maven Central — bump when a newer version ships.
          Need a snapshot or branch build instead? See "Try it in 60 seconds"
          in the Gargantua README for the JitPack (com.github.giskardb.gargantua)

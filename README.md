@@ -5,7 +5,7 @@
 [![Latest tag](https://img.shields.io/github/v/tag/GiskardB/gargantua?style=flat-square&label=tag&color=brightgreen)](https://github.com/GiskardB/gargantua/tags)
 [![JitPack](https://jitpack.io/v/GiskardB/gargantua.svg?style=flat-square)](https://jitpack.io/#GiskardB/gargantua)
 [![CI](https://img.shields.io/github/actions/workflow/status/GiskardB/gargantua/ci.yml?style=flat-square&label=CI)](https://github.com/GiskardB/gargantua/actions/workflows/ci.yml)
-[![Java](https://img.shields.io/badge/Java-25-007396?style=flat-square&logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/25/)
+[![Java](https://img.shields.io/badge/Java-21-007396?style=flat-square&logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/21/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.0-6DB33F?style=flat-square&logo=spring&logoColor=white)](https://spring.io/projects/spring-boot)
 [![LangChain4j](https://img.shields.io/badge/LangChain4j-1.12-ff6b35?style=flat-square)](https://docs.langchain4j.dev/)
 
@@ -26,7 +26,7 @@ memory, guardrails and streaming behave identically. This is **Library mode**, t
 original way to use Gargantua and still fully supported — see
 [Two ways to ship an agent](#two-ways-to-ship-an-agent).
 
-Built on Java 25, Spring Boot 4.1.0, and LangChain4j.
+Built on Java 21, Spring Boot 4.1.0, and LangChain4j.
 
 **This repository is complete and self-contained.** Download the runtime jar or image
 and run a hand-written bundle, or add the library dependency and write Java — either way
@@ -43,7 +43,7 @@ here. Otherwise, the quickstart is next.
 
 ## Try it in 60 seconds
 
-> Requires: Java 25+ (or Docker), an OpenAI-compatible API key. No clone, no build.
+> Requires: Java 21+ (or Docker), an OpenAI-compatible API key. No clone, no build.
 
 ### Option A — Runtime mode: a bundle, no Java code (recommended first look)
 
@@ -372,7 +372,7 @@ section replaces that with persistent MongoDB/Redis and a local Ollama routing m
 
 ### Prerequisites
 
-- **Java 25+** — the framework uses Virtual Threads (Project Loom)
+- **Java 21+** — the framework uses Virtual Threads (Project Loom)
 - **Maven 3.9+**
 - **Docker & Docker Compose** — for MongoDB, Redis, and Ollama
 
@@ -753,7 +753,7 @@ JitPack uses the groupId `com.github.giskardb.gargantua` and versions match Git 
 
 | Component | Version |
 |-----------|---------|
-| Java | 25 (Virtual Threads) |
+| Java | 21 (Virtual Threads) |
 | Spring Boot | 4.1.0 |
 | Spring Framework | 7.0.5 |
 | LangChain4j | 1.12.1 |

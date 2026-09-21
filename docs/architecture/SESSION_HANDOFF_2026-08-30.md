@@ -82,7 +82,7 @@ following the same convention as the earlier Loadout bump.
 derivation/blank-input cases), 6 new in `ManifestParserTest`, 1 new in
 `ManifestPropertiesTest`. Full reactor verified **869 tests, all green** (up from 842 —
 verified by an actual build capturing Surefire summaries per module, not estimated), via
-a throwaway `maven:3.9-eclipse-temurin-25` (glibc, not Alpine — musl breaks onnxruntime's
+a throwaway `maven:3.9-eclipse-temurin-21` (glibc, not Alpine — musl breaks onnxruntime's
 native lib in `agent-engine`'s RAG tests, unrelated to this session's changes) Docker
 image, cleaned up after each run.
 

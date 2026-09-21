@@ -39,7 +39,7 @@ them so we don't "adopt" what we already have:
 | Guardrails (input/output) | `core.guardrail.*` |
 | Studio produces a compatible artifact | Agent Designer → `gargantua.ai/v1` manifest; Skill Designer → `SKILL.md`, both via the shared `agent-core` model |
 
-Corrections to the source document: it says **Java 21** — Gargantua is on **Java 25**.
+Corrections to the source document: it says **Java 21** — Gargantua is on **Java 21**.
 It says **"Modular Monolith, don't start with microservices"** (§74) while its own
 §77 lists **11 repos**; Gargantua already chose a distributed multi-repo layout
 (ADR-001) and explicitly rejected a single-deployable modular monolith. That decision

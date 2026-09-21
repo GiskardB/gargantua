@@ -60,8 +60,8 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-plugin-plugin</artifactId>
-        <!-- 3.15.2 bundles ASM 9.9, which can parse Java 25 bytecode (class
-             file major version 69); 3.15.1's ASM 9.7.1 cannot. -->
+        <!-- 3.15.2 bundles ASM 9.9, which can parse Java 21 bytecode (class
+             file major version 65); 3.15.1's ASM 9.7.1 cannot. -->
         <version>3.15.2</version>
       </plugin>
     </plugins>

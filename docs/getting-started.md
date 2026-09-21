@@ -8,7 +8,7 @@ This guide walks you through installing, running, and customizing your first age
 
 ## Prerequisites
 
-- **Java 25+** — the framework uses Virtual Threads (Project Loom)
+- **Java 21+** — the framework uses Virtual Threads (Project Loom)
 - **Maven 3.9+**
 - An OpenAI-compatible API key *(or any LangChain4j-supported provider)*
 - *(Optional)* **Docker & Docker Compose** — for MongoDB, Redis, and Ollama in standard mode
@@ -382,7 +382,7 @@ SPRING_PROFILES_ACTIVE=embedded mvn spring-boot:run
 
 | Component         | Version              |
 |-------------------|----------------------|
-| Java              | 25 (Virtual Threads) |
+| Java              | 21 (Virtual Threads) |
 | Spring Boot       | 4.1.0                |
 | Spring Framework  | 7.0.5                |
 | LangChain4j       | 1.12.1               |

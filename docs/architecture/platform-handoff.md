@@ -97,9 +97,9 @@ also mirror to GitHub (`GiskardB`). Sibling repos are checked out side by side u
 
 | Repo | Role | Stack | Status (2026-08) |
 |---|---|---|---|
-| `gargantua` | **Runtime** + execution-side Kernel; **home of all architecture docs**; publishes `agent-core`; also home of the draft [PACT spec](https://github.com/GiskardB/PACT/blob/main/SPECIFICATION.md) | Java 25 / Spring Boot 4.1, 9 Maven modules | Phase 1 + loadout + governance parsing + PACT Core fields; docs hub; on `1.4.0-SNAPSHOT` |
-| `gargantua-control-plane` | **Control Plane**: Registry + Catalog + Policy + Deployment (now with per-agent port tracking + undeploy) | Java 25 / Boot 4.1, `agent-core` | **MVP** — publish→index→discovery works; Deployment tracks real running instances; 28 tests |
-| `gargantua-studio` | **Studio** — frontend **and** BFF in ONE repo / ONE image (Spring serves the SPA at `/`, API at `/api`). Agent+Skill Designer, radial graph editor, Publish dialog, Playground (multi-agent aware) against real runtimes, Launch button (concurrent, per-agent). | React 18 / Vite 5 / XYFlow (in `frontend/`) + Java 25 / Boot 4.1 BFF (`agent-core`) | **MVP** — merged 2026-08; concurrent multi-agent launch 2026-08-29; 55 backend tests; 8 frontend tests; TypeScript clean |
+| `gargantua` | **Runtime** + execution-side Kernel; **home of all architecture docs**; publishes `agent-core`; also home of the draft [PACT spec](https://github.com/GiskardB/PACT/blob/main/SPECIFICATION.md) | Java 21 / Spring Boot 4.1, 9 Maven modules | Phase 1 + loadout + governance parsing + PACT Core fields; docs hub; on `1.4.0-SNAPSHOT` |
+| `gargantua-control-plane` | **Control Plane**: Registry + Catalog + Policy + Deployment (now with per-agent port tracking + undeploy) | Java 21 / Boot 4.1, `agent-core` | **MVP** — publish→index→discovery works; Deployment tracks real running instances; 28 tests |
+| `gargantua-studio` | **Studio** — frontend **and** BFF in ONE repo / ONE image (Spring serves the SPA at `/`, API at `/api`). Agent+Skill Designer, radial graph editor, Publish dialog, Playground (multi-agent aware) against real runtimes, Launch button (concurrent, per-agent). | React 18 / Vite 5 / XYFlow (in `frontend/`) + Java 21 / Boot 4.1 BFF (`agent-core`) | **MVP** — merged 2026-08; concurrent multi-agent launch 2026-08-29; 55 backend tests; 8 frontend tests; TypeScript clean |
 | ~~`gargantua-studio-backend`~~ | **Merged into `gargantua-studio`** (2026-08) — no longer a separate repo/image | — | Deprecated |
 | `gargantua-compose` | **Local vertical slice** (Docker Compose) wiring the agent-creation flow; `start.bat`/`stop.bat` | Compose v2 | **Done** — ports in 18xxx/19xxx (off Cave's range); authored + statically verified |
 | `gargantua-gateway` | Agent Gateway (Intent/Capability/Version routing) | TBD | **Not built** — Phase 4; decision: *evaluate `agentgateway`* first |
@@ -269,11 +269,11 @@ repo must be a sibling checkout.
 **without Java/Maven**. If `mvn`/`java` are missing, install a portable toolchain (this is
 what the recent JVM work was built/verified with):
 ```bash
-# Temurin JDK 25 + Maven 3.9.9 under ~/tools
-curl -fsSL -o ~/tools/jdk25.tar.gz "https://api.adoptium.net/v3/binary/latest/25/ga/linux/x64/jdk/hotspot/normal/eclipse"
+# Temurin JDK 21 + Maven 3.9.9 under ~/tools
+curl -fsSL -o ~/tools/jdk21.tar.gz "https://api.adoptium.net/v3/binary/latest/21/ga/linux/x64/jdk/hotspot/normal/eclipse"
 curl -fsSL -o ~/tools/maven.tar.gz "https://archive.apache.org/dist/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz"
 # extract both under ~/tools, then:
-export JAVA_HOME=~/tools/jdk-25.0.4.1+1
+export JAVA_HOME=~/tools/jdk-21.0.6+7
 export PATH=$JAVA_HOME/bin:~/tools/apache-maven-3.9.9/bin:$PATH
 ```
 
@@ -347,7 +347,7 @@ Full rationale in memory and in the linked docs; the load-bearing ones:
   decoupling stays (Runtime routing/Catalog depend on it). See
   [skills-and-routing.md](../skills-and-routing.md).
 - **Shared `agent-core` jar, not mirrored types.** (§3.)
-- **Stack (frozen):** Java 25 LTS + Boot 4.1 + Maven everywhere; Postgres
+- **Stack (frozen):** Java 21 LTS + Boot 4.1 + Maven everywhere; Postgres
   (control-plane state + bundle blobs), MongoDB (runtime state), Redis (cache/rate-limit);
   A2A + MCP as interop; React Flow / Monaco / Zustand for Studio.
   Vector search stays pluggable (pgvector / Qdrant / in-memory behind `EmbeddingPort`).

@@ -275,7 +275,7 @@ on ports 18101–18103; `customer-agent`/`customer-agenteee` published but not l
   apostrophes are just literal bytes. Prefer that over inline single-quoted `curl -d '...'`
   whenever the payload has free-text content.
 - **This box has no local `java`/`mvn`.** Backend changes were compiled/tested via a
-  throwaway `maven:3.9-eclipse-temurin-25-alpine` Docker image with the
+  throwaway `maven:3.9-eclipse-temurin-21-alpine` Docker image with the
   `gargantua-m2-4` named volume mounted at `/root/.m2` for the cached `agent-core`
   dependency — `docker run --rm -v gargantua-m2-4:/root/.m2 <image> sh -c "mvn -o test"`.
   Rebuilding the *actual* compose image is separate (`docker compose build <service>`)
