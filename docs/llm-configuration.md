@@ -118,10 +118,15 @@ agent:
       endpoint: ${LLM_PRIMARY_ENDPOINT:}               # Required only for azure-openai
       temperature: ${LLM_PRIMARY_TEMPERATURE:0.7}
       max-tokens: ${LLM_PRIMARY_MAX_TOKENS:1000}
+      api-version: ${LLM_PRIMARY_API_VERSION:}         # Azure OpenAI only — required for azure-openai
+      deployment-name: ${LLM_PRIMARY_DEPLOYMENT_NAME:} # Azure OpenAI only — defaults to model when blank
     fallback:
       provider: ${LLM_FALLBACK_PROVIDER:anthropic}
       model: ${LLM_FALLBACK_MODEL:claude-sonnet-4-20250514}
       api-key: ${LLM_FALLBACK_API_KEY:}
+      endpoint: ${LLM_FALLBACK_ENDPOINT:}
+      api-version: ${LLM_FALLBACK_API_VERSION:}
+      deployment-name: ${LLM_FALLBACK_DEPLOYMENT_NAME:}
     routing-model:
       provider: ${LLM_ROUTING_PROVIDER:ollama}
       model: ${LLM_ROUTING_MODEL:phi4-mini}
@@ -158,6 +163,31 @@ Request → Primary LLM
 ```
 
 The circuit breaker tracks failures. After repeated failures, it **opens** and routes directly to fallback without waiting for primary to timeout. It periodically retries primary to check if it's recovered.
+
+### Azure OpenAI / Azure AI Foundry
+
+Set `provider: azure-openai` and use the resource base URL — **do not** paste the full URL with `/openai/responses?api-version=...` that the Azure portal shows for the Responses API:
+
+```bash
+set LLM_PRIMARY_PROVIDER=azure-openai
+set LLM_PRIMARY_MODEL=gpt-5.1
+set LLM_PRIMARY_API_KEY=<Azure OpenAI key>
+set LLM_PRIMARY_ENDPOINT=https://bx-aifo-all-se-01.cognitiveservices.azure.com
+set LLM_PRIMARY_API_VERSION=2025-04-01-preview
+set LLM_PRIMARY_DEPLOYMENT_NAME=gpt-5.1
+```
+
+| Variable | Purpose |
+|----------|---------|
+| `LLM_PRIMARY_ENDPOINT` | Azure resource base URL, no path or query string |
+| `LLM_PRIMARY_API_VERSION` | Required for Azure — must match the deployment's supported version |
+| `LLM_PRIMARY_DEPLOYMENT_NAME` | The Azure deployment name; defaults to `model` when left blank |
+
+`agent.llm.*.api-version` maps to `AzureOpenAiChatModel.builder().serviceVersion(...)`. If omitted, Gargantua falls back to `2024-08-01-preview` (and logs a warning).
+
+> **Common pitfalls:**  
+> - 404 "Resource not found" — usually the endpoint still contains `/openai/responses?...` or the deployment name differs from the model id.  
+> - Gargantua's built-in Azure provider uses the **Chat Completions** endpoint (`/openai/deployments/{deployment}/chat/completions`), not the Responses API. If your Foundry deployment exposes only the Responses API, provide a custom `ChatModel` bean instead.
 
 ### Rate limiting
 

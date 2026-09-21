@@ -89,6 +89,8 @@ LLM_PRIMARY_PROVIDER=openai LLM_PRIMARY_MODEL=gpt-4o LLM_PRIMARY_API_KEY=sk-your
 java -jar gargantua-runtime.jar run my-agent --spring.profiles.active=embedded
 ```
 
+Then open the built-in chat UI at **http://localhost:8080/chat.html** (or **http://localhost:8080/chat**, which redirects there).
+
 ```bash
 curl -X POST http://localhost:8080/api/agent/chat \
   -H "Content-Type: application/json" \
@@ -492,7 +494,7 @@ curl -X POST http://localhost:8080/api/agent/chat \
 curl http://localhost:8080/.well-known/agent.json
 
 # Chat web UI (SSE streaming, agent intro)
-open http://localhost:8080/chat
+open http://localhost:8080/chat.html
 
 # Interactive docs
 open http://localhost:8080/swagger-ui
@@ -908,7 +910,9 @@ All storage uses in-memory ConcurrentHashMaps. Data is lost on restart.
 | `LLM_PRIMARY_PROVIDER` | LLM provider: `openai`, `anthropic`, `azure-openai`, `ollama`, or any OpenAI-compatible endpoint | `openai` |
 | `LLM_PRIMARY_MODEL` | Which model from that provider (e.g. `gpt-4o`, `gpt-4o-mini`) | `gpt-4o` |
 | `LLM_PRIMARY_API_KEY` | API key for the chosen provider (e.g. OpenAI: `sk-...`) | **(required)** |
-| `LLM_PRIMARY_ENDPOINT` | Provider API endpoint (must be OpenAI-compatible). Required for `azure-openai`. Default: `https://api.openai.com/v1` | `https://api.openai.com/v1` |
+| `LLM_PRIMARY_ENDPOINT` | Provider API endpoint. Required for `azure-openai`; for Azure use the **resource base URL** with no path or query string. Default: `https://api.openai.com/v1` | *(empty)* |
+| `LLM_PRIMARY_API_VERSION` | Azure OpenAI service version (e.g. `2025-04-01-preview`). Required for `azure-openai`. | *(empty)* |
+| `LLM_PRIMARY_DEPLOYMENT_NAME` | Azure OpenAI deployment name; defaults to `LLM_PRIMARY_MODEL` when blank. Required if deployment id differs from model id. | *(empty)* |
 | `LLM_PRIMARY_TEMPERATURE` | Sampling temperature (0.0 -- 1.0) | `0.7` |
 | `LLM_PRIMARY_MAX_TOKENS` | Max tokens in LLM response | `1000` |
 | **Fallback LLM** | Used automatically when primary provider fails | |
