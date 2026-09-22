@@ -79,7 +79,7 @@ sequenceDiagram
     participant Engine as OrchestratorEngine
     participant Semantic as SemanticRoutingService
     participant Embed as Embedding Model<br/>(all-MiniLM-L6-v2)
-    participant LLM_Route as LLM Routing<br/>(Ollama / phi4-mini)
+    participant LLM_Route as LLM Routing<br/>(same as primary)
     participant Registry as SkillRegistry
 
     Engine->>Registry: listMeta() [from Caffeine cache]

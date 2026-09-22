@@ -22,11 +22,11 @@ Before extending, make sure your agent runs correctly with the base setup:
 |-------------|---------|-------------|
 | **MongoDB** | Episodic memory, chat history, knowledge, costs | `docker compose up -d mongo` |
 | **Redis** | Working memory, HITL approvals, tool cache, rate limits | `docker compose up -d redis` |
-| **Ollama** | Local routing model (skill routing, session summaries) | `docker compose up -d ollama` |
+| **Ollama** *(optional)* | Free local routing model — routing rides on the primary provider if you skip this | `docker compose up -d ollama` |
 | **LLM API key** | Primary model for agent responses | `export LLM_PRIMARY_API_KEY=sk-...` |
 
 ```bash
-# Start everything
+# Start everything, including local routing via Ollama
 docker compose up -d mongo redis ollama
 
 # Pull the routing model (one-time, after first Ollama start)

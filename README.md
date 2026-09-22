@@ -140,7 +140,7 @@ Central — no `settings.xml` edit, no extra repository.
 <dependency>
   <groupId>io.github.giskardb</groupId>
   <artifactId>agent-engine</artifactId>
-  <version>1.4.0</version>
+  <version>1.4.4</version>
 </dependency>
 ```
 
@@ -151,7 +151,7 @@ Or scaffold a fresh project:
 mvn archetype:generate \
   -DarchetypeGroupId=io.github.giskardb \
   -DarchetypeArtifactId=agent-archetype \
-  -DarchetypeVersion=1.4.0 \
+  -DarchetypeVersion=1.4.4 \
   -DgroupId=com.mycompany -DartifactId=my-agent \
   -Dversion=1.0.0 -DagentName=MyAgent -DinteractiveMode=false
 
@@ -205,7 +205,7 @@ Then generate with the JitPack coordinates (note the `v` prefix on the version):
 mvn archetype:generate \
   -DarchetypeGroupId=com.github.giskardb.gargantua \
   -DarchetypeArtifactId=agent-archetype \
-  -DarchetypeVersion=v1.4.0 \
+  -DarchetypeVersion=v1.4.4 \
   -DgroupId=com.mycompany -DartifactId=my-agent \
   -Dversion=1.0.0 -DagentName=MyAgent -DinteractiveMode=false
 ```
@@ -400,7 +400,7 @@ The archetype lives on Maven Central along with the rest of the framework — no
 mvn archetype:generate \
   -DarchetypeGroupId=io.github.giskardb \
   -DarchetypeArtifactId=agent-archetype \
-  -DarchetypeVersion=1.4.0 \
+  -DarchetypeVersion=1.4.4 \
   -DgroupId=com.mycompany \
   -DartifactId=my-agent \
   -Dversion=1.0.0 \
@@ -606,8 +606,8 @@ java -jar gargantua-runtime.jar validate my-agent.gbundle   # parse, verify inte
 java -jar gargantua-runtime.jar run       my-agent.gbundle   # execute
 ```
 
-Pin a specific version instead of `latest` with `ghcr.io/giskardb/gargantua-runtime:1.4.0`
-or `.../releases/download/v1.4.0/gargantua-runtime.jar`. Building from source works too
+Pin a specific version instead of `latest` with `ghcr.io/giskardb/gargantua-runtime:1.4.4`
+or `.../releases/download/v1.4.4/gargantua-runtime.jar`. Building from source works too
 (`docker build -f agent-runtime/Dockerfile -t gargantua-runtime:local .` from the repo
 root, or `mvn -pl agent-core,agent-memory-sdk,agent-mcp-client,agent-bundle,agent-engine,agent-runtime
 -am package -DskipTests`) — useful for tracking `main` between releases.
@@ -700,21 +700,21 @@ clone required. (Runtime mode doesn't need Central at all: it's a jar/image down
 | `agent-archetype` | `io.github.giskardb` | `com.github.giskardb.gargantua` | Maven archetype to scaffold new agent projects. |
 
 `agent-bundle`, `agent-mcp-client` and `agent-runtime` — the modules Runtime mode is
-built from — joined Central as of `1.4.0`; earlier releases (e.g. `1.2.20`) predate them,
+built from — joined Central as of `1.4.4`; earlier releases (e.g. `1.2.20`) predate them,
 so an app depending on an older `agent-engine` doesn't pull them in transitively.
 
 Two distribution channels, same source code:
 
 | Channel | When to use | Versioning |
 |---------|-------------|------------|
-| **Maven Central** *(default)* | Tagged releases — signed, immutable, queried by default. No `settings.xml` needed. | semver, no prefix (`1.4.0`) |
-| **JitPack** | Snapshots, intermediate tags, `develop-SNAPSHOT`, branch builds — built on-demand. | mirrors Git tags (`v1.4.0`) |
+| **Maven Central** *(default)* | Tagged releases — signed, immutable, queried by default. No `settings.xml` needed. | semver, no prefix (`1.4.4`) |
+| **JitPack** | Snapshots, intermediate tags, `develop-SNAPSHOT`, branch builds — built on-demand. | mirrors Git tags (`v1.4.4`) |
 
 ### Maven Central (recommended)
 
 ```xml
 <properties>
-    <gargantua.version>1.4.0</gargantua.version>
+    <gargantua.version>1.4.4</gargantua.version>
 </properties>
 
 <dependencies>
@@ -742,7 +742,7 @@ No `<repositories>` block needed — Maven Central is in the default Maven repos
 
 ```xml
 <properties>
-    <gargantua.version>v1.4.0</gargantua.version>
+    <gargantua.version>v1.4.4</gargantua.version>
 </properties>
 
 <repositories>
