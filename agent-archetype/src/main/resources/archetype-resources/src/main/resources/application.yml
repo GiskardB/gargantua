@@ -25,9 +25,11 @@ ${symbol_pound}   LLM_PRIMARY_API_VERSION       Azure OpenAI service version, e.
 ${symbol_pound}                                 Required when LLM_PRIMARY_PROVIDER=azure-openai.
 ${symbol_pound}   LLM_PRIMARY_DEPLOYMENT_NAME   Azure deployment name. Defaults to LLM_PRIMARY_MODEL when blank.
 ${symbol_pound}
-${symbol_pound}   LLM_ROUTING_PROVIDER     Routing model provider (default: ollama / phi4-mini, local)
-${symbol_pound}   LLM_ROUTING_MODEL        Routing model name (default: phi4-mini)
-${symbol_pound}   LLM_ROUTING_API_KEY      Not needed for Ollama; set when routing on a cloud provider
+${symbol_pound}   LLM_ROUTING_PROVIDER     Routing model provider (default: same as LLM_PRIMARY_PROVIDER)
+${symbol_pound}   LLM_ROUTING_MODEL        Routing model name (default: same as LLM_PRIMARY_MODEL)
+${symbol_pound}   LLM_ROUTING_API_KEY      Routing model API key (default: same as LLM_PRIMARY_API_KEY)
+${symbol_pound}                           Set LLM_ROUTING_* to point routing at a separate (e.g. local
+${symbol_pound}                           Ollama) model instead — see docs/llm-configuration.md.
 ${symbol_pound}
 ${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}${symbol_pound}
 
@@ -86,11 +88,17 @@ agent:
       endpoint: ${symbol_dollar}{LLM_FALLBACK_ENDPOINT:}
       api-version: ${symbol_dollar}{LLM_FALLBACK_API_VERSION:}
       deployment-name: ${symbol_dollar}{LLM_FALLBACK_DEPLOYMENT_NAME:}
+    ${symbol_pound} Unset LLM_ROUTING_* and routing rides on the primary provider/model —
+    ${symbol_pound} zero extra config needed to get started. Set LLM_ROUTING_* explicitly
+    ${symbol_pound} only when you want routing on a separate (e.g. local/cheaper) model.
     routing-model:
-      provider: ${symbol_dollar}{LLM_ROUTING_PROVIDER:ollama}
-      model: ${symbol_dollar}{LLM_ROUTING_MODEL:phi4-mini}
-      api-key: ${symbol_dollar}{LLM_ROUTING_API_KEY:}
-      endpoint: ${symbol_dollar}{LLM_ROUTING_ENDPOINT:http://localhost:11434}
+      provider: ${symbol_dollar}{LLM_ROUTING_PROVIDER:${symbol_dollar}{LLM_PRIMARY_PROVIDER:openai}}
+      model: ${symbol_dollar}{LLM_ROUTING_MODEL:${symbol_dollar}{LLM_PRIMARY_MODEL:gpt-4o}}
+      api-key: ${symbol_dollar}{LLM_ROUTING_API_KEY:${symbol_dollar}{LLM_PRIMARY_API_KEY:}}
+      endpoint: ${symbol_dollar}{LLM_ROUTING_ENDPOINT:${symbol_dollar}{LLM_PRIMARY_ENDPOINT:}}
+      api-version: ${symbol_dollar}{LLM_ROUTING_API_VERSION:${symbol_dollar}{LLM_PRIMARY_API_VERSION:}}
+      deployment-name: ${symbol_dollar}{LLM_ROUTING_DEPLOYMENT_NAME:${symbol_dollar}{LLM_PRIMARY_DEPLOYMENT_NAME:}}
+      max-completion-tokens: ${symbol_dollar}{LLM_ROUTING_MAX_COMPLETION_TOKENS:${symbol_dollar}{LLM_PRIMARY_MAX_COMPLETION_TOKENS:}}
       temperature: 0.0
       max-tokens: 50
 

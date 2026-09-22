@@ -128,9 +128,11 @@ agent:
       api-version: ${LLM_FALLBACK_API_VERSION:}
       deployment-name: ${LLM_FALLBACK_DEPLOYMENT_NAME:}
     routing-model:
-      provider: ${LLM_ROUTING_PROVIDER:ollama}
-      model: ${LLM_ROUTING_MODEL:phi4-mini}
-      endpoint: ${LLM_ROUTING_ENDPOINT:http://localhost:11434}
+      # Unset LLM_ROUTING_* and this rides on LLM_PRIMARY_* automatically —
+      # nothing extra to configure to get started.
+      provider: ${LLM_ROUTING_PROVIDER:${LLM_PRIMARY_PROVIDER:openai}}
+      model: ${LLM_ROUTING_MODEL:${LLM_PRIMARY_MODEL:gpt-4o}}
+      endpoint: ${LLM_ROUTING_ENDPOINT:${LLM_PRIMARY_ENDPOINT:https://api.openai.com/v1}}
       # temperature/max-tokens are inherited (0.7 / 1000) unless you set them.
       # Archetype-generated projects override them to 0.0 / 50 for cheap routing;
       # the standalone runtime image does not.
@@ -142,9 +144,9 @@ agent:
 |------|--------------------|------------------|---------|------|
 | **Primary** | Agent conversations — the LLM that answers the user | Every chat request | `openai` / `gpt-4o` | Per-token API cost |
 | **Fallback** | Automatic failover when primary fails (timeout, HTTP 5xx, rate limit) | Only on primary failure | `anthropic` / `claude-sonnet` | Per-token API cost |
-| **Routing** | Skill routing, session summaries, topic scope guardrail | Multiple times per request (internally) | `ollama` / `phi4-mini` | **Free** (local) |
+| **Routing** | Skill routing, session summaries, topic scope guardrail | Multiple times per request (internally) | Same as primary | Per-token API cost, unless overridden |
 
-> **Why Ollama for routing?** The routing model is called frequently (every request for skill selection, periodically for session summaries). Using a local model eliminates API costs for these internal operations. The `phi4-mini` model is small (~2GB) and fast enough for classification tasks.
+> **Want free/local routing instead?** The routing model is called frequently (every request for skill selection, periodically for session summaries) — running it on a local Ollama model eliminates API cost for these internal calls. Set `LLM_ROUTING_PROVIDER=ollama`, `LLM_ROUTING_MODEL=phi4-mini` (small, ~2GB, fast enough for classification), `LLM_ROUTING_ENDPOINT=http://localhost:11434` to opt in — the [archetype-generated `docker-compose.yml`](../agent-archetype/src/main/resources/archetype-resources/docker-compose.yml) does exactly this out of the box.
 
 ### How failover works
 

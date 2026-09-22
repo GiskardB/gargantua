@@ -10,9 +10,10 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * LLM-based skill routing service. Uses the routing model (typically Ollama phi4-mini)
- * to classify user messages into the most appropriate skill. This is used as a fallback
- * when semantic routing confidence is below threshold.
+ * LLM-based skill routing service. Uses the routing model (the primary model unless
+ * {@code agent.llm.routing-model.*} overrides it) to classify user messages into the
+ * most appropriate skill. This is used as a fallback when semantic routing confidence
+ * is below threshold.
  */
 public class RoutingService {
 

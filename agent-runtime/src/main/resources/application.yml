@@ -49,14 +49,17 @@ agent:
       endpoint: ${LLM_FALLBACK_ENDPOINT:}
       api-version: ${LLM_FALLBACK_API_VERSION:}
       deployment-name: ${LLM_FALLBACK_DEPLOYMENT_NAME:}
+    # Unset LLM_ROUTING_* and routing rides on the primary provider/model —
+    # zero extra config needed to get started. Set LLM_ROUTING_* explicitly
+    # only when you want routing on a separate (e.g. local/cheaper) model.
     routing-model:
-      provider: ${LLM_ROUTING_PROVIDER:ollama}
-      model: ${LLM_ROUTING_MODEL:phi4-mini}
-      endpoint: ${LLM_ROUTING_ENDPOINT:http://localhost:11434}
-      api-key: ${LLM_ROUTING_API_KEY:}
-      max-completion-tokens: ${LLM_ROUTING_MAX_COMPLETION_TOKENS:}
-      api-version: ${LLM_ROUTING_API_VERSION:}
-      deployment-name: ${LLM_ROUTING_DEPLOYMENT_NAME:}
+      provider: ${LLM_ROUTING_PROVIDER:${LLM_PRIMARY_PROVIDER:openai}}
+      model: ${LLM_ROUTING_MODEL:${LLM_PRIMARY_MODEL:gpt-4o}}
+      endpoint: ${LLM_ROUTING_ENDPOINT:${LLM_PRIMARY_ENDPOINT:https://api.openai.com/v1}}
+      api-key: ${LLM_ROUTING_API_KEY:${LLM_PRIMARY_API_KEY:}}
+      max-completion-tokens: ${LLM_ROUTING_MAX_COMPLETION_TOKENS:${LLM_PRIMARY_MAX_COMPLETION_TOKENS:}}
+      api-version: ${LLM_ROUTING_API_VERSION:${LLM_PRIMARY_API_VERSION:}}
+      deployment-name: ${LLM_ROUTING_DEPLOYMENT_NAME:${LLM_PRIMARY_DEPLOYMENT_NAME:}}
   routing:
     strategy: ${ROUTING_STRATEGY:hybrid}
   audit:

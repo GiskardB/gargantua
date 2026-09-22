@@ -1,4 +1,12 @@
-# Gargantua -- AI Agent Runtime & Framework
+<div align="center">
+
+# ⬤ GARGANTUA
+
+### Declare an agent. Gargantua runs it.
+
+A `manifest.yaml` + a `SKILL.md` in, a running agent out — skill routing, 3-layer memory,
+guardrails, human-in-the-loop, streaming, A2A and MCP included, no Java required. Need
+tools that call your own code instead? The same engine runs as a Java library, too.
 
 [![License](https://img.shields.io/github/license/GiskardB/gargantua?style=flat-square&color=blue)](LICENSE)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.giskardb/agent-engine?style=flat-square&label=Maven%20Central&color=blue&logo=apachemaven&logoColor=white)](https://central.sonatype.com/artifact/io.github.giskardb/agent-engine)
@@ -9,35 +17,35 @@
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.0-6DB33F?style=flat-square&logo=spring&logoColor=white)](https://spring.io/projects/spring-boot)
 [![LangChain4j](https://img.shields.io/badge/LangChain4j-1.12-ff6b35?style=flat-square)](https://docs.langchain4j.dev/)
 
-**Declare an agent in YAML and Markdown — Gargantua runs it.** Write a `manifest.yaml`
-and a `SKILL.md`, point at an MCP server for tools, and a generic runtime executes it:
-skill routing, 3-layer memory, input/output guardrails, human-in-the-loop approvals, cost
-tracking, A2A interoperability. No Java required to build one.
+**[Try it in 60 seconds](#try-it-in-60-seconds)** · [Features](#features) ·
+[How it works](#how-it-works) · [Docs](#documentation) · [Optional companions](#optional-companions)
 
-This is **Runtime mode** — a generic executor that loads a declarative bundle (no code,
-just YAML + Markdown) at startup. It's the primary, recommended way to use Gargantua and
-the fastest path from zero to a running agent: [Try it in 60 seconds](#try-it-in-60-seconds)
-below downloads it — a released jar or a `docker run`, no build required.
+</div>
 
-Need tools that call your own services, a database, or an existing domain model instead?
-The same engine runs as a **Java library**: add `agent-engine` as a Maven dependency,
-annotate methods `@AgentTool`, and your Spring Boot application *is* the agent — routing,
-memory, guardrails and streaming behave identically. This is **Library mode**, the
-original way to use Gargantua and still fully supported — see
-[Two ways to ship an agent](#two-ways-to-ship-an-agent).
+---
 
-Built on Java 21, Spring Boot 4.1.0, and LangChain4j.
+Two ways to run it, same engine underneath:
 
-**This repository is complete and self-contained.** Download the runtime jar or image
-and run a hand-written bundle, or add the library dependency and write Java — either way
-nothing else to install. The manifest (`gargantua.ai/v1`) also composes with
-[PACT](https://github.com/GiskardB/PACT/blob/main/SPECIFICATION.md), an open, implementation-neutral
-agent-description spec this project is drafting.
+- **Runtime mode** *(recommended first look)* — a generic executor that loads a
+  declarative bundle (no code, just YAML + Markdown) at startup. Fastest path from zero
+  to a running agent: [Try it in 60 seconds](#try-it-in-60-seconds) downloads a released
+  jar or `docker run`, no build required.
+- **Library mode** — need tools that call your own services, a database, or an existing
+  domain model? Add `agent-engine` as a Maven dependency, annotate methods `@AgentTool`,
+  and your Spring Boot application *is* the agent — routing, memory, guardrails and
+  streaming behave identically. The original way to use Gargantua, still fully
+  supported — see [Two ways to ship an agent](#two-ways-to-ship-an-agent).
+
+Built on Java 21, Spring Boot 4.1.0, and LangChain4j. **This repository is complete and
+self-contained** — download the runtime jar/image or add the library dependency, either
+way nothing else to install. The manifest (`gargantua.ai/v1`) also composes with
+[PACT](https://github.com/GiskardB/PACT/blob/main/SPECIFICATION.md), an open,
+implementation-neutral agent-description spec this project is drafting.
 
 Separately, and entirely optionally, a few companion projects build **on top of** this
 one for teams that want a visual authoring UI or fleet management across many agents —
-see [**Optional companions**](#optional-companions) below if that's what brought you
-here. Otherwise, the quickstart is next.
+see [Optional companions](#optional-companions) if that's what brought you here.
+Otherwise, the quickstart is next.
 
 ---
 
@@ -89,12 +97,11 @@ LLM_PRIMARY_PROVIDER=openai LLM_PRIMARY_MODEL=gpt-4o LLM_PRIMARY_API_KEY=sk-your
 java -jar gargantua-runtime.jar run my-agent --spring.profiles.active=embedded
 ```
 
-> Skill routing uses a small local model by default (Ollama, `phi4-mini` — no Ollama
-> running? routing just falls back to the manifest's `defaultSkill`, nothing breaks). To
-> route through the same cloud provider as `LLM_PRIMARY_*` instead, set
-> `LLM_ROUTING_PROVIDER`, `LLM_ROUTING_MODEL`, `LLM_ROUTING_API_KEY` and
-> `LLM_ROUTING_ENDPOINT` (plus `LLM_ROUTING_API_VERSION`/`LLM_ROUTING_DEPLOYMENT_NAME` for
-> `azure-openai`) — see [Configure your LLM providers](#3-configure-your-llm-providers) below.
+> Skill routing rides on `LLM_PRIMARY_*` by default — nothing else to configure. Want
+> routing on a separate, free local model instead? Set `LLM_ROUTING_PROVIDER=ollama`,
+> `LLM_ROUTING_MODEL=phi4-mini`, `LLM_ROUTING_ENDPOINT=http://localhost:11434` (any
+> OpenAI-compatible provider works too) — see
+> [Configure your LLM providers](#3-configure-your-llm-providers) below.
 
 Then open the built-in chat UI at **http://localhost:8080/chat.html** (or **http://localhost:8080/chat**, which redirects there).
 
@@ -928,14 +935,14 @@ All storage uses in-memory ConcurrentHashMaps. Data is lost on restart.
 | `LLM_FALLBACK_MODEL` | Fallback model | *(optional)* |
 | `LLM_FALLBACK_API_KEY` | Fallback API key | *(optional)* |
 | `LLM_FALLBACK_ENDPOINT` | Fallback endpoint (OpenAI-compatible) | *(optional)* |
-| **Routing LLM** | Local model for skill routing and session summaries (zero API cost via Ollama) | |
-| `LLM_ROUTING_PROVIDER` | Routing model provider: `ollama`, `openai`, or any OpenAI-compatible endpoint | `ollama` |
-| `LLM_ROUTING_MODEL` | Routing model name | `phi4-mini` |
-| `LLM_ROUTING_ENDPOINT` | Routing model endpoint (Ollama URL when running locally) | `http://localhost:11434` |
-| `LLM_ROUTING_API_KEY` | Routing model API key (not needed for Ollama) | *(optional)* |
-| `LLM_ROUTING_API_VERSION` | Azure OpenAI service version. Required if `LLM_ROUTING_PROVIDER=azure-openai`. | *(empty)* |
-| `LLM_ROUTING_DEPLOYMENT_NAME` | Azure OpenAI deployment name; defaults to `LLM_ROUTING_MODEL` when blank. | *(empty)* |
-| `LLM_ROUTING_MAX_COMPLETION_TOKENS` | Azure OpenAI only — same `max_completion_tokens` override as primary, for routing models like `gpt-5.1`. | *(empty)* |
+| **Routing LLM** | Used for skill routing and session summaries. Leave `LLM_ROUTING_*` unset and it rides on `LLM_PRIMARY_*` — set these only to route on a separate (e.g. free local Ollama) model | |
+| `LLM_ROUTING_PROVIDER` | Routing model provider: `ollama`, `openai`, or any OpenAI-compatible endpoint | same as `LLM_PRIMARY_PROVIDER` |
+| `LLM_ROUTING_MODEL` | Routing model name | same as `LLM_PRIMARY_MODEL` |
+| `LLM_ROUTING_ENDPOINT` | Routing model endpoint (e.g. `http://localhost:11434` for local Ollama) | same as `LLM_PRIMARY_ENDPOINT` |
+| `LLM_ROUTING_API_KEY` | Routing model API key (not needed for Ollama) | same as `LLM_PRIMARY_API_KEY` |
+| `LLM_ROUTING_API_VERSION` | Azure OpenAI service version. Required if `LLM_ROUTING_PROVIDER=azure-openai`. | same as `LLM_PRIMARY_API_VERSION` |
+| `LLM_ROUTING_DEPLOYMENT_NAME` | Azure OpenAI deployment name; defaults to `LLM_ROUTING_MODEL` when blank. | same as `LLM_PRIMARY_DEPLOYMENT_NAME` |
+| `LLM_ROUTING_MAX_COMPLETION_TOKENS` | Azure OpenAI only — same `max_completion_tokens` override as primary, for routing models like `gpt-5.1`. | same as `LLM_PRIMARY_MAX_COMPLETION_TOKENS` |
 | **Routing** | | |
 | `ROUTING_STRATEGY` | Skill routing: `hybrid`, `semantic`, `llm`. Read by the runtime image; archetype projects set `agent.routing.strategy` directly. | `hybrid` |
 | **Audit** | | |

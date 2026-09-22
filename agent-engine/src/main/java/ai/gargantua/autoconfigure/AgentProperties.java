@@ -231,8 +231,11 @@ public class AgentProperties {
 
         public static class RoutingModel extends LlmModelConfig {
             {
-                // Routing runs on every request, so the default is a local model:
-                // zero API cost, matching the documented and archetype-generated setup.
+                // Pure-library fallback when no application.yml overrides this at all
+                // (the runtime image and archetype-generated projects both default
+                // agent.llm.routing-model.* to the primary provider/model instead —
+                // see their application.yml — so this local-Ollama default only
+                // applies to hand-wired Spring apps that skip config entirely).
                 setProvider("ollama");
                 setModel("phi4-mini");
                 setEndpoint("http://localhost:11434");
