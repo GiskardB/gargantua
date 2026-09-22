@@ -89,6 +89,13 @@ LLM_PRIMARY_PROVIDER=openai LLM_PRIMARY_MODEL=gpt-4o LLM_PRIMARY_API_KEY=sk-your
 java -jar gargantua-runtime.jar run my-agent --spring.profiles.active=embedded
 ```
 
+> Skill routing uses a small local model by default (Ollama, `phi4-mini` — no Ollama
+> running? routing just falls back to the manifest's `defaultSkill`, nothing breaks). To
+> route through the same cloud provider as `LLM_PRIMARY_*` instead, set
+> `LLM_ROUTING_PROVIDER`, `LLM_ROUTING_MODEL`, `LLM_ROUTING_API_KEY` and
+> `LLM_ROUTING_ENDPOINT` (plus `LLM_ROUTING_API_VERSION`/`LLM_ROUTING_DEPLOYMENT_NAME` for
+> `azure-openai`) — see [Configure your LLM providers](#3-configure-your-llm-providers) below.
+
 Then open the built-in chat UI at **http://localhost:8080/chat.html** (or **http://localhost:8080/chat**, which redirects there).
 
 ```bash
@@ -926,6 +933,9 @@ All storage uses in-memory ConcurrentHashMaps. Data is lost on restart.
 | `LLM_ROUTING_MODEL` | Routing model name | `phi4-mini` |
 | `LLM_ROUTING_ENDPOINT` | Routing model endpoint (Ollama URL when running locally) | `http://localhost:11434` |
 | `LLM_ROUTING_API_KEY` | Routing model API key (not needed for Ollama) | *(optional)* |
+| `LLM_ROUTING_API_VERSION` | Azure OpenAI service version. Required if `LLM_ROUTING_PROVIDER=azure-openai`. | *(empty)* |
+| `LLM_ROUTING_DEPLOYMENT_NAME` | Azure OpenAI deployment name; defaults to `LLM_ROUTING_MODEL` when blank. | *(empty)* |
+| `LLM_ROUTING_MAX_COMPLETION_TOKENS` | Azure OpenAI only — same `max_completion_tokens` override as primary, for routing models like `gpt-5.1`. | *(empty)* |
 | **Routing** | | |
 | `ROUTING_STRATEGY` | Skill routing: `hybrid`, `semantic`, `llm`. Read by the runtime image; archetype projects set `agent.routing.strategy` directly. | `hybrid` |
 | **Audit** | | |

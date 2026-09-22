@@ -31,15 +31,32 @@ agent:
       model: ${LLM_PRIMARY_MODEL:gpt-4o}
       api-key: ${LLM_PRIMARY_API_KEY:}
       endpoint: ${LLM_PRIMARY_ENDPOINT:https://api.openai.com/v1}
+      temperature: ${LLM_PRIMARY_TEMPERATURE:0.7}
+      max-tokens: ${LLM_PRIMARY_MAX_TOKENS:1000}
+      # Azure OpenAI only — newer models (e.g. gpt-5.1) require
+      # max_completion_tokens instead of max_tokens. When set, it
+      # takes precedence over max-tokens for azure-openai.
+      max-completion-tokens: ${LLM_PRIMARY_MAX_COMPLETION_TOKENS:}
+      # Azure OpenAI only — Foundry requires an api-version and (typically)
+      # a deployment name distinct from the model id. Both are no-ops
+      # when provider != azure-openai.
+      api-version: ${LLM_PRIMARY_API_VERSION:}
+      deployment-name: ${LLM_PRIMARY_DEPLOYMENT_NAME:}
     fallback:
       provider: ${LLM_FALLBACK_PROVIDER:anthropic}
       model: ${LLM_FALLBACK_MODEL:claude-sonnet-4-20250514}
       api-key: ${LLM_FALLBACK_API_KEY:}
+      endpoint: ${LLM_FALLBACK_ENDPOINT:}
+      api-version: ${LLM_FALLBACK_API_VERSION:}
+      deployment-name: ${LLM_FALLBACK_DEPLOYMENT_NAME:}
     routing-model:
       provider: ${LLM_ROUTING_PROVIDER:ollama}
       model: ${LLM_ROUTING_MODEL:phi4-mini}
       endpoint: ${LLM_ROUTING_ENDPOINT:http://localhost:11434}
       api-key: ${LLM_ROUTING_API_KEY:}
+      max-completion-tokens: ${LLM_ROUTING_MAX_COMPLETION_TOKENS:}
+      api-version: ${LLM_ROUTING_API_VERSION:}
+      deployment-name: ${LLM_ROUTING_DEPLOYMENT_NAME:}
   routing:
     strategy: ${ROUTING_STRATEGY:hybrid}
   audit:

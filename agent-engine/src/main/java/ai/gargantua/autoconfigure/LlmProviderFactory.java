@@ -253,15 +253,21 @@ public class LlmProviderFactory {
                     .logRequests(log.isDebugEnabled())
                     .logResponses(log.isDebugEnabled())
                     .build();
-            case "azure-openai" -> AzureOpenAiStreamingChatModel.builder()
-                    .endpoint(config.getEndpoint())
-                    .apiKey(apiKey)
-                    .deploymentName(resolveAzureDeployment(config))
-                    .serviceVersion(resolveAzureServiceVersion(config))
-                    .temperature(config.getTemperature())
-                    .maxTokens(config.getMaxTokens())
-                    .logRequestsAndResponses(log.isDebugEnabled())
-                    .build();
+            case "azure-openai" -> {
+                var builder = AzureOpenAiStreamingChatModel.builder()
+                        .endpoint(config.getEndpoint())
+                        .apiKey(apiKey)
+                        .deploymentName(resolveAzureDeployment(config))
+                        .serviceVersion(resolveAzureServiceVersion(config))
+                        .temperature(config.getTemperature())
+                        .logRequestsAndResponses(log.isDebugEnabled());
+                if (config.getMaxCompletionTokens() != null) {
+                    builder.maxCompletionTokens(config.getMaxCompletionTokens());
+                } else {
+                    builder.maxTokens(config.getMaxTokens());
+                }
+                yield builder.build();
+            }
             default -> {
                 String baseUrl = normalizeEndpoint(config.getEndpoint());
                 yield OpenAiStreamingChatModel.builder()

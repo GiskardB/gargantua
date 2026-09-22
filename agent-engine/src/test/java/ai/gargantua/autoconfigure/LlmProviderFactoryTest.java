@@ -270,5 +270,19 @@ class LlmProviderFactoryTest {
             assertThat(model).isInstanceOf(dev.langchain4j.model.openai.OpenAiChatModel.class);
             assertThat(model).isNotInstanceOf(dev.langchain4j.model.azure.AzureOpenAiChatModel.class);
         }
+
+        @Test
+        @DisplayName("max-completion-tokens set builds a StreamingChatModel too (gpt-5.1 rejects max_tokens on /chat/completions/streaming)")
+        void azureStreamingUsesMaxCompletionTokensWhenSet() {
+            properties.getLlm().getPrimary().setProvider("azure-openai");
+            properties.getLlm().getPrimary().setEndpoint("https://my-foundry.openai.azure.com");
+            properties.getLlm().getPrimary().setApiKey("azure-key");
+            properties.getLlm().getPrimary().setModel("gpt-5.1");
+            properties.getLlm().getPrimary().setApiVersion("2025-04-01-preview");
+            properties.getLlm().getPrimary().setMaxCompletionTokens(4096);
+
+            var model = factory.getStreamingModel("primary");
+            assertThat(model).isInstanceOf(dev.langchain4j.model.azure.AzureOpenAiStreamingChatModel.class);
+        }
     }
 }
