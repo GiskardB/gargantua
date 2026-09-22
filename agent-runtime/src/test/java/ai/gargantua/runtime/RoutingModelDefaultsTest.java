@@ -30,7 +30,8 @@ class RoutingModelDefaultsTest {
         new YamlPropertySourceLoader()
                 .load("application", new ClassPathResource("application.yml"))
                 .forEach(environment.getPropertySources()::addLast);
-        return Binder.get(environment).bind("agent", AgentProperties.class).orElseThrow();
+        return Binder.get(environment).bind("agent", AgentProperties.class)
+                .orElseThrow(() -> new IllegalStateException("agent.* did not bind"));
     }
 
     @Test
