@@ -1,6 +1,6 @@
 <div align="center">
 
-# ⬤ GARGANTUA
+<img src="docs/assets/banner.jpg" alt="Gargantua — AI Agent Framework for Java" width="800">
 
 ### Declare an agent. Gargantua runs it.
 
