@@ -27,7 +27,7 @@
          Need a snapshot or branch build instead? See "Try it in 60 seconds"
          in the Gargantua README for the JitPack (com.github.giskardb.gargantua)
          coordinates and repository block. -->
-    <gargantua.version>1.2.20</gargantua.version>
+    <gargantua.version>1.4.5</gargantua.version>
   </properties>
 
   <dependencies>

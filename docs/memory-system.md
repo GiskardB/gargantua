@@ -314,12 +314,12 @@ The memory layer is published as a separate Maven artifact (`io.github.giskardb:
 <dependency>
     <groupId>io.github.giskardb</groupId>
     <artifactId>agent-memory-sdk</artifactId>
-    <version>1.2.20</version>
+    <version>1.4.5</version>
 </dependency>
 ```
 
 Snapshots/branch builds aren't on Central — use the JitPack coordinates instead
-(`com.github.giskardb.gargantua:agent-memory-sdk:v1.2.20`); see
+(`com.github.giskardb.gargantua:agent-memory-sdk:v1.4.5`); see
 [`getting-started.md`](getting-started.md) for the two-channel explanation.
 
 The SDK auto-configures all three adapters and the `MemoryComposer` via `AgentMemoryAutoConfiguration`. Configuration binds to the `agentkit.memory.*` prefix:

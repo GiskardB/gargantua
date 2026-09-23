@@ -99,16 +99,16 @@ If neither a matching skill nor the configured fallback skill exists, unmatched 
 
 ## Skill Registry
 
-The skill registry discovers, loads and serves skill definitions. Five implementations exist and are composed into a chain by `SkillRegistryAutoConfiguration`:
+The skill registry discovers, loads and serves skill definitions. Six implementations exist and are composed into a chain by `SkillRegistryAutoConfiguration`:
 
 ```
-FilesystemSkillRegistry + ClasspathSkillsJarRegistry
+FilesystemSkillRegistry + ClasspathSkillsJarRegistry + AnnotatedSkillRegistry
         → CompositeSkillRegistry
         → CachedSkillRegistry
         → HotReloadSkillRegistry   (only when agent.skill.hot-reload=true)
 ```
 
-The first two are sources; the rest are decorators. You rarely instantiate any of them
+The first three are sources; the rest are decorators. You rarely instantiate any of them
 directly.
 
 ### FilesystemSkillRegistry

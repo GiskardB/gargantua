@@ -71,7 +71,7 @@ public class ChatExportController {
                     .header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN_VALUE)
                     .header(HttpHeaders.CONTENT_DISPOSITION,
                             "attachment; filename=\"chat-%s.md\"".formatted(sessionId))
-                    .body(formatAsMarkdown(messages, sessionId));
+                    .body(formatAsMarkdown(messages, "Session %s".formatted(sessionId)));
             default -> ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                     .header(HttpHeaders.CONTENT_DISPOSITION,
@@ -104,11 +104,23 @@ public class ChatExportController {
         Query query = new Query(criteria).with(Sort.by(Sort.Direction.ASC, "timestamp"));
         List<ChatMessage> messages = mongoTemplate.find(query, ChatMessage.class, MESSAGES_COLLECTION);
 
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"export-%s.json\"".formatted(userId))
-                .body(formatAsJson(messages));
+        return switch (format.toLowerCase()) {
+            case "txt" -> ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN_VALUE)
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\"export-%s.txt\"".formatted(userId))
+                    .body(formatAsText(messages));
+            case "md" -> ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN_VALUE)
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\"export-%s.md\"".formatted(userId))
+                    .body(formatAsMarkdown(messages, "User %s".formatted(userId)));
+            default -> ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\"export-%s.json\"".formatted(userId))
+                    .body(formatAsJson(messages));
+        };
     }
 
     private String formatAsText(List<ChatMessage> messages) {
@@ -119,8 +131,8 @@ public class ChatExportController {
         return sb.toString();
     }
 
-    private String formatAsMarkdown(List<ChatMessage> messages, String sessionId) {
-        var sb = new StringBuilder("# Chat Export - Session %s\n\n".formatted(sessionId));
+    private String formatAsMarkdown(List<ChatMessage> messages, String title) {
+        var sb = new StringBuilder("# Chat Export - %s\n\n".formatted(title));
         for (var msg : messages) {
             var label = "user".equals(msg.role()) ? "**User**" : "**Assistant**";
             sb.append("### %s (%s)\n\n%s\n\n---\n\n".formatted(label, msg.timestamp(), msg.content()));

@@ -91,6 +91,21 @@ jobs:
           mvn versions:commit --batch-mode --no-transfer-progress
           echo "All POMs set to version: ${VERSION}"
 
+      # ── Pin the archetype template to this release too ─────────────────────
+      # gargantua.version inside archetype-resources/pom.xml is a resource file,
+      # not a reactor POM — `mvn versions:set` above never touches it, so every
+      # project scaffolded via `mvn archetype:generate` would keep resolving
+      # whatever version was last hand-typed there (this drifted for 9 releases
+      # before someone noticed). Patch it here so the archetype JAR published
+      # for this tag always points at itself.
+      - name: Pin archetype template version
+        if: steps.version.outputs.version != ''
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          sed -i "s#<gargantua.version>.*</gargantua.version>#<gargantua.version>${VERSION}</gargantua.version>#" \
+            agent-archetype/src/main/resources/archetype-resources/pom.xml
+          grep gargantua.version agent-archetype/src/main/resources/archetype-resources/pom.xml
+
       # ── Build all framework modules ────────────────────────────────────────
       - name: Build
         run: >

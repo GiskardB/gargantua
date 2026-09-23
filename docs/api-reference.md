@@ -167,21 +167,21 @@ Resolves a pending human-in-the-loop approval request.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `decision` | string | Yes | `APPROVED` or `DENIED`. |
+| `decision` | string | Yes | `approve` or `deny` (anything else is treated as a deny). |
 | `reason` | string | No | Optional reason for audit logging. |
 
 **Example**
 ```bash
 curl -X POST http://localhost:8080/api/agent/approval/apr_7f3a9c \
   -H "Content-Type: application/json" \
-  -d '{"decision": "APPROVED", "reason": "User confirmed email recipient"}'
+  -d '{"decision": "approve", "reason": "User confirmed email recipient"}'
 ```
 
 **Response (200)**
 ```json
 {
   "requestId": "apr_7f3a9c",
-  "decision": "APPROVED",
+  "decision": "approve",
   "status": "resolved"
 }
 ```
@@ -261,7 +261,7 @@ These endpoints require MongoDB. They are conditionally registered when `MongoTe
 | DELETE | `/api/agent/chat/history/{userId}/{sessionId}` | Delete a session and all its messages. |
 | DELETE | `/api/agent/chat/history/{userId}` | GDPR-compliant deletion of all sessions and messages for a user. |
 | GET | `/api/agent/chat/export/{userId}/{sessionId}?format=json` | Export a session. Formats: `json`, `txt`, `md`. |
-| GET | `/api/agent/chat/export/{userId}?format=json&from=...&to=...` | Export all user messages in a date range (ISO-8601). |
+| GET | `/api/agent/chat/export/{userId}?format=json&from=...&to=...` | Export all user messages in a date range (ISO-8601). Formats: `json`, `txt`, `md`. |
 
 ---
 

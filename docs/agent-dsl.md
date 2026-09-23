@@ -48,7 +48,7 @@ public class CoderAgent {
 
 1. At startup, `AgentSkillProcessor` scans all Spring beans annotated with `@AgentSkill`
 2. It auto-detects all **public** `@AgentTool` methods in the class → these become the skill's `allowed-tools` (private/protected methods are ignored)
-3. The system prompt is read from a `public static final String PROMPT` field (since Javadoc isn't available at runtime)
+3. The system prompt is read from a `static final String PROMPT` field (since Javadoc isn't available at runtime)
 4. A `SkillCard` is generated and registered in the `SkillRegistry`
 5. The skill participates in routing, guardrails, memory, and everything else — identical to file-based skills
 
