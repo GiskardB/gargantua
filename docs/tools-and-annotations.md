@@ -118,7 +118,7 @@ When the agent attempts to call a tool annotated with `@RequiresApproval`, the f
    Content-Type: application/json
 
    {
-     "decision": "APPROVED"   // or "DENIED"
+     "decision": "approve"   // or "deny"
    }
    ```
 5. The decision is written to the `ApprovalStore`.
