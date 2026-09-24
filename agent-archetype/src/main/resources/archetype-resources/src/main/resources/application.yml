@@ -110,7 +110,7 @@ agent:
   routing:
     strategy: hybrid
     fallback-skill: default-skill
-    semantic:
+    classifier:
       threshold: 0.82
 
   memory:

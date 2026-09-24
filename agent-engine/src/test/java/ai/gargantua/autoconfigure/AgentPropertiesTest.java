@@ -156,9 +156,15 @@ class AgentPropertiesTest {
         }
 
         @Test
-        @DisplayName("semantic threshold defaults to 0.6")
-        void semanticThreshold() {
-            assertThat(new AgentProperties().getRouting().getSemantic().getThreshold()).isEqualTo(0.6);
+        @DisplayName("classifier threshold defaults to 0.6")
+        void classifierThreshold() {
+            assertThat(new AgentProperties().getRouting().getClassifier().getThreshold()).isEqualTo(0.6);
+        }
+
+        @Test
+        @DisplayName("classifier engine defaults to semantic")
+        void classifierEngine() {
+            assertThat(new AgentProperties().getRouting().getClassifier().getEngine()).isEqualTo("semantic");
         }
     }
 

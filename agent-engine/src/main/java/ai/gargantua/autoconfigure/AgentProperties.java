@@ -327,7 +327,7 @@ public class AgentProperties {
     public static class Routing {
         private String strategy = "hybrid";
         private String fallbackSkill = "default";
-        private Semantic semantic = new Semantic();
+        private Classifier classifier = new Classifier();
 
         public String getStrategy() { return strategy; }
         public void setStrategy(String strategy) { this.strategy = strategy; }
@@ -335,18 +335,57 @@ public class AgentProperties {
         public String getFallbackSkill() { return fallbackSkill; }
         public void setFallbackSkill(String fallbackSkill) { this.fallbackSkill = fallbackSkill; }
 
-        public Semantic getSemantic() { return semantic; }
-        public void setSemantic(Semantic semantic) { this.semantic = semantic; }
+        public Classifier getClassifier() { return classifier; }
+        public void setClassifier(Classifier classifier) { this.classifier = classifier; }
 
-        public static class Semantic {
+        /** Config for the pluggable {@link ai.gargantua.core.routing.SkillClassifier} (see docs/architecture/offline-skill-classifier-proposal.md). */
+        public static class Classifier {
+            private String engine = "semantic";
             private double threshold = 0.6;
-            private String model = "all-MiniLM-L6-v2";
+            private Semantic semantic = new Semantic();
+            private Onnx onnx = new Onnx();
+            private Tribuo tribuo = new Tribuo();
+
+            public String getEngine() { return engine; }
+            public void setEngine(String engine) { this.engine = engine; }
 
             public double getThreshold() { return threshold; }
             public void setThreshold(double threshold) { this.threshold = threshold; }
 
-            public String getModel() { return model; }
-            public void setModel(String model) { this.model = model; }
+            public Semantic getSemantic() { return semantic; }
+            public void setSemantic(Semantic semantic) { this.semantic = semantic; }
+
+            public Onnx getOnnx() { return onnx; }
+            public void setOnnx(Onnx onnx) { this.onnx = onnx; }
+
+            public Tribuo getTribuo() { return tribuo; }
+            public void setTribuo(Tribuo tribuo) { this.tribuo = tribuo; }
+
+            public static class Semantic {
+                private String model = "all-MiniLM-L6-v2";
+
+                public String getModel() { return model; }
+                public void setModel(String model) { this.model = model; }
+            }
+
+            public static class Onnx {
+                private String modelPath = "classpath:models/skill-classifier.onnx";
+                private java.util.List<String> labels = new java.util.ArrayList<>();
+
+                public String getModelPath() { return modelPath; }
+                public void setModelPath(String modelPath) { this.modelPath = modelPath; }
+
+                /** Skill names in the same order as the ONNX model's output logits. */
+                public java.util.List<String> getLabels() { return labels; }
+                public void setLabels(java.util.List<String> labels) { this.labels = labels; }
+            }
+
+            public static class Tribuo {
+                private String modelPath = "classpath:models/skill-classifier.tribuo";
+
+                public String getModelPath() { return modelPath; }
+                public void setModelPath(String modelPath) { this.modelPath = modelPath; }
+            }
         }
     }
 

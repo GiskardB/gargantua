@@ -19,7 +19,7 @@ class SemanticRoutingServiceTest {
     @BeforeEach
     void setUp() {
         properties = new AgentProperties();
-        properties.getRouting().getSemantic().setThreshold(0.1);
+        properties.getRouting().getClassifier().setThreshold(0.1);
         properties.getRouting().setFallbackSkill("fallback");
 
         // RoutingService needs LlmProviderFactory, but for semantic-only tests
@@ -28,7 +28,7 @@ class SemanticRoutingServiceTest {
         LlmRouter llmRouter = new LlmRouter(properties);
         LlmProviderFactory llmProviderFactory = new LlmProviderFactory(properties, llmRouter);
         RoutingService routingService = new RoutingService(properties, llmProviderFactory);
-        service = new SemanticRoutingService(properties, routingService);
+        service = new SemanticRoutingService(properties, routingService, new SemanticSimilarityClassifier());
     }
 
     private SkillMeta skill(String name, String description) {
@@ -53,7 +53,7 @@ class SemanticRoutingServiceTest {
 
     @Test
     void fallsBackToLlmWhenBelowThreshold() {
-        properties.getRouting().getSemantic().setThreshold(0.99); // Very high threshold
+        properties.getRouting().getClassifier().setThreshold(0.99); // Very high threshold
 
         List<SkillMeta> skills = List.of(
                 skill("skill-a", "Does something very specific"),

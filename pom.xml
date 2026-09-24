@@ -62,6 +62,7 @@
     <module>agent-runtime</module>
     <module>agent-mcp-server</module>
     <module>agent-skill-linter-maven-plugin</module>
+    <module>agent-router-trainer-maven-plugin</module>
     <module>agent-archetype</module>
   </modules>
 
@@ -91,6 +92,7 @@
     <testcontainers.version>1.20.4</testcontainers.version>
     <wiremock.version>3.10.0</wiremock.version>
     <mcp-sdk.version>0.9.0</mcp-sdk.version>
+    <tribuo.version>4.3.2</tribuo.version>
 
     <!-- Release-time plugin versions (used by the `release` profile below) -->
     <maven-source-plugin.version>3.3.1</maven-source-plugin.version>
@@ -177,6 +179,13 @@
         <groupId>com.vladsch.flexmark</groupId>
         <artifactId>flexmark-all</artifactId>
         <version>${flexmark.version}</version>
+      </dependency>
+      <dependency>
+        <!-- Pure-JVM classifier training/inference for the offline skill router
+             (see docs/architecture/offline-skill-classifier-proposal.md). -->
+        <groupId>org.tribuo</groupId>
+        <artifactId>tribuo-classification-sgd</artifactId>
+        <version>${tribuo.version}</version>
       </dependency>
 
       <dependency>

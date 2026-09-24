@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.github.giskardb</groupId>
+    <artifactId>gargantua-parent</artifactId>
+    <version>1.4.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>agent-router-trainer-maven-plugin</artifactId>
+  <packaging>maven-plugin</packaging>
+  <name>Agent Router Trainer Maven Plugin</name>
+  <description>Maven plugin (goal: train-router) that trains the offline SkillClassifier from SKILL.md examples/routing-hints</description>
+
+  <dependencies>
+    <!-- Maven Plugin API -->
+    <dependency>
+      <groupId>org.apache.maven</groupId>
+      <artifactId>maven-plugin-api</artifactId>
+      <version>3.9.9</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.maven.plugin-tools</groupId>
+      <artifactId>maven-plugin-annotations</artifactId>
+      <version>3.15.2</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.maven</groupId>
+      <artifactId>maven-project</artifactId>
+      <version>2.2.1</version>
+    </dependency>
+
+    <!-- YAML frontmatter parsing (same approach as agent-skill-linter-maven-plugin) -->
+    <dependency>
+      <groupId>org.yaml</groupId>
+      <artifactId>snakeyaml</artifactId>
+    </dependency>
+
+    <!-- Feature extraction: same in-process MiniLM embedding used at inference time -->
+    <dependency>
+      <groupId>dev.langchain4j</groupId>
+      <artifactId>langchain4j-embeddings-all-minilm-l6-v2-q</artifactId>
+    </dependency>
+
+    <!-- Training: pure-JVM classifier -->
+    <dependency>
+      <groupId>org.tribuo</groupId>
+      <artifactId>tribuo-classification-sgd</artifactId>
+    </dependency>
+
+    <!-- Test -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-plugin-plugin</artifactId>
+        <!-- 3.15.2 bundles ASM 9.9, which can parse Java 21 bytecode (class
+             file major version 65); 3.15.1's ASM 9.7.1 cannot. -->
+        <version>3.15.2</version>
+      </plugin>
+    </plugins>
+  </build>
+</project>

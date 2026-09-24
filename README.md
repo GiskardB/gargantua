@@ -697,6 +697,7 @@ clone required. (Runtime mode doesn't need Central at all: it's a jar/image down
 | `agent-runtime` | `io.github.giskardb` | `com.github.giskardb.gargantua` | Standalone runtime that loads and executes an agent bundle. Also published pre-built — see [Try it in 60 seconds](#try-it-in-60-seconds). |
 | `agent-mcp-server` | `io.github.giskardb` | `com.github.giskardb.gargantua` | MCP Server gateway (optional). |
 | `agent-skill-linter-maven-plugin` | `io.github.giskardb` | `com.github.giskardb.gargantua` | Build-time SKILL.md validation. |
+| `agent-router-trainer-maven-plugin` | `io.github.giskardb` | `com.github.giskardb.gargantua` | `train-router` goal: trains the offline skill classifier (Tribuo) from SKILL.md examples/routing-hints. |
 | `agent-archetype` | `io.github.giskardb` | `com.github.giskardb.gargantua` | Maven archetype to scaffold new agent projects. |
 
 `agent-bundle`, `agent-mcp-client` and `agent-runtime` — the modules Runtime mode is

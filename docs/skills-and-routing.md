@@ -52,7 +52,8 @@ Do NOT answer questions unrelated to weather. Politely redirect the user.
 | `metadata.rag-min-score` | float | No | Minimum similarity score for RAG results. Default `0.3`. |
 | `metadata.allowed-roles` | list of strings | No | Roles permitted to use this skill (e.g. `[financial-advisor, super-admin]`). If set, `RbacGuardrail` blocks users without a matching role. The `super-admin` role bypasses all restrictions. **Tested** by `agent-example-tool-rbac` (tool-level RBAC, same store). |
 | `metadata.memory-layers` | list of strings | No | Subset of memory layers to fetch for this skill: `working`, `episodic`, `knowledge` (case-insensitive). When set, layers not listed are skipped — their port (Redis or MongoDB) is not queried. Defaults to all three layers. Use it for stateless skills (greetings, simple Q&A) to save a Redis/MongoDB round-trip. See [Memory System](memory-system.md). |
-| `examples` | list of strings | No | Example prompts surfaced via the A2A Agent Card for client discovery (e.g. `["What's the weather in Berlin?"]`). |
+| `examples` | list of strings | No | Example prompts surfaced via the A2A Agent Card for client discovery (e.g. `["What's the weather in Berlin?"]`). Also used as positive training phrases by `mvn gargantua:train-router` (see [Routing](#routing) below). |
+| `metadata.routing-hints` | list of strings | No | Short keywords/phrases used as additional training examples by `mvn gargantua:train-router` (e.g. `[spending, budget, expenses]`). Not read at runtime by any classifier engine. |
 
 ### Folder Structure
 
@@ -197,12 +198,14 @@ agent:
   routing:
     strategy: hybrid          # semantic | llm | hybrid
     fallback-skill: default   # Skill name to route to when no match meets threshold
-    semantic:
-      threshold: 0.6          # Minimum cosine similarity for semantic match
-      model: all-minilm-l6-v2
+    classifier:
+      engine: semantic         # semantic (default) | onnx | tribuo — see SkillClassifier below
+      threshold: 0.6           # Minimum confidence for a local classifier match
+      semantic:
+        model: all-minilm-l6-v2
 ```
 
-> The threshold is nested under `semantic`. `agent.routing.threshold` is **not** a
+> The threshold is nested under `classifier`. `agent.routing.threshold` is **not** a
 > property — Spring ignores unknown keys, so getting this wrong silently leaves the
 > default in place. Archetype-generated projects ship `0.82`; the framework default is
 > `0.6`.
@@ -211,9 +214,29 @@ agent:
 
 | Strategy | Behavior |
 |----------|----------|
-| `semantic` | Embedding similarity only. If no skill meets the threshold, returns the configured `fallback-skill` (no LLM call). |
-| `llm` | Skips embeddings entirely; every request goes through `RoutingService.routeWithLlm`. |
-| `hybrid` | Default. Tries semantic first; if below threshold, falls back to LLM routing. |
+| `semantic` | Local classifier only. If no skill meets the threshold, returns the configured `fallback-skill` (no LLM call). |
+| `llm` | Skips the local classifier entirely; every request goes through `RoutingService.routeWithLlm`. |
+| `hybrid` | Default. Tries the local classifier first; if below threshold, falls back to LLM routing. |
+
+#### `SkillClassifier` — pluggable local matching engine
+
+The `semantic`/`hybrid` strategies delegate their first-pass matching to a
+`ai.gargantua.core.routing.SkillClassifier` bean, selected via
+`agent.routing.classifier.engine`:
+
+| Engine | Class | Training required | Notes |
+|---|---|---|---|
+| `semantic` (default) | `SemanticSimilarityClassifier` | No | ONNX embedding (all-MiniLM-L6-v2) + cosine similarity against skill `description`. Zero-shot. |
+| `tribuo` | `TribuoClassifier` | Yes — `mvn gargantua:train-router` | Pure-JVM logistic regression over the same MiniLM embeddings as features. Higher accuracy on ambiguous phrasing than zero-shot cosine similarity. |
+| `onnx` | `OnnxClassifier` | Yes — bring your own model | Escape hatch for a custom classification head exported to ONNX; expects the same 384-dim MiniLM embedding as input (`agent.routing.classifier.onnx.model-path` + `.labels`). |
+
+Register your own engine by defining a `@Bean SkillClassifier` in your
+application context — it wins over the built-ins
+(`@ConditionalOnMissingBean`). See
+`docs/architecture/offline-skill-classifier-proposal.md` for the full design
+and the `mvn gargantua:train-router` training pipeline, including the
+optional `metadata.routing-hints` frontmatter field used only at training
+time (alongside `examples`, see the frontmatter table above).
 
 ### Force a Specific Skill
 

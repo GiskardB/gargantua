@@ -83,6 +83,12 @@
       <artifactId>langchain4j-agentic</artifactId>
     </dependency>
 
+    <!-- Pluggable offline skill classifier (Tribuo engine) -->
+    <dependency>
+      <groupId>org.tribuo</groupId>
+      <artifactId>tribuo-classification-sgd</artifactId>
+    </dependency>
+
     <!-- Resilience -->
     <dependency>
       <groupId>io.github.resilience4j</groupId>

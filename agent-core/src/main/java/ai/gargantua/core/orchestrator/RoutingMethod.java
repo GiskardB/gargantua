@@ -6,9 +6,12 @@ package ai.gargantua.core.orchestrator;
  * @see RoutingResult
  */
 public enum RoutingMethod {
-    /** Matched via embedding similarity against skill descriptions. Fastest path. */
+    /**
+     * Matched by the in-process {@link ai.gargantua.core.routing.SkillClassifier} configured via
+     * {@code agent.routing.classifier.engine} (semantic embedding similarity by default). Fastest path.
+     */
     SEMANTIC,
-    /** Semantic score was below threshold, so the LLM picked the skill. More accurate but slower. */
+    /** Classifier confidence was below threshold, so the routing LLM picked the skill. More accurate but slower. */
     LLM,
     /** The caller explicitly set {@link AgentRequest#forceSkill()}, bypassing routing entirely. */
     FORCED
