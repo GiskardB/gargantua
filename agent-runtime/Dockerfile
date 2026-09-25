@@ -27,6 +27,7 @@ COPY agent-engine/pom.xml agent-engine/
 COPY agent-runtime/pom.xml agent-runtime/
 COPY agent-mcp-server/pom.xml agent-mcp-server/
 COPY agent-skill-linter-maven-plugin/pom.xml agent-skill-linter-maven-plugin/
+COPY agent-router-trainer-maven-plugin/pom.xml agent-router-trainer-maven-plugin/
 COPY agent-archetype/pom.xml agent-archetype/
 
 COPY agent-core/src agent-core/src
