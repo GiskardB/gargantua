@@ -90,6 +90,7 @@ public class ToolRegistry {
     private final List<ToolProvider> additionalProviders;
     private final Map<String, ToolProvider> providerRouting = new LinkedHashMap<>();
     private final Map<List<String>, List<ToolSpecification>> specCache = new ConcurrentHashMap<>();
+    private final Map<String, Retry> retries = new ConcurrentHashMap<>();
 
     /**
      * Holds the bean + method plus the four method-level annotations evaluated on
@@ -249,6 +250,12 @@ public class ToolRegistry {
 
     public Collection<ToolDefinition> getToolDefinitions() {
         return tools.values();
+    }
+
+    /** The descriptor of one tool, or {@code null} when no such tool is registered. */
+    @org.springframework.lang.Nullable
+    public ToolDefinition getTool(String toolName) {
+        return tools.get(toolName);
     }
 
     public List<String> getAllToolNames() {
@@ -595,6 +602,21 @@ public class ToolRegistry {
     }
 
     private String executeWithRetry(String toolName, ToolRetry ann, Supplier<String> call) {
+        Retry retry = retries.computeIfAbsent(toolName, name -> buildRetry(name, ann));
+        try {
+            return Retry.decorateSupplier(retry, call).get();
+        } catch (RuntimeException e) {
+            log.error("[ToolRegistry] Tool '{}' failed after retries: {}", toolName, e.getMessage());
+            return errorJson("Tool execution failed: " + safeMessage(e));
+        }
+    }
+
+    /**
+     * Built once per tool: the policy comes from an annotation and never changes, and a
+     * {@link Retry} is designed to be reused. Rebuilding it on every call also
+     * re-registered the metric listeners each time.
+     */
+    private Retry buildRetry(String toolName, ToolRetry ann) {
         RetryConfig config = RetryConfig.custom()
                 .maxAttempts(Math.max(1, ann.maxAttempts()))
                 .intervalFunction(IntervalFunction.ofExponentialBackoff(
@@ -616,12 +638,7 @@ public class ToolRegistry {
                     .onRetry(e -> meters.counter("agent.tool.retry.attempts", "tool", toolName).increment())
                     .onError(e -> meters.counter("agent.tool.retry.exhausted", "tool", toolName).increment());
         }
-        try {
-            return Retry.decorateSupplier(retry, call).get();
-        } catch (RuntimeException e) {
-            log.error("[ToolRegistry] Tool '{}' failed after retries: {}", toolName, e.getMessage());
-            return errorJson("Tool execution failed: " + safeMessage(e));
-        }
+        return retry;
     }
 
     private boolean matches(Throwable t, Class<? extends Throwable>[] types) {
@@ -713,8 +730,17 @@ public class ToolRegistry {
         return result != null && result.startsWith(ERROR_PREFIX);
     }
 
+    /**
+     * Builds the {@code {"error":"..."}} payload handed back to the model. The message
+     * often embeds an exception text, so it is escaped by Jackson rather than by hand:
+     * a backslash or a newline in it used to yield JSON the caller could not parse.
+     */
     private String errorJson(String message) {
-        return "{\"error\":\"" + message.replace("\"", "\\\"") + "\"}";
+        try {
+            return ERROR_PREFIX + objectMapper.writeValueAsString(message) + "}";
+        } catch (Exception e) {
+            return ERROR_PREFIX + "\"tool error\"}";
+        }
     }
 
     private String safeMessage(Throwable t) {
