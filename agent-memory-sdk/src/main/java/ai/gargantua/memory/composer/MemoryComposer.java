@@ -16,6 +16,8 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 /**
  * Composes all three memory layers (working, episodic, knowledge) in parallel,
@@ -38,6 +40,9 @@ public class MemoryComposer {
     private static final Set<MemoryLayer> ALL_LAYERS = EnumSet.allOf(MemoryLayer.class);
 
     private static final int DEFAULT_MAX_EPISODIC_SUMMARIES = 10;
+
+    /** One virtual thread per layer fetch; nothing to size, nothing to shut down. */
+    private static final Executor FETCH_EXECUTOR = Executors.newVirtualThreadPerTaskExecutor();
 
     private final WorkingMemoryPort workingMemory;
     private final EpisodicMemoryPort episodicMemory;
@@ -92,15 +97,21 @@ public class MemoryComposer {
         log.debug("[MemoryComposer] Composing memory for userId={}, sessionId={}, budget={}, layers={}",
                 userId, sessionId, budget, layers);
 
-        // Parallel fetch — only for enabled layers
+        // Parallel fetch — only for enabled layers. Each fetch is a blocking store call,
+        // so it runs on a virtual thread: the default supplyAsync executor is the common
+        // ForkJoinPool, which is sized for CPU work and stalls every other user of it
+        // (parallel streams included) when its few workers sit waiting on Redis or Mongo.
         CompletableFuture<List<ChatMessage>> workingFuture = layers.contains(MemoryLayer.WORKING)
-                ? CompletableFuture.supplyAsync(() -> workingMemory.getMessages(sessionId))
+                ? CompletableFuture.supplyAsync(() -> workingMemory.getMessages(sessionId), FETCH_EXECUTOR)
                 : CompletableFuture.completedFuture(List.of());
+
         CompletableFuture<List<SessionSummary>> episodicFuture = layers.contains(MemoryLayer.EPISODIC)
-                ? CompletableFuture.supplyAsync(() -> episodicMemory.getRecentSummaries(userId, maxEpisodicSummaries))
+                ? CompletableFuture.supplyAsync(
+                        () -> episodicMemory.getRecentSummaries(userId, maxEpisodicSummaries), FETCH_EXECUTOR)
                 : CompletableFuture.completedFuture(List.of());
+
         CompletableFuture<List<KnowledgeSegment>> knowledgeFuture = layers.contains(MemoryLayer.KNOWLEDGE)
-                ? CompletableFuture.supplyAsync(() -> knowledgeMemory.getSegments(userId))
+                ? CompletableFuture.supplyAsync(() -> knowledgeMemory.getSegments(userId), FETCH_EXECUTOR)
                 : CompletableFuture.completedFuture(List.of());
 
         CompletableFuture.allOf(workingFuture, episodicFuture, knowledgeFuture).join();

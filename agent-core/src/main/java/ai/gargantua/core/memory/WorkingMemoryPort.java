@@ -20,6 +20,20 @@ public interface WorkingMemoryPort {
     /** Appends a message and resets the session TTL. */
     void appendMessage(String sessionId, ChatMessage message);
 
+    /**
+     * Appends several messages in order. A turn always stores a user message and the
+     * assistant's reply together, so adapters backed by a remote store should override
+     * this to write the batch in one round trip; the default simply loops.
+     *
+     * @param sessionId the session to append to
+     * @param messages  the messages, oldest first
+     */
+    default void appendMessages(String sessionId, List<ChatMessage> messages) {
+        for (ChatMessage message : messages) {
+            appendMessage(sessionId, message);
+        }
+    }
+
     /** Removes all messages for the session. */
     void clear(String sessionId);
 

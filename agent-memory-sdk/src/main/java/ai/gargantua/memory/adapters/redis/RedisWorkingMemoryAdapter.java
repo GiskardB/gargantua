@@ -4,8 +4,10 @@ import ai.gargantua.core.memory.ChatMessage;
 import ai.gargantua.core.memory.WorkingMemoryPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -56,14 +58,32 @@ public class RedisWorkingMemoryAdapter implements WorkingMemoryPort {
 
     @Override
     public void appendMessage(String sessionId, ChatMessage message) {
-        String key = key(sessionId);
-        String json = serialize(message);
-        redis.opsForList().rightPush(key, json);
-        // Trim to keep only the most recent maxMessages entries
-        redis.opsForList().trim(key, -maxMessages, -1);
-        // Reset TTL on every append
-        redis.expire(key, ttlMinutes, TimeUnit.MINUTES);
-        log.debug("[WorkingMemory] Appended message to session={}, role={}", sessionId, message.role());
+        appendMessages(sessionId, List.of(message));
+    }
+
+    /**
+     * Push, trim and TTL refresh go out in a single pipelined round trip. Issued one by
+     * one they cost three round trips per message — six per turn — and left a window
+     * in which a crash between the push and the expire produced a key with no TTL.
+     */
+    @Override
+    public void appendMessages(String sessionId, List<ChatMessage> messages) {
+        if (messages == null || messages.isEmpty()) {
+            return;
+        }
+        byte[] key = key(sessionId).getBytes(StandardCharsets.UTF_8);
+        byte[][] values = messages.stream()
+                .map(m -> serialize(m).getBytes(StandardCharsets.UTF_8))
+                .toArray(byte[][]::new);
+        long ttlSeconds = TimeUnit.MINUTES.toSeconds(ttlMinutes);
+        redis.executePipelined((RedisCallback<Object>) connection -> {
+            connection.listCommands().rPush(key, values);
+            // Keep only the most recent maxMessages entries.
+            connection.listCommands().lTrim(key, -maxMessages, -1);
+            connection.keyCommands().expire(key, ttlSeconds);
+            return null;
+        });
+        log.debug("[WorkingMemory] Appended {} message(s) to session={}", messages.size(), sessionId);
     }
 
     @Override
