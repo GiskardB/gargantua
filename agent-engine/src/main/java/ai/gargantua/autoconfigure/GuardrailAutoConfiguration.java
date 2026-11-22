@@ -1,5 +1,9 @@
 package ai.gargantua.autoconfigure;
 
+import ai.gargantua.adapters.ratelimit.InMemoryRequestRateLimiter;
+import ai.gargantua.adapters.ratelimit.RedisRequestRateLimiter;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import ai.gargantua.autoconfigure.guardrails.DisclaimerInjectorGuardrail;
 import ai.gargantua.autoconfigure.guardrails.MaxLengthGuardrail;
 import ai.gargantua.autoconfigure.guardrails.PiiInputGuardrail;
@@ -53,10 +57,21 @@ public class GuardrailAutoConfiguration {
         return new PiiInputGuardrail(properties);
     }
 
+    /**
+     * Shared across replicas when a Redis template is present, local to this JVM
+     * otherwise (the {@code embedded} profile, or an app with no Redis).
+     */
+    @Bean
+    @ConditionalOnMissingBean(RequestRateLimiter.class)
+    public RequestRateLimiter requestRateLimiter(ObjectProvider<StringRedisTemplate> redisTemplate) {
+        StringRedisTemplate redis = redisTemplate.getIfAvailable();
+        return redis != null ? new RedisRequestRateLimiter(redis) : new InMemoryRequestRateLimiter();
+    }
+
     @Bean
     @ConditionalOnMissingBean(RateLimitGuardrail.class)
-    public RateLimitGuardrail rateLimitGuardrail(AgentProperties properties) {
-        return new RateLimitGuardrail(properties);
+    public RateLimitGuardrail rateLimitGuardrail(AgentProperties properties, RequestRateLimiter limiter) {
+        return new RateLimitGuardrail(properties, limiter);
     }
 
     @Bean

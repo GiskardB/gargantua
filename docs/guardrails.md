@@ -186,7 +186,13 @@ PASS (pii_detected=true, pii_count=2)
 - `agent.guardrail.input.rate-limit-max-requests` -- integer, default `60`
 - `agent.guardrail.input.rate-limit-window-seconds` -- integer, default `60`
 
-**Note:** The current implementation is a placeholder that always returns PASS. The production implementation will use a Redis sliding window counter keyed by userId.
+**How it counts.** A sliding window per caller: the user id, prefixed with the tenant id when the request carries one, so the same user id in two tenants is two callers. A request over the limit is rejected and *not* counted, so a client that keeps retrying is admitted again as soon as its oldest request leaves the window.
+
+**Where the counters live.** In Redis when the application has a `StringRedisTemplate` — the limit then holds across every replica of the agent — and in the JVM otherwise (the `embedded` profile). With several replicas and no Redis, each replica enforces the limit on its own share of traffic. Supply your own `RequestRateLimiter` bean to change the store.
+
+**If Redis is down** the limiter admits the request and logs a warning: an unreachable counter must not take the agent down with it.
+
+**What the client sees.** `429 Too Many Requests` on `/api/agent/chat`; an `error` event with code `RATE_LIMIT_EXCEEDED` on `/api/agent/chat/stream`.
 
 ## Built-in Output Guardrails
 
