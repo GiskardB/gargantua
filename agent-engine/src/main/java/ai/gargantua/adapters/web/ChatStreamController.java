@@ -203,7 +203,7 @@ public class ChatStreamController {
                 });
                 StreamingChatModel streamingModel = llmProviderFactory.getStreamingModel(turn.modelAlias());
                 streamSingleTurn(sink, streamingModel, agentRequest, turn, startTime, 0,
-                        new ArrayList<>(), new StringBuilder());
+                        new ArrayList<>(), new StringBuilder(), new TurnPipeline.TokenTally());
             } catch (GuardrailBlockedException e) {
                 emitError(sink, "GUARDRAIL_BLOCKED", "Blocked by guardrail: " + e.getMessage());
                 sink.tryEmitComplete();
@@ -231,7 +231,8 @@ public class ChatStreamController {
                                    long startTime,
                                    int iteration,
                                    List<String> toolsCalled,
-                                   StringBuilder fullResponse) {
+                                   StringBuilder fullResponse,
+                                   TurnPipeline.TokenTally usage) {
         if (iteration >= 10) {
             emitError(sink, "MAX_TOOL_ITERATIONS", "Max tool iterations reached");
             sink.tryEmitComplete();
@@ -266,6 +267,7 @@ public class ChatStreamController {
 
             @Override
             public void onCompleteResponse(ChatResponse response) {
+                usage.add(response.tokenUsage());
                 AiMessage aiMessage = response.aiMessage();
                 messages.add(aiMessage);
 
@@ -309,7 +311,7 @@ public class ChatStreamController {
 
                     // Continue the loop: call LLM again with tool results
                     streamSingleTurn(sink, streamingModel, agentRequest, turn, startTime,
-                            iteration + 1, toolsCalled, fullResponse);
+                            iteration + 1, toolsCalled, fullResponse, usage);
                 } else {
                     // Final response — complete the stream
                     String finalText = fullResponse.toString();
@@ -327,7 +329,7 @@ public class ChatStreamController {
 
                     // Working memory, chat history, cost, audit — shared with the sync path.
                     AgentResponse completed = turnPipeline.complete(
-                            agentRequest, turn, finalText, toolsCalled, startTime);
+                            agentRequest, turn, finalText, toolsCalled, startTime, usage);
 
                     String toolsJson = String.join(",", toolsCalled.stream()
                             .map(t -> "\"" + escapeJson(t) + "\"")

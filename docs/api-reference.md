@@ -64,6 +64,8 @@ curl -X POST http://localhost:8080/api/agent/chat \
 
 Response fields: `text` (the answer), `sessionId`, `skillUsed` (which skill handled it), `routingMethod` (`SEMANTIC` | `LLM` | `FORCED`), `routingConfidence`, `toolsCalled` (list of tool names), `inputTokens`, `outputTokens`, `totalTokens` (their sum), `estimatedCostUsd`, `durationMs` (end-to-end latency), `dryRun`.
 
+**Where the token counts come from.** When the model provider reports usage, `inputTokens` and `outputTokens` are its figures, summed over every model call of the turn — a turn that calls tools invokes the model once per round, and each round is billed. When the provider reports nothing, they are estimates (about four characters per token) of the full prompt — system prompt, replayed history and the user message — and of the response text. `estimatedCostUsd` is priced from whichever of the two was used.
+
 ---
 
 ### POST /api/agent/chat/stream -- SSE Streaming

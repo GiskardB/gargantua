@@ -206,8 +206,9 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
         emit(traceId, seq, ExecutionEventType.LLM_CALL, "main", "model " + turn.modelAlias(),
                 Map.of("model", turn.modelAlias(), "toolsAvailable", turn.toolSpecs().size()),
                 agentId, effectiveSessionId, null);
+        var usage = new TurnPipeline.TokenTally();
         var rawResponse = executeLlmWithTools(model, turn.messages(), turn.toolSpecs(),
-                toolsCalled, turn.toolContext(), skillCard);
+                toolsCalled, turn.toolContext(), skillCard, usage);
         log.info("[Pipeline] Step 9 — LLM call complete, tools called: {}", toolsCalled);
         for (String tool : toolsCalled) {
             emit(traceId, seq, ExecutionEventType.TOOL_CALLED, "main", tool,
@@ -217,10 +218,10 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
         // 10. Output guardrails — with schema-validation auto-retry.
         var processedResponse = runOutputGuardrailsWithSchemaRetry(
                 rawResponse, request, effectiveSessionId, skillCard, turn.attributes(),
-                model, turn.messages(), turn.toolSpecs(), toolsCalled, turn.toolContext());
+                model, turn.messages(), turn.toolSpecs(), toolsCalled, turn.toolContext(), usage);
 
         // 11-13. Persist, price, audit.
-        var response = turnPipeline.complete(request, turn, processedResponse, toolsCalled, startTime);
+        var response = turnPipeline.complete(request, turn, processedResponse, toolsCalled, startTime, usage);
 
         log.info("[Pipeline] END userId={}, skill={}, method={}, tokens={}, durationMs={}, dryRun={}",
                 request.userId(), response.skillUsed(), response.routingMethod(),
@@ -251,7 +252,8 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
             List<dev.langchain4j.data.message.ChatMessage> messages,
             List<ToolSpecification> toolSpecs,
             List<String> toolsCalled,
-            ToolExecutionContext toolContext) {
+            ToolExecutionContext toolContext,
+            TurnPipeline.TokenTally usage) {
 
         int maxRetries = Math.max(0, properties.getOutput().getValidationRetries());
         String currentResponse = initialResponse;
@@ -281,7 +283,7 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
                             + detailed.blockedReason()
                             + ". Re-emit a valid response that conforms to the schema; "
                             + "do not include any prose outside the JSON."));
-            currentResponse = executeLlmWithTools(model, messages, toolSpecs, toolsCalled, toolContext, skillCard);
+            currentResponse = executeLlmWithTools(model, messages, toolSpecs, toolsCalled, toolContext, skillCard, usage);
         }
         return currentResponse;
     }
@@ -299,7 +301,8 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
                                         List<ToolSpecification> toolSpecs,
                                         List<String> toolsCalled,
                                         ToolExecutionContext toolContext,
-                                        @Nullable SkillCard skillCard) {
+                                        @Nullable SkillCard skillCard,
+                                        TurnPipeline.TokenTally usage) {
         int maxIterations = 10;
 
         Double skillTemperature = skillCard != null ? skillCard.temperature() : null;
@@ -319,6 +322,7 @@ public class DefaultOrchestratorEngine implements OrchestratorEngine {
             }
 
             ChatResponse chatResponse = model.chat(requestBuilder.build());
+            usage.add(chatResponse.tokenUsage());
             AiMessage aiMessage = chatResponse.aiMessage();
             messages.add(aiMessage);
 

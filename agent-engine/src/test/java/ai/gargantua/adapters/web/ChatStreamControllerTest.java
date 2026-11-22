@@ -57,7 +57,10 @@ class ChatStreamControllerTest {
             modelCalls.incrementAndGet();
             handler.onPartialResponse("Hel");
             handler.onPartialResponse("lo");
-            handler.onCompleteResponse(ChatResponse.builder().aiMessage(AiMessage.from("Hello")).build());
+            handler.onCompleteResponse(ChatResponse.builder()
+                    .aiMessage(AiMessage.from("Hello"))
+                    .tokenUsage(new dev.langchain4j.model.output.TokenUsage(50, 7))
+                    .build());
         }
     };
 
@@ -113,7 +116,9 @@ class ChatStreamControllerTest {
         assertThat(events).extracting(ServerSentEvent::event).containsExactly("token", "token", "done");
         assertThat(events.getLast().data())
                 .contains("\"skillUsed\":\"" + RESTRICTED + "\"")
-                .contains("\"sessionId\":\"s1\"");
+                .contains("\"sessionId\":\"s1\"")
+                // The provider's own counts, not a length-based guess.
+                .contains("\"totalTokens\":57");
         assertThat(modelCalls).hasValue(1);
         verify(workingMemory).appendMessages(eq("s1"), org.mockito.ArgumentMatchers.<List<ChatMessage>>argThat(
                 messages -> messages.size() == 2 && "Hello".equals(messages.get(1).content())));

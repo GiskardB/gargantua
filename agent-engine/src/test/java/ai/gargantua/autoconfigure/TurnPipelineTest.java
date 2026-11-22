@@ -228,6 +228,59 @@ class TurnPipelineTest {
     }
 
     @Test
+    void exceedingTheRateLimitSurfacesAsItsOwnExceptionAndCostsOneCountPerRequest() {
+        properties.getGuardrail().getInput().setRateLimitEnabled(true);
+        properties.getGuardrail().getInput().setRateLimitMaxRequests(2);
+        var guardrails = new GuardrailPipeline(
+                List.of(new ai.gargantua.autoconfigure.guardrails.RateLimitGuardrail(properties)),
+                List.of(), properties);
+        var pipeline = new TurnPipeline(guardrails, routing, new DefaultTokenBudgetManager(), llm,
+                new PromptBuilder(), tools, properties, skillRegistry, List.of(), null,
+                null, workingMemory, null, null);
+
+        // Two full requests fit a limit of two even though each runs the guardrails twice.
+        pipeline.prepare(request("one").build(), null);
+        pipeline.prepare(request("two").build(), null);
+
+        assertThatThrownBy(() -> pipeline.prepare(request("three").build(), null))
+                .isInstanceOf(ai.gargantua.core.exception.RateLimitExceededException.class)
+                .satisfies(e -> assertThat(
+                        ((ai.gargantua.core.exception.RateLimitExceededException) e).getLimit()).isEqualTo(2));
+    }
+
+    @Test
+    void providerReportedUsageIsSummedAcrossModelCallsAndPreferredOverTheEstimate() {
+        var pipeline = pipeline();
+        var req = request("hello").build();
+        var turn = pipeline.prepare(req, null);
+        var usage = new TurnPipeline.TokenTally();
+        usage.add(new dev.langchain4j.model.output.TokenUsage(1200, 40));   // first call: asks for a tool
+        usage.add(null);                                                    // a call with no usage is skipped
+        usage.add(new dev.langchain4j.model.output.TokenUsage(1300, 90));   // second call: final answer
+
+        var response = pipeline.complete(req, turn, "hi", List.of(), System.currentTimeMillis(), usage);
+
+        assertThat(response.inputTokens()).isEqualTo(2500);
+        assertThat(response.outputTokens()).isEqualTo(130);
+        assertThat(response.totalTokens()).isEqualTo(2630);
+    }
+
+    @Test
+    void withoutProviderUsageTheEstimateCoversTheWholePromptNotJustTheUserLine() {
+        when(skillRegistry.load(OPEN)).thenReturn(new SkillCard(
+                new SkillMeta(OPEN, "", "1.0.0", true, false, "general", SkillSource.FILESYSTEM, Set.of()),
+                "x".repeat(4000), List.of(), null, List.of(), null, null, null, null));
+        var pipeline = pipeline();
+        var req = request("hello").build();
+
+        var response = pipeline.complete(req, pipeline.prepare(req, null), "hi", List.of(),
+                System.currentTimeMillis(), new TurnPipeline.TokenTally());
+
+        // 4000 chars of system prompt is ~1000 tokens; "hello" alone would be 1.
+        assertThat(response.inputTokens()).isGreaterThanOrEqualTo(1000);
+    }
+
+    @Test
     void dryRunPersistsNothing() {
         var pipeline = pipeline();
         var req = request("hello").dryRunContext(DryRunContext.active(Map.of())).build();

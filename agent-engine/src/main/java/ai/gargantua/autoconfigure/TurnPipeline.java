@@ -1,6 +1,8 @@
 package ai.gargantua.autoconfigure;
 
+import ai.gargantua.autoconfigure.guardrails.RateLimitGuardrail;
 import ai.gargantua.autoconfigure.guardrails.RbacGuardrail;
+import ai.gargantua.core.exception.RateLimitExceededException;
 import ai.gargantua.core.exception.GuardrailBlockedException;
 import ai.gargantua.core.exception.SkillNotFoundException;
 import ai.gargantua.core.guardrail.GuardrailInputContext;
@@ -108,7 +110,42 @@ public class TurnPipeline {
             List<dev.langchain4j.data.message.ChatMessage> messages,
             List<ToolSpecification> toolSpecs,
             String modelAlias,
-            ToolExecutionContext toolContext) {
+            ToolExecutionContext toolContext,
+            int estimatedPromptTokens) {
+    }
+
+    /**
+     * Token counts reported by the provider, summed over every model call of a turn — a
+     * turn that uses tools calls the model once per round, and each call is billed.
+     * Not thread-safe; one instance belongs to one turn.
+     */
+    public static final class TokenTally {
+        private int inputTokens;
+        private int outputTokens;
+        private boolean reported;
+
+        /** Adds one model call's usage; ignored when the provider reported none. */
+        public void add(@Nullable dev.langchain4j.model.output.TokenUsage usage) {
+            if (usage == null || (usage.inputTokenCount() == null && usage.outputTokenCount() == null)) {
+                return;
+            }
+            reported = true;
+            inputTokens += usage.inputTokenCount() != null ? usage.inputTokenCount() : 0;
+            outputTokens += usage.outputTokenCount() != null ? usage.outputTokenCount() : 0;
+        }
+
+        /** Whether at least one model call came back with usage figures. */
+        public boolean reported() {
+            return reported;
+        }
+
+        public int inputTokens() {
+            return inputTokens;
+        }
+
+        public int outputTokens() {
+            return outputTokens;
+        }
     }
 
     private final GuardrailPipeline guardrailPipeline;
@@ -187,6 +224,13 @@ public class TurnPipeline {
         if (inputResult.blocked()) {
             log.warn("[Pipeline] Input BLOCKED by guardrail '{}': {}",
                     inputResult.blockedBy(), inputResult.reason());
+            if (RateLimitGuardrail.NAME.equals(inputResult.blockedBy())) {
+                // Its own exception so REST answers 429 and SSE reports RATE_LIMIT_EXCEEDED,
+                // rather than the generic guardrail block.
+                throw new RateLimitExceededException(
+                        request.userId() != null ? request.userId() : "anonymous",
+                        properties.getGuardrail().getInput().getRateLimitMaxRequests());
+            }
             throw new GuardrailBlockedException(inputResult.blockedBy(), inputResult.reason(), Map.of());
         }
 
@@ -258,6 +302,14 @@ public class TurnPipeline {
         var messages = llmProviderFactory.buildMessages(
                 allocation.systemPrompt(), llmUserMessage, memory.workingMessages());
 
+        // Fallback input size for providers that report no usage: the whole prompt the
+        // model is sent, not just the user's line — history and system prompt are billed too.
+        int estimatedPromptTokens = tokenBudgetManager.estimate(allocation.systemPrompt())
+                + tokenBudgetManager.estimate(llmUserMessage);
+        for (ChatMessage past : memory.workingMessages()) {
+            estimatedPromptTokens += tokenBudgetManager.estimate(past.content());
+        }
+
         return new PreparedTurn(
                 effectiveSessionId,
                 attributes,
@@ -269,7 +321,8 @@ public class TurnPipeline {
                 messages,
                 toolRegistry.getToolSpecifications(skillCard.allowedTools()),
                 alias,
-                ToolExecutionContext.of(securityContext, effectiveSessionId));
+                ToolExecutionContext.of(securityContext, effectiveSessionId),
+                estimatedPromptTokens);
     }
 
     /** The session id as stored and traced: tenant-prefixed for multi-tenant callers. */
@@ -289,13 +342,25 @@ public class TurnPipeline {
      */
     public AgentResponse complete(AgentRequest request, PreparedTurn turn, String responseText,
                                   List<String> toolsCalled, long startTimeMs) {
+        return complete(request, turn, responseText, toolsCalled, startTimeMs, null);
+    }
+
+    /**
+     * As {@link #complete(AgentRequest, PreparedTurn, String, List, long)}, pricing the
+     * turn from the provider's own token counts when {@code usage} carries any. Without
+     * them the counts are estimated from the prompt and the response text.
+     */
+    public AgentResponse complete(AgentRequest request, PreparedTurn turn, String responseText,
+                                  List<String> toolsCalled, long startTimeMs,
+                                  @Nullable TokenTally usage) {
         boolean dryRun = request.dryRunContext() != null && request.dryRunContext().active();
         if (!dryRun) {
             persist(request, turn, responseText);
         }
 
-        int inputTokens = tokenBudgetManager.estimate(request.message());
-        int outputTokens = tokenBudgetManager.estimate(responseText);
+        boolean measured = usage != null && usage.reported();
+        int inputTokens = measured ? usage.inputTokens() : turn.estimatedPromptTokens();
+        int outputTokens = measured ? usage.outputTokens() : tokenBudgetManager.estimate(responseText);
         var modelConfig = llmProviderFactory.getModelConfig(turn.modelAlias());
         double estimatedCostUsd = costTracker != null
                 ? costTracker.estimateUsd(
