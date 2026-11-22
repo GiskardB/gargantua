@@ -40,9 +40,14 @@ import java.util.List;
 @EnableConfigurationProperties(AgentProperties.class)
 public class AgentAutoConfiguration {
 
+    /**
+     * The model-independent half of a turn, shared by the synchronous engine and the
+     * streaming controller so both enforce the same guardrails and record the same
+     * history and audit trail.
+     */
     @Bean
-    @ConditionalOnMissingBean(OrchestratorEngine.class)
-    public DefaultOrchestratorEngine defaultOrchestratorEngine(
+    @ConditionalOnMissingBean(TurnPipeline.class)
+    public TurnPipeline turnPipeline(
             GuardrailPipeline guardrailPipeline,
             SemanticRoutingService semanticRoutingService,
             TokenBudgetManager tokenBudgetManager,
@@ -56,13 +61,25 @@ public class AgentAutoConfiguration {
             @Nullable MemoryComposer memoryComposer,
             @Nullable WorkingMemoryPort workingMemoryPort,
             @Nullable MongoTemplate mongoTemplate,
-            @Nullable CostTracker costTracker,
-            @Nullable ExecutionEventPublisher eventPublisher) {
-        return new DefaultOrchestratorEngine(
+            @Nullable CostTracker costTracker) {
+        return new TurnPipeline(
                 guardrailPipeline, semanticRoutingService, tokenBudgetManager,
                 llmProviderFactory, promptBuilder, toolRegistry, properties,
                 skillRegistry, contextEnrichers, auditService,
-                memoryComposer, workingMemoryPort, mongoTemplate, costTracker, eventPublisher);
+                memoryComposer, workingMemoryPort, mongoTemplate, costTracker);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(OrchestratorEngine.class)
+    public DefaultOrchestratorEngine defaultOrchestratorEngine(
+            TurnPipeline turnPipeline,
+            GuardrailPipeline guardrailPipeline,
+            LlmProviderFactory llmProviderFactory,
+            ToolRegistry toolRegistry,
+            AgentProperties properties,
+            @Nullable ExecutionEventPublisher eventPublisher) {
+        return new DefaultOrchestratorEngine(turnPipeline, guardrailPipeline,
+                llmProviderFactory, toolRegistry, properties, eventPublisher);
     }
 
     /**

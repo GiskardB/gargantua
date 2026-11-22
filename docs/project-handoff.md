@@ -99,6 +99,14 @@ blank credential. See ADR-005.
 layers, allowed roles, minimum version — are parsed but **not** acted on. This is
 honest by design: read it before assuming a manifest field does something.
 
+**The two chat endpoints share one `TurnPipeline`.** Everything before the model call
+(guardrails, routing, the post-routing guardrail pass that enforces `allowed-roles`,
+memory, prompt, model choice) and everything after it (working memory, chat history,
+cost, audit) lives in `TurnPipeline`, used by both `DefaultOrchestratorEngine` and
+`ChatStreamController`. They once had separate copies and the streaming one silently
+lost the RBAC pass, the history write and the audit event. A new pipeline step belongs
+in `TurnPipeline`, never in one of the two callers.
+
 **One runtime process hosts exactly one agent.** Isolation between agents is
 process isolation. This is why `AgentProperties`, `SkillRegistry` and
 `ToolRegistry` can stay singletons. See ADR-001.

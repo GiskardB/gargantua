@@ -52,10 +52,13 @@ flowchart LR
 
 Each input guardrail receives a `GuardrailInputContext` containing the user message, userId, sessionId, activated skill, and a mutable `attributes` map for inter-guardrail communication (e.g., PII maps). Each output guardrail receives a `GuardrailOutputContext` with the current response text and an `inputAttributes()` map carrying the values the input phase put into context.
 
-> **The streaming endpoint does not propagate input attributes.** `ChatStreamController`
-> builds the output context with an empty map, so anything the input phase stashed —
-> notably the PII map — is unavailable on `/api/agent/chat/stream`. See the note under
-> [PiiOutput](#piioutput-order-10).
+> **Both chat endpoints run the same guardrails.** `/api/agent/chat` and
+> `/api/agent/chat/stream` share one `TurnPipeline` for everything that happens before and
+> after the model call: both input-guardrail passes (including the post-routing one that
+> enforces a skill's `allowed-roles`), and the attribute map handed to the output phase.
+> The one inherent difference is timing: on the streaming endpoint tokens have already
+> reached the client by the time output guardrails run, so an output guardrail there
+> shapes what is *stored* and reported, not what was streamed.
 
 ## Built-in Input Guardrails
 
@@ -151,6 +154,10 @@ BLOCK: "Blocked topic detected: politics"
 
 **When it triggers.** Always runs when enabled. **Always returns PASS** -- this is a transformation, not a blocker. The LLM sees the masked message; the original PII is preserved in context only.
 
+**Where the masked text goes.** The masked message is what is sent to the model (current turn and routing), what is written to working memory — so it is also what the model is shown as history on later turns — and what the audit trail records. The original text is kept only in the request-scoped `pii_map` and in the user-facing chat history.
+
+**Limit.** Placeholders are numbered per request, so `[EMAIL_0]` in one turn and `[EMAIL_0]` in the next may stand for different addresses; the model cannot tell them apart across turns. And if the model's reply quotes a placeholder, `PiiOutput` restores the original in that reply, which is then stored as the assistant message.
+
 **Config key:**
 - `agent.guardrail.input.pii-masking-enabled` -- boolean, default `false`
 
@@ -189,10 +196,11 @@ PASS (pii_detected=true, pii_count=2)
 
 When the input phase has stashed a `pii_map` (placeholder → original) in context attributes, this guardrail restores the originals before returning the response — longer placeholders are replaced first to avoid partial substitution. When no `pii_map` is present (input masking was off), the guardrail falls back to regex-based redaction of email/IBAN/phone patterns it sees in the LLM output.
 
-> **On the streaming endpoint the fallback is always what runs.** `/api/agent/chat/stream`
-> passes an empty attribute map to the output phase, so de-anonymisation never has a
-> `pii_map` to work from and silently degrades to regex redaction. If you rely on
-> placeholder restoration, use the synchronous `/api/agent/chat` endpoint.
+> **On the streaming endpoint restoration applies to the stored text only.** The
+> `pii_map` reaches the output phase on both endpoints, but streamed tokens have already
+> left: the client saw the placeholders as the model wrote them. The restored text is what
+> goes to working memory and chat history. If the client must receive restored values, use
+> the synchronous `/api/agent/chat` endpoint.
 
 **Config key:**
 - `agent.guardrail.output.pii-masking-enabled` -- boolean, default `false`

@@ -82,24 +82,14 @@ public class WebAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean(ChatStreamController.class)
     public ChatStreamController chatStreamController(
-            OrchestratorEngine orchestratorEngine,
+            TurnPipeline turnPipeline,
             LlmProviderFactory llmProviderFactory,
             GuardrailPipeline guardrailPipeline,
-            SemanticRoutingService semanticRoutingService,
-            TokenBudgetManager tokenBudgetManager,
-            PromptBuilder promptBuilder,
             ToolRegistry toolRegistry,
             AgentProperties properties,
-            List<ContextEnricher> contextEnrichers,
-            @Nullable SkillRegistry skillRegistry,
-            @Nullable MemoryComposer memoryComposer,
-            @Nullable WorkingMemoryPort workingMemoryPort,
-            @Nullable CostTracker costTracker,
             @Nullable ApprovalStore approvalStore) {
-        return new ChatStreamController(orchestratorEngine, llmProviderFactory,
-                guardrailPipeline, semanticRoutingService, tokenBudgetManager,
-                promptBuilder, toolRegistry, properties, contextEnrichers,
-                skillRegistry, memoryComposer, workingMemoryPort, costTracker, approvalStore);
+        return new ChatStreamController(turnPipeline, llmProviderFactory,
+                guardrailPipeline, toolRegistry, properties, approvalStore);
     }
 
     @Bean

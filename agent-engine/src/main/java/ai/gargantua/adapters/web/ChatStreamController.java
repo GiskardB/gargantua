@@ -1,13 +1,13 @@
 package ai.gargantua.adapters.web;
 
 import ai.gargantua.autoconfigure.CostTracker;
-import ai.gargantua.autoconfigure.DefaultOrchestratorEngine;
 import ai.gargantua.autoconfigure.GuardrailPipeline;
 import ai.gargantua.autoconfigure.LlmProviderFactory;
 import ai.gargantua.autoconfigure.PromptBuilder;
 import ai.gargantua.autoconfigure.SemanticRoutingService;
 import ai.gargantua.autoconfigure.SecurityContextFilter;
 import ai.gargantua.autoconfigure.ToolRegistry;
+import ai.gargantua.autoconfigure.TurnPipeline;
 import ai.gargantua.autoconfigure.AgentProperties;
 import ai.gargantua.core.exception.GuardrailBlockedException;
 import ai.gargantua.core.exception.RateLimitExceededException;
@@ -16,27 +16,23 @@ import ai.gargantua.core.exception.TokenBudgetExceededException;
 import ai.gargantua.core.exception.ApprovalExpiredException;
 import ai.gargantua.core.exception.DryRunNotAllowedException;
 import ai.gargantua.core.exception.SkillNotFoundException;
-import ai.gargantua.core.guardrail.GuardrailInputContext;
 import ai.gargantua.core.guardrail.GuardrailOutputContext;
+import ai.gargantua.core.guardrail.GuardrailPipelineResult;
 import ai.gargantua.core.guardrail.GuardrailResult;
 import ai.gargantua.core.guardrail.GuardrailVerdict;
 import ai.gargantua.core.hitl.ApprovalRequest;
 import ai.gargantua.core.hitl.ApprovalStore;
-import ai.gargantua.core.llm.LlmRoutingContext;
-import ai.gargantua.core.memory.ChatMessage;
-import ai.gargantua.core.memory.ComposedMemory;
 import ai.gargantua.core.memory.WorkingMemoryPort;
-import ai.gargantua.core.orchestrator.BudgetRequest;
+import ai.gargantua.core.orchestrator.AgentRequest;
+import ai.gargantua.core.orchestrator.AgentResponse;
 import ai.gargantua.core.orchestrator.ContextEnricher;
-import ai.gargantua.core.orchestrator.EnricherContext;
+import ai.gargantua.core.session.DryRunContext;
 import ai.gargantua.core.orchestrator.OrchestratorEngine;
 import ai.gargantua.core.orchestrator.TokenBudgetManager;
 import ai.gargantua.core.security.SecurityContext;
 import ai.gargantua.core.skill.SkillCard;
-import ai.gargantua.core.skill.SkillMeta;
 import ai.gargantua.core.skill.SkillRegistry;
 import ai.gargantua.core.tool.ToolDefinition;
-import ai.gargantua.core.tool.ToolExecutionContext;
 import ai.gargantua.memory.composer.MemoryComposer;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
@@ -64,10 +60,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Schedulers;
 
-import java.time.DayOfWeek;
-import java.time.LocalTime;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -90,31 +83,34 @@ public class ChatStreamController {
 
     private static final Logger log = LoggerFactory.getLogger(ChatStreamController.class);
 
-    private final OrchestratorEngine orchestratorEngine;
     private final LlmProviderFactory llmProviderFactory;
     private final GuardrailPipeline guardrailPipeline;
-    private final SemanticRoutingService semanticRoutingService;
-    private final TokenBudgetManager tokenBudgetManager;
-    private final PromptBuilder promptBuilder;
     private final ToolRegistry toolRegistry;
     private final AgentProperties properties;
-    private final List<ContextEnricher> contextEnrichers;
-
-    @Nullable
-    private final SkillRegistry skillRegistry;
-
-    @Nullable
-    private final MemoryComposer memoryComposer;
-
-    @Nullable
-    private final WorkingMemoryPort workingMemoryPort;
-
-    @Nullable
-    private final CostTracker costTracker;
+    private final TurnPipeline turnPipeline;
 
     @Nullable
     private final ApprovalStore approvalStore;
 
+    public ChatStreamController(TurnPipeline turnPipeline,
+                                LlmProviderFactory llmProviderFactory,
+                                GuardrailPipeline guardrailPipeline,
+                                ToolRegistry toolRegistry,
+                                AgentProperties properties,
+                                @Nullable ApprovalStore approvalStore) {
+        this.turnPipeline = turnPipeline;
+        this.llmProviderFactory = llmProviderFactory;
+        this.guardrailPipeline = guardrailPipeline;
+        this.toolRegistry = toolRegistry;
+        this.properties = properties;
+        this.approvalStore = approvalStore;
+    }
+
+    /**
+     * Constructor kept for callers that assemble the controller by hand. It has no audit
+     * service or chat-history store to hand to the {@link TurnPipeline}, so a controller
+     * built this way streams without recording either — prefer the constructor above.
+     */
     public ChatStreamController(OrchestratorEngine orchestratorEngine,
                                 LlmProviderFactory llmProviderFactory,
                                 GuardrailPipeline guardrailPipeline,
@@ -129,25 +125,10 @@ public class ChatStreamController {
                                 @Nullable WorkingMemoryPort workingMemoryPort,
                                 @Nullable CostTracker costTracker,
                                 @Nullable ApprovalStore approvalStore) {
-        this.orchestratorEngine = orchestratorEngine;
-        this.llmProviderFactory = llmProviderFactory;
-        this.guardrailPipeline = guardrailPipeline;
-        this.semanticRoutingService = semanticRoutingService;
-        this.tokenBudgetManager = tokenBudgetManager;
-        this.promptBuilder = promptBuilder;
-        this.toolRegistry = toolRegistry;
-        this.properties = properties;
-        // Pre-sort enrichers once — see DefaultOrchestratorEngine for the same rationale.
-        this.contextEnrichers = (contextEnrichers == null || contextEnrichers.isEmpty())
-                ? List.of()
-                : contextEnrichers.stream()
-                        .sorted(Comparator.comparingInt(ContextEnricher::order))
-                        .toList();
-        this.skillRegistry = skillRegistry;
-        this.memoryComposer = memoryComposer;
-        this.workingMemoryPort = workingMemoryPort;
-        this.costTracker = costTracker;
-        this.approvalStore = approvalStore;
+        this(new TurnPipeline(guardrailPipeline, semanticRoutingService, tokenBudgetManager,
+                        llmProviderFactory, promptBuilder, toolRegistry, properties, skillRegistry,
+                        contextEnrichers, null, memoryComposer, workingMemoryPort, null, costTracker),
+                llmProviderFactory, guardrailPipeline, toolRegistry, properties, approvalStore);
     }
 
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -197,127 +178,35 @@ public class ChatStreamController {
         var securityContext = (SecurityContext) httpRequest.getAttribute(SecurityContextFilter.SECURITY_CONTEXT_ATTR);
         Map<String, String> headerAttrs = RequestContextHeaders.extract(httpRequest);
 
+        AgentRequest agentRequest = AgentRequest.builder()
+                .message(request.message())
+                .userId(userId)
+                .sessionId(sessionId)
+                .forceSkill(forceSkill)
+                .dryRunContext(dryRun ? DryRunContext.active(Map.of()) : DryRunContext.inactive())
+                .securityContext(securityContext)
+                .contextAttributes(new HashMap<>(headerAttrs))
+                .build();
+
         Sinks.Many<ServerSentEvent<String>> sink = Sinks.many().unicast().onBackpressureBuffer();
 
         Flux.defer(() -> {
             long startTime = System.currentTimeMillis();
             try {
-                // --- Pre-LLM pipeline (synchronous, fast) ---
-
-                // Input guardrails
-                var inputAttributes = new HashMap<String, Object>();
-                if (securityContext != null) {
-                    inputAttributes.put("gargantua.securityContext", securityContext);
-                }
-                inputAttributes.putAll(headerAttrs);
-                var inputCtx = new GuardrailInputContext(
-                        request.message(), userId, sessionId, null, inputAttributes);
-                var inputResult = guardrailPipeline.checkInput(inputCtx);
-                emitGuardrailWarnings(sink, inputResult.results(), "input");
-                if (inputResult.blocked()) {
-                    emitError(sink, "GUARDRAIL_BLOCKED",
-                            "Blocked by guardrail: " + inputResult.reason());
-                    sink.tryEmitComplete();
-                    return Flux.empty();
-                }
-
-                // Route to skill
-                var skills = skillRegistry != null ? skillRegistry.listMeta() : List.<SkillMeta>of();
-                var routingResult = (forceSkill != null && !forceSkill.isBlank())
-                        ? ai.gargantua.core.orchestrator.RoutingResult.forced(forceSkill)
-                        : semanticRoutingService.route(request.message(), skills);
-
-                // Load skill card
-                SkillCard skillCard;
-                if (skillRegistry != null) {
-                    try {
-                        skillCard = skillRegistry.load(routingResult.skillName());
-                    } catch (Exception e) {
-                        throw new SkillNotFoundException(routingResult.skillName());
+                // Guardrails, routing, post-routing RBAC, memory, prompt, model selection:
+                // the same steps, from the same code, as POST /api/agent/chat.
+                var turn = turnPipeline.prepare(agentRequest, new TurnPipeline.Listener() {
+                    @Override
+                    public void onInputChecked(GuardrailPipelineResult result) {
+                        emitGuardrailWarnings(sink, result.results(), "input");
                     }
-                } else {
-                    var meta = new SkillMeta(routingResult.skillName(), "", "1.0.0",
-                            true, false, "general",
-                            ai.gargantua.core.skill.SkillSource.FILESYSTEM, java.util.Set.of());
-                    skillCard = new SkillCard(meta, "", List.of(), null, List.of(), null, null, null, null);
-                }
-
-                // Compose memory from the agent's enabled layers (spec.memoryLayers,
-                // workload-level — SKILL.md's per-skill memory-layers is no longer
-                // consulted here; see AgentProperties.Memory#getEnabledLayers)
-                String effectiveSessionId = (securityContext != null && securityContext.isMultiTenant())
-                        ? securityContext.tenantId() + ":" + sessionId
-                        : sessionId;
-
-                ComposedMemory memory;
-                if (memoryComposer != null) {
-                    try {
-                        memory = memoryComposer.compose(userId, effectiveSessionId,
-                                properties.getMemory().getComposer().getMaxContextTokens(),
-                                properties.getMemory().getEnabledLayers());
-                    } catch (Exception e) {
-                        memory = new ComposedMemory(List.of(), List.of(), List.of(), 0);
-                    }
-                } else {
-                    memory = new ComposedMemory(List.of(), List.of(), List.of(), 0);
-                }
-
-                // Build prompt with enrichers — seed with X-Context-* attrs so enrichers can read them
-                var enricherAttributes = new HashMap<String, String>(headerAttrs);
-                var enricherCtx = new EnricherContext(
-                        userId, effectiveSessionId, skillCard.meta().name(),
-                        skillCard.meta().domain(), request.message(), headerAttrs);
-                contextEnrichers.stream()
-                        .filter(e -> e.targetSkill() == null || e.targetSkill().equals(skillCard.meta().name()))
-                        .forEach(e -> {
-                            try {
-                                String section = e.enrich(enricherCtx);
-                                if (section != null && !section.isBlank()) {
-                                    enricherAttributes.put(e.sectionName(), section);
-                                }
-                            } catch (Exception ex) {
-                                log.warn("Context enricher failed: {}", ex.getMessage());
-                            }
-                        });
-
-                var enricherContext = new EnricherContext(
-                        userId, effectiveSessionId, skillCard.meta().name(),
-                        skillCard.meta().domain(), request.message(), enricherAttributes);
-                var systemPrompt = promptBuilder.build(skillCard, memory, enricherContext);
-
-                // Token budget
-                var toolDescriptions = toolRegistry.getFilteredTools(skillCard.allowedTools())
-                        .stream().map(ToolDefinition::description).toList();
-                var budgetRequest = new BudgetRequest(
-                        systemPrompt, "",
-                        skillCard.references() != null ? skillCard.references() : List.of(),
-                        List.of(), memory.knowledgeSegments(), toolDescriptions,
-                        request.message(),
-                        properties.getMemory().getComposer().getMaxContextTokens());
-                var allocation = tokenBudgetManager.allocate(budgetRequest);
-
-                // Build messages and tool specs
-                var messages = llmProviderFactory.buildMessages(
-                        allocation.systemPrompt(), request.message(), memory.workingMessages());
-                var toolSpecs = toolRegistry.getToolSpecifications(skillCard.allowedTools());
-
-                // Resolve streaming model
-                var llmCtx = new LlmRoutingContext(
-                        userId, effectiveSessionId, skillCard.meta().name(),
-                        skillCard.meta().domain(), request.message(),
-                        request.message() != null ? request.message().length() : 0,
-                        tokenBudgetManager.estimate(request.message()),
-                        "default", LocalTime.now(),
-                        DayOfWeek.from(java.time.LocalDate.now()), Map.of());
-                String alias = llmProviderFactory.resolveModelAlias(skillCard, llmCtx);
-                StreamingChatModel streamingModel = llmProviderFactory.getStreamingModel(alias);
-
-                // --- Real streaming with tool calling loop ---
-                var toolContext = ToolExecutionContext.of(securityContext, effectiveSessionId);
-                streamWithToolLoop(sink, streamingModel, messages, toolSpecs, skillCard,
-                        routingResult, effectiveSessionId, userId, request.message(),
-                        memory, startTime, dryRun, toolContext, alias);
-
+                });
+                StreamingChatModel streamingModel = llmProviderFactory.getStreamingModel(turn.modelAlias());
+                streamSingleTurn(sink, streamingModel, agentRequest, turn, startTime, 0,
+                        new ArrayList<>(), new StringBuilder());
+            } catch (GuardrailBlockedException e) {
+                emitError(sink, "GUARDRAIL_BLOCKED", "Blocked by guardrail: " + e.getMessage());
+                sink.tryEmitComplete();
             } catch (Exception e) {
                 log.error("Error during streaming chat setup", e);
                 emitError(sink, errorCodeFor(e),
@@ -331,62 +220,37 @@ public class ChatStreamController {
     }
 
     /**
-     * Perform real LLM streaming with a tool calling loop. When the LLM requests tool calls,
-     * tools are executed and results fed back; then streaming resumes for the next LLM turn.
+     * One model call of the tool-calling loop. When the model asks for tools they are
+     * executed, their results appended, and the method calls itself for the next turn;
+     * otherwise the stream is finished.
      */
-    private void streamWithToolLoop(Sinks.Many<ServerSentEvent<String>> sink,
-                                     StreamingChatModel streamingModel,
-                                     List<dev.langchain4j.data.message.ChatMessage> messages,
-                                     List<dev.langchain4j.agent.tool.ToolSpecification> toolSpecs,
-                                     SkillCard skillCard,
-                                     ai.gargantua.core.orchestrator.RoutingResult routingResult,
-                                     String effectiveSessionId,
-                                     String userId,
-                                     String userMessage,
-                                     ComposedMemory memory,
-                                     long startTime,
-                                     boolean dryRun,
-                                     ToolExecutionContext toolContext,
-                                     String modelAlias) {
-        streamSingleTurn(sink, streamingModel, messages, toolSpecs, skillCard,
-                routingResult, effectiveSessionId, userId, userMessage, memory,
-                startTime, dryRun, 0, new ArrayList<>(), new StringBuilder(), toolContext, modelAlias);
-    }
-
     private void streamSingleTurn(Sinks.Many<ServerSentEvent<String>> sink,
                                    StreamingChatModel streamingModel,
-                                   List<dev.langchain4j.data.message.ChatMessage> messages,
-                                   List<dev.langchain4j.agent.tool.ToolSpecification> toolSpecs,
-                                   SkillCard skillCard,
-                                   ai.gargantua.core.orchestrator.RoutingResult routingResult,
-                                   String effectiveSessionId,
-                                   String userId,
-                                   String userMessage,
-                                   ComposedMemory memory,
+                                   AgentRequest agentRequest,
+                                   TurnPipeline.PreparedTurn turn,
                                    long startTime,
-                                   boolean dryRun,
                                    int iteration,
                                    List<String> toolsCalled,
-                                   StringBuilder fullResponse,
-                                   ToolExecutionContext toolContext,
-                                   String modelAlias) {
+                                   StringBuilder fullResponse) {
         if (iteration >= 10) {
             emitError(sink, "MAX_TOOL_ITERATIONS", "Max tool iterations reached");
             sink.tryEmitComplete();
             return;
         }
 
+        SkillCard skillCard = turn.skillCard();
+        var messages = turn.messages();
         dev.langchain4j.model.chat.request.ChatRequest.Builder requestBuilder =
                 dev.langchain4j.model.chat.request.ChatRequest.builder().messages(messages);
-        if (toolSpecs != null && !toolSpecs.isEmpty()) {
-            requestBuilder.toolSpecifications(toolSpecs);
+        if (!turn.toolSpecs().isEmpty()) {
+            requestBuilder.toolSpecifications(turn.toolSpecs());
         }
         // Apply skill-level overrides (v1.2.17+): SKILL.md `metadata.temperature`
         // and `metadata.max-tokens` win over the model's defaults for this turn.
-        if (skillCard != null && skillCard.temperature() != null) {
+        if (skillCard.temperature() != null) {
             requestBuilder.temperature(skillCard.temperature());
         }
-        if (skillCard != null && skillCard.maxTokens() != null && skillCard.maxTokens() > 0) {
+        if (skillCard.maxTokens() != null && skillCard.maxTokens() > 0) {
             requestBuilder.maxOutputTokens(skillCard.maxTokens());
         }
 
@@ -413,22 +277,22 @@ public class ChatStreamController {
                         String toolName = toolRequest.name();
                         toolsCalled.add(toolName);
 
+                        String arguments = toolRequest.arguments();
                         sink.tryEmitNext(ServerSentEvent.<String>builder()
                                 .event("tool_call")
                                 .data("{\"tool\":\"%s\",\"arguments\":%s}".formatted(
-                                        escapeJson(toolName), toolRequest.arguments()))
+                                        escapeJson(toolName),
+                                        arguments == null || arguments.isBlank() ? "{}" : arguments))
                                 .build());
 
-                        ToolDefinition def = toolRegistry.getFilteredTools(null).stream()
-                                .filter(t -> toolName.equals(t.name()))
-                                .findFirst().orElse(null);
+                        ToolDefinition def = toolRegistry.getTool(toolName);
 
                         // Since 1.2.6 the @RequiresApproval gate lives in
                         // ToolRegistry.executeTool — the registry persists the
                         // pending request and returns the awaiting_approval JSON.
                         // The controller's job is only to surface the SSE event
                         // when that JSON comes back.
-                        String result = toolRegistry.executeTool(toolName, toolRequest.arguments(), toolContext);
+                        String result = toolRegistry.executeTool(toolName, arguments, turn.toolContext());
                         if (def != null && def.requiresApproval() && isAwaitingApproval(result)) {
                             emitApprovalRequiredEvent(sink, def, toolName, extractRequestId(result));
                         }
@@ -444,45 +308,26 @@ public class ChatStreamController {
                     }
 
                     // Continue the loop: call LLM again with tool results
-                    streamSingleTurn(sink, streamingModel, messages, toolSpecs, skillCard,
-                            routingResult, effectiveSessionId, userId, userMessage, memory,
-                            startTime, dryRun, iteration + 1, toolsCalled, fullResponse,
-                            toolContext, modelAlias);
+                    streamSingleTurn(sink, streamingModel, agentRequest, turn, startTime,
+                            iteration + 1, toolsCalled, fullResponse);
                 } else {
                     // Final response — complete the stream
                     String finalText = fullResponse.toString();
 
-                    // Output guardrails
+                    // Output guardrails, fed the attributes the input phase produced
+                    // (PII map, output schema) exactly as on the synchronous path.
                     try {
                         var outputCtx = new GuardrailOutputContext(
-                                finalText, userId, effectiveSessionId, skillCard.meta(), Map.of());
+                                finalText, agentRequest.userId(), turn.effectiveSessionId(),
+                                skillCard.meta(), turn.attributes());
                         finalText = guardrailPipeline.processOutput(outputCtx);
                     } catch (Exception e) {
                         log.warn("Output guardrail failed: {}", e.getMessage());
                     }
 
-                    // Persist memory
-                    if (!dryRun && workingMemoryPort != null) {
-                        try {
-                            workingMemoryPort.appendMessage(effectiveSessionId,
-                                    ChatMessage.userMessage(userMessage));
-                            workingMemoryPort.appendMessage(effectiveSessionId,
-                                    ChatMessage.assistantMessage(finalText));
-                        } catch (Exception e) {
-                            log.warn("Failed to persist working memory: {}", e.getMessage());
-                        }
-                    }
-
-                    long durationMs = System.currentTimeMillis() - startTime;
-                    int inputTokens = tokenBudgetManager.estimate(userMessage);
-                    int outputTokens = tokenBudgetManager.estimate(finalText);
-
-                    var modelConfig = llmProviderFactory.getModelConfig(modelAlias);
-                    String provider = modelConfig != null ? modelConfig.getProvider() : "";
-                    String modelName = modelConfig != null ? modelConfig.getModel() : "";
-                    double estimatedCostUsd = costTracker != null
-                            ? costTracker.estimateUsd(provider, modelName, inputTokens, outputTokens)
-                            : 0.0;
+                    // Working memory, chat history, cost, audit — shared with the sync path.
+                    AgentResponse completed = turnPipeline.complete(
+                            agentRequest, turn, finalText, toolsCalled, startTime);
 
                     String toolsJson = String.join(",", toolsCalled.stream()
                             .map(t -> "\"" + escapeJson(t) + "\"")
@@ -493,12 +338,12 @@ public class ChatStreamController {
                                     + "\"routingMethod\":\"%s\",\"totalTokens\":%d,"
                                     + "\"estimatedCostUsd\":%s,\"durationMs\":%d,"
                                     + "\"toolsCalled\":[%s]}")
-                                    .formatted(escapeJson(effectiveSessionId),
-                                            escapeJson(routingResult.skillName()),
-                                            routingResult.method() != null ? routingResult.method().name() : "",
-                                            inputTokens + outputTokens,
-                                            formatCost(estimatedCostUsd),
-                                            durationMs,
+                                    .formatted(escapeJson(completed.sessionId()),
+                                            escapeJson(completed.skillUsed()),
+                                            completed.routingMethod() != null ? completed.routingMethod().name() : "",
+                                            completed.totalTokens(),
+                                            formatCost(completed.estimatedCostUsd()),
+                                            completed.durationMs(),
                                             toolsJson))
                             .build());
 
