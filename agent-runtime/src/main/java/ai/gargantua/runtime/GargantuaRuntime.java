@@ -47,6 +47,8 @@ public class GargantuaRuntime {
 
     static final String BUNDLE_ENV = "GARGANTUA_BUNDLE";
     static final String BUNDLE_URL_ENV = "GARGANTUA_BUNDLE_URL";
+    /** Bearer token sent with the bundle download, for a Control Plane that requires one. */
+    static final String BUNDLE_TOKEN_ENV = "GARGANTUA_BUNDLE_TOKEN";
     static final String DEFAULT_BUNDLE_PATH = "/bundle";
     private static final String BUNDLE_FLAG = "--bundle=";
 
@@ -198,17 +200,21 @@ public class GargantuaRuntime {
      * endpoint), otherwise falling back to the local-path resolution above.
      */
     static Path resolveBundlePath(List<String> arguments) {
-        return resolveBundlePath(arguments, System.getenv(BUNDLE_URL_ENV));
+        return resolveBundlePath(arguments, System.getenv(BUNDLE_URL_ENV), System.getenv(BUNDLE_TOKEN_ENV));
     }
 
     static Path resolveBundlePath(List<String> arguments, String bundleUrl) {
+        return resolveBundlePath(arguments, bundleUrl, null);
+    }
+
+    static Path resolveBundlePath(List<String> arguments, String bundleUrl, String bundleToken) {
         if (bundleUrl != null && !bundleUrl.isBlank()) {
-            return downloadBundle(bundleUrl);
+            return downloadBundle(bundleUrl, bundleToken);
         }
         return bundlePath(arguments);
     }
 
-    private static Path downloadBundle(String url) {
+    private static Path downloadBundle(String url, String token) {
         Path target;
         try {
             target = Files.createTempFile("gargantua-bundle-", ".tmp");
@@ -217,11 +223,19 @@ public class GargantuaRuntime {
         }
         try {
             HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
-            HttpRequest request = HttpRequest.newBuilder(URI.create(url))
+            HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url))
                     .timeout(Duration.ofMinutes(2))
-                    .GET()
-                    .build();
+                    .GET();
+            if (token != null && !token.isBlank()) {
+                builder.header("Authorization", "Bearer " + token.strip());
+            }
+            HttpRequest request = builder.build();
             HttpResponse<Path> response = client.send(request, HttpResponse.BodyHandlers.ofFile(target));
+            if (response.statusCode() == 401 || response.statusCode() == 403) {
+                throw new BundleException("Downloading bundle from " + url + " was refused (HTTP "
+                        + response.statusCode() + "): set " + BUNDLE_TOKEN_ENV
+                        + " to a token the Control Plane accepts");
+            }
             if (response.statusCode() != 200) {
                 throw new BundleException("Downloading bundle from " + url + " failed: HTTP " + response.statusCode());
             }
@@ -266,7 +280,8 @@ public class GargantuaRuntime {
                   gargantua help                show this message
 
                 Bundle location:
-                  If GARGANTUA_BUNDLE_URL is set, the bundle is downloaded from it.
+                  If GARGANTUA_BUNDLE_URL is set, the bundle is downloaded from it
+                  (with GARGANTUA_BUNDLE_TOKEN as a bearer token, when set).
                   Otherwise, in order of precedence:
                     1. positional argument
                     2. --bundle=<path>

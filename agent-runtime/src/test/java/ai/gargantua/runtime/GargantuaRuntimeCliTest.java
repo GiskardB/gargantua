@@ -110,4 +110,47 @@ class GargantuaRuntimeCliTest {
             server.stop(0);
         }
     }
+
+    /** A stand-in Control Plane that serves the bundle only to the bearer token "s3cret". */
+    private static HttpServer protectedBundleServer() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/bundle", exchange -> {
+            boolean ok = "Bearer s3cret".equals(exchange.getRequestHeaders().getFirst("Authorization"));
+            byte[] body = (ok ? "bundle" : "denied").getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(ok ? 200 : 401, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
+        server.start();
+        return server;
+    }
+
+    @Test
+    @DisplayName("the bundle token is sent as a bearer token")
+    void bundleTokenIsSentAsBearer() throws Exception {
+        HttpServer server = protectedBundleServer();
+        try {
+            String url = "http://127.0.0.1:" + server.getAddress().getPort() + "/bundle";
+            Path downloaded = GargantuaRuntime.resolveBundlePath(List.of("run"), url, " s3cret ");
+            assertThat(Files.readString(downloaded)).isEqualTo("bundle");
+            Files.deleteIfExists(downloaded);
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    @DisplayName("a refused download names the variable to set")
+    void refusedDownloadPointsAtTheTokenVariable() throws Exception {
+        HttpServer server = protectedBundleServer();
+        try {
+            String url = "http://127.0.0.1:" + server.getAddress().getPort() + "/bundle";
+            org.assertj.core.api.Assertions.assertThatThrownBy(
+                            () -> GargantuaRuntime.resolveBundlePath(List.of("run"), url, null))
+                    .hasMessageContaining("HTTP 401")
+                    .hasMessageContaining("GARGANTUA_BUNDLE_TOKEN");
+        } finally {
+            server.stop(0);
+        }
+    }
 }

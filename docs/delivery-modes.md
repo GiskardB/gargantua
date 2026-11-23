@@ -91,6 +91,20 @@ docker run -v ./customer-agent.gbundle:/bundle:ro \
            ghcr.io/giskardb/gargantua-runtime:latest
 ```
 
+Instead of mounting the bundle you can have the runtime download it — typically from the
+Control Plane's registry:
+
+```bash
+docker run \
+  -e GARGANTUA_BUNDLE_URL=https://control-plane.example.com/api/v1/registry/bundles/customer-agent/1.2.0/bundle \
+  -e GARGANTUA_BUNDLE_TOKEN=... \
+  gargantua-runtime
+```
+
+`GARGANTUA_BUNDLE_TOKEN` is sent as a bearer token and is only needed when the Control
+Plane requires one; a reader token is enough. A refused download says so and names the
+variable, rather than failing as a generic bundle error.
+
 Or as a plain jar, downloaded once:
 
 ```bash

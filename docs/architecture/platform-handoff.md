@@ -650,6 +650,32 @@ against `develop` because of the earlier `getSemantic()` rename).
 `exec java` entrypoints, the BuildKit cache mount and Studio's image with Monaco are
 untested as images. Token usage was exercised with unit tests, not a live provider.
 
+### 2026-11-23 (later): the four follow-ups from the review
+
+- **Token budget now shapes the prompt** (the gap found 2026-09-05). `TurnPipeline` budgets
+  first and builds the system prompt from the allocation, so an oversized reference or a
+  long memory is actually left out instead of merely being logged as truncated. History
+  counts against the budget.
+- **`PipelineContractTest`.** Drives the real engine, pipeline and built-in guardrails
+  against a scripted model and asserts on what the model was sent and what the caller got
+  back — one scenario per documented setting. This is the test that would have caught the
+  PII, rate-limit, RBAC-on-stream and token-budget defects; it was mutation-checked
+  (breaking PII masking or the budget fails it). **A new documented setting gets a
+  scenario here.**
+- **Control Plane authentication.** Bearer tokens from configuration: *admin* (read and
+  write) and *reader* (read only — enough for a Runtime to fetch its bundle). No token
+  configured = open, with a startup warning. Studio stores a token per Control Plane
+  (server-side only), the Runtime sends `GARGANTUA_BUNDLE_TOKEN`, compose passes both
+  through from `.env`. Verified with the real Control Plane, Studio and runtime jar
+  running together.
+- **`agent.routing.semantic.*` is read again**, with a deprecation warning. The keys moved
+  to `agent.routing.classifier.*` in 1.5.0 and the old block was silently ignored, so an
+  upgraded app quietly fell back to the default threshold. The examples were still on the
+  old keys; they are now on `classifier` and on 1.5.1.
+- **Site** moved from 1.4.6 to 1.5.1 (version strings, and the routing docs merged from the
+  1.5.1 runtime docs). It deliberately does **not** describe the unreleased `develop`
+  changes above.
+
 ## 8. Known gaps & honest caveats
 
 - **Version drift risk is recurring** — every time `gargantua` bumps `agent-core` (e.g. Loadout → `1.3.0`, PACT Core → `1.4.0`), sibling repos (`gargantua-control-plane`, `gargantua-studio`) must follow or their builds fail. Two patterns have caused this:
@@ -699,26 +725,15 @@ untested as images. Token usage was exercised with unit tests, not a live provid
   (`ControlPlaneRegistry`/`ControlPlaneClient`, see `SESSION_HANDOFF_2026-08-29.md`).
 - **Bundle *signature* verification** is not implemented (SHA-256 checksum is). The bundle
   zip the Control Plane assembles is likewise unsigned.
-- The Control Plane is an **MVP**: Registry/Catalog/Policy/Deployment exist; auth is
-  permit-all in dev (OIDC/Keycloak profile stubbed), no RBAC enforcement yet.
+- The Control Plane is an **MVP**: Registry/Catalog/Policy/Deployment exist. Authentication
+  is **shared bearer tokens** (admin / reader) and is **off unless tokens are configured**;
+  there is no per-user identity, no OIDC, and the stored policies are still not enforced
+  anywhere. Studio keeps each Control Plane's token in its own database in clear text.
 - The Studio backend security is **permit-all in dev**, JWT under the `oidc` profile.
 - Docker availability in the Cave IDE env has flipped state at least once mid-project —
   it works now (verified, §4) but treat it as environment-dependent, not guaranteed.
   Java/Maven may also be missing after a re-provision — restore a portable toolchain
   (§4 build note) if `mvn`/`java` vanish.
-- **`TokenBudgetManager`'s allocation never reaches the actual prompt** (found 2026-09-05,
-  **still open** after the 2026-11-23 review — the code moved into `TurnPipeline.prepare()`,
-  which makes it a one-place fix, but it was not fixed).
-  `TurnPipeline` builds the real system prompt via
-  `PromptBuilder.build()` *before* calling `tokenBudgetManager.allocate(...)`, and never
-  use the (possibly-truncated) allocation afterward — episodic summaries are even passed
-  into the `BudgetRequest` as a hardcoded empty list, independent of what
-  `PromptBuilder` actually included. A skill with a very large reference file, or a long
-  episodic/knowledge history, has no real protection against blowing the context window
-  today, despite the budget machinery existing and running on every request. Properly
-  fixing this means reordering pipeline steps in both call sites so the prompt is built
-  *from* the allocation's output, not before it — real work, not folded into the
-  reference-file fix that surfaced it (`SESSION_HANDOFF_2026-09-05.md`).
 - **`ScopeValidator` output guardrail is still a placeholder** that always passes
   (documented as such in `guardrails.md`). The rate-limit guardrail was the same until
   2026-11-23; this one remains.
@@ -726,8 +741,6 @@ untested as images. Token usage was exercised with unit tests, not a live provid
   model cannot relate `[EMAIL_0]` across turns, and a placeholder the model quotes back is
   restored into the stored assistant message. Good enough to keep raw PII out of the
   prompt and the audit trail; not a conversation-level anonymisation scheme.
-- **Examples lag `develop`.** `agent-example-mcp-client` and `agent-example-routing-strategy`
-  call `AgentProperties.Routing#getSemantic()`, renamed by the offline-classifier work.
 - **No `Retry-After` on 429**, and the Studio launch flow still creates a new deployment
   record on every relaunch (see the superseded-record note above).
 - **`agent.mcp.security.auth-required` does nothing** (found 2026-09-05, same session as
