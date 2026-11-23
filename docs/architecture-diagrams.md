@@ -136,7 +136,7 @@ sequenceDiagram
 
     Note over Engine: ... after LLM response ...
 
-    Engine->>Redis: appendMessage(sessionId, userMsg + assistantMsg)
+    Engine->>Redis: appendMessages(sessionId, [userMsg, assistantMsg])<br/>one pipelined round trip: RPUSH + LTRIM + EXPIRE
     Note over Redis: TTL reset on each append (default: 30 min)
 
     Note over Scheduler: Every agent.summarization.scan-interval-minutes (default 5)

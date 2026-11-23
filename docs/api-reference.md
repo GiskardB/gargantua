@@ -458,7 +458,7 @@ Standard fields: `type` (stable URI for programmatic matching), `title` (human-r
 | `approval-expired` | 410 | A HITL approval request was resolved after its timeout window. |
 | `schema-validation` | 400 | The request body or a tool argument failed JSON Schema validation. |
 | `token-budget-exceeded` | 413 | The request would exceed the configured per-request token budget. |
-| `rate-limit-exceeded` | 429 | The user or client has exceeded the configured rate limit. No `Retry-After` header is currently set. |
+| `rate-limit-exceeded` | 429 | The caller exceeded `agent.guardrail.input.rate-limit-max-requests` within the window (see [Guardrails](guardrails.md#ratelimit-order-50)). The body carries `userId` and `limit`. No `Retry-After` header is currently set. |
 | `dry-run-not-allowed` | 403 | Dry-run was requested but is disabled for the active profile. |
 | `bad-request` | 400 | Malformed input, such as a non-ISO-8601 date on an admin query. |
 | `not-found` | 404 | No handler or static resource matches the path. |

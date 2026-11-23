@@ -591,6 +591,65 @@ archive mapped vs 302 MiB without) is not evidence either way: mmap'd archive pa
 count toward a process's own RSS regardless of whether the kernel is deduplicating
 them with sibling containers.
 
+### 2026-11-23: Cross-repo review — one pipeline for both chat endpoints, launcher hardening
+
+A read-through of all four repositories for efficiency turned up mostly correctness and
+security defects instead. What changed, by repository:
+
+**Runtime (`gargantua`, on `develop`)**
+
+- **`TurnPipeline`.** `DefaultOrchestratorEngine` and `ChatStreamController` each carried
+  a copy of the steps around the model call and had drifted apart. The streaming copy
+  never re-ran the input guardrails after routing, so a skill's `allowed-roles` was **not
+  enforced on `/api/agent/chat/stream`**; it also wrote no chat history and no audit
+  event. Both now call `TurnPipeline.prepare()` / `complete()`. A pipeline step belongs
+  there, never in one of the two callers.
+- **PII input masking now masks.** The masked message was computed and then ignored; the
+  model received the raw text. It is now what the model, working memory and the audit
+  trail get. Remaining limit (placeholders are per-request) is in `guardrails.md`.
+- **Rate-limit guardrail is real.** It was a placeholder that passed everything. Sliding
+  window per caller, Redis-backed when a template exists (holds across replicas),
+  in-JVM otherwise; fails open if Redis is unreachable; `429` / `RATE_LIMIT_EXCEEDED`.
+- **Token counts come from the provider.** `inputTokens` used to be an estimate of the
+  user's line alone. It is now `ChatResponse.tokenUsage()` summed over every model call of
+  the turn, with a whole-prompt estimate as fallback. Reported tokens and cost went **up**
+  accordingly — they were under-reported before.
+- **Fewer round trips.** A turn's two working-memory writes are one pipelined Redis call
+  (was six commands); the two chat-history inserts are one Mongo batch; memory layers are
+  fetched on virtual threads instead of the common `ForkJoinPool`.
+- Tool error payloads are valid JSON for any message; a `@ToolRetry` policy is built once.
+
+**Control Plane**
+
+- `POST /deployments/{id}/launch` substituted an unvalidated bundle name into `sh -c`
+  (command injection), was not actually asynchronous, and marked failed launches
+  `HEALTHY`. All three fixed — and the endpoint is now **opt-in**
+  (`gargantua.launch.enabled`, default `false`), since ADR-004 has the Control Plane
+  record deployments and an executor (Studio) apply them.
+- A bundle's versions are read from the key index instead of loading the whole registry.
+
+**Studio**
+
+- CORS admitted every `https://` origin on an API that can rewrite and run the launch
+  command. Default is now loopback origins only; a split-origin deployment sets
+  `GARGANTUA_CORS_ALLOWED_ORIGIN_PATTERNS`.
+- Monaco is bundled (was fetched from a CDN, so editors never loaded on a closed
+  network) and lives in its own lazily loaded chunk, as do the secondary screens.
+
+**Compose**
+
+- README, `.env.example`, the `.bat` wrappers and the smoke script described nginx, MinIO
+  and a port 18090 that no longer exist. The runtime image build keeps the Maven
+  repository in a BuildKit cache.
+
+**Verified:** Runtime 916 tests; Control Plane 47; Studio 70 backend + 14 frontend; the
+Redis paths against a real Redis, the registry query against Postgres 16, the Studio UI in
+a browser with the CDN unreachable; 20 of 22 examples (the other two do not compile
+against `develop` because of the earlier `getSemantic()` rename).
+**Not verified:** no Docker daemon was available, so **no image was built** — the
+`exec java` entrypoints, the BuildKit cache mount and Studio's image with Monaco are
+untested as images. Token usage was exercised with unit tests, not a live provider.
+
 ## 8. Known gaps & honest caveats
 
 - **Version drift risk is recurring** — every time `gargantua` bumps `agent-core` (e.g. Loadout → `1.3.0`, PACT Core → `1.4.0`), sibling repos (`gargantua-control-plane`, `gargantua-studio`) must follow or their builds fail. Two patterns have caused this:
@@ -616,7 +675,9 @@ them with sibling containers.
   (`GARGANTUA_BUNDLE_URL`) instead of a baked/mounted one; and a Studio **Launch** button has
   `studio-backend` run an editable command (`docker run`) to start a runtime pointed at the
   bundle. **Caveats:** the launch command runs with the backend's Docker privileges —
-  local-dev/demo only, never expose it. The Runtime still hosts **one agent per process**
+  local-dev/demo only, never expose it. (The Control Plane has a launch endpoint of its
+  own, but it is opt-in and off by default — `gargantua.launch.enabled`; Studio is the
+  executor in this stack.) The Runtime still hosts **one agent per process**
   (ADR-001): "launch" recreates *that agent's* runtime container, it does not hot-swap —
   but as of 2026-08-29 that's a per-agent-name container/port, not one shared slot, so
   **several agents run concurrently** (verified live: 3 agents, 3 containers, 3 ports,
@@ -645,8 +706,10 @@ them with sibling containers.
   it works now (verified, §4) but treat it as environment-dependent, not guaranteed.
   Java/Maven may also be missing after a re-provision — restore a portable toolchain
   (§4 build note) if `mvn`/`java` vanish.
-- **`TokenBudgetManager`'s allocation never reaches the actual prompt** (found 2026-09-05).
-  `DefaultOrchestratorEngine`/`ChatStreamController` build the real system prompt via
+- **`TokenBudgetManager`'s allocation never reaches the actual prompt** (found 2026-09-05,
+  **still open** after the 2026-11-23 review — the code moved into `TurnPipeline.prepare()`,
+  which makes it a one-place fix, but it was not fixed).
+  `TurnPipeline` builds the real system prompt via
   `PromptBuilder.build()` *before* calling `tokenBudgetManager.allocate(...)`, and never
   use the (possibly-truncated) allocation afterward — episodic summaries are even passed
   into the `BudgetRequest` as a hardcoded empty list, independent of what
@@ -656,6 +719,17 @@ them with sibling containers.
   fixing this means reordering pipeline steps in both call sites so the prompt is built
   *from* the allocation's output, not before it — real work, not folded into the
   reference-file fix that surfaced it (`SESSION_HANDOFF_2026-09-05.md`).
+- **`ScopeValidator` output guardrail is still a placeholder** that always passes
+  (documented as such in `guardrails.md`). The rate-limit guardrail was the same until
+  2026-11-23; this one remains.
+- **PII masking is per request.** Placeholders are numbered from zero on every turn, so the
+  model cannot relate `[EMAIL_0]` across turns, and a placeholder the model quotes back is
+  restored into the stored assistant message. Good enough to keep raw PII out of the
+  prompt and the audit trail; not a conversation-level anonymisation scheme.
+- **Examples lag `develop`.** `agent-example-mcp-client` and `agent-example-routing-strategy`
+  call `AgentProperties.Routing#getSemantic()`, renamed by the offline-classifier work.
+- **No `Retry-After` on 429**, and the Studio launch flow still creates a new deployment
+  record on every relaunch (see the superseded-record note above).
 - **`agent.mcp.security.auth-required` does nothing** (found 2026-09-05, same session as
   the MCP transport fix). The property binds and logs correctly but nothing checks it —
   an MCP server declared with `auth-required: true` doesn't actually require anything.

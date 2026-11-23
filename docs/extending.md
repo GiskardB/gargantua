@@ -226,6 +226,8 @@ bean of the same type replaces the default.
 | `SessionSummarizer` | `RoutingModelSessionSummarizer` | Uses the routing model |
 | `OrchestratorEngine` | `DefaultOrchestratorEngine` | The whole pipeline |
 | `TokenBudgetManager` | `DefaultTokenBudgetManager` | — |
+| `RequestRateLimiter` | `RedisRequestRateLimiter` when a `StringRedisTemplate` exists, else `InMemoryRequestRateLimiter` | Backs the rate-limit guardrail — see [Guardrails](guardrails.md#ratelimit-order-50) |
+| `TurnPipeline` | `TurnPipeline` | The steps both chat endpoints share before and after the model call; replace it only to change the pipeline itself |
 | `SecretResolver` | `EnvironmentSecretResolver` | Resolves `${secrets.*}` — see below |
 | `CapabilityRegistry` | empty | Populated from the manifest in runtime mode |
 | `ToolProvider` | none by default; one per declared MCP server | For external tool sources only — `@AgentTool` methods are scanned directly by the registry. See [Tools & Annotations](tools-and-annotations.md#writing-a-custom-tool-source) |
