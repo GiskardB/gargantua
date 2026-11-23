@@ -438,4 +438,30 @@ class AgentPropertiesTest {
             assertThat(new AgentProperties().getSkillsjars().getToolMappings()).isEmpty();
         }
     }
+
+    @org.junit.jupiter.api.Test
+    @org.junit.jupiter.api.DisplayName("the pre-1.5 agent.routing.semantic block still takes effect")
+    void legacyRoutingSemanticBlockIsAppliedToTheClassifier() {
+        var source = new org.springframework.boot.context.properties.source.MapConfigurationPropertySource(
+                java.util.Map.of(
+                        "agent.routing.semantic.threshold", "0.30",
+                        "agent.routing.semantic.model", "custom-embedder"));
+        AgentProperties bound = new org.springframework.boot.context.properties.bind.Binder(source)
+                .bind("agent", AgentProperties.class).get();
+
+        org.assertj.core.api.Assertions.assertThat(bound.getRouting().getClassifier().getThreshold()).isEqualTo(0.30);
+        org.assertj.core.api.Assertions.assertThat(bound.getRouting().getClassifier().getSemantic().getModel())
+                .isEqualTo("custom-embedder");
+    }
+
+    @org.junit.jupiter.api.Test
+    @org.junit.jupiter.api.DisplayName("the current agent.routing.classifier keys bind as before")
+    void classifierKeysBind() {
+        var source = new org.springframework.boot.context.properties.source.MapConfigurationPropertySource(
+                java.util.Map.of("agent.routing.classifier.threshold", "0.42"));
+        AgentProperties bound = new org.springframework.boot.context.properties.bind.Binder(source)
+                .bind("agent", AgentProperties.class).get();
+
+        org.assertj.core.api.Assertions.assertThat(bound.getRouting().getClassifier().getThreshold()).isEqualTo(0.42);
+    }
 }

@@ -338,6 +338,47 @@ public class AgentProperties {
         public Classifier getClassifier() { return classifier; }
         public void setClassifier(Classifier classifier) { this.classifier = classifier; }
 
+        /**
+         * Accepts the pre-1.5 {@code agent.routing.semantic.*} block. The keys moved to
+         * {@code agent.routing.classifier.*} when the classifier became pluggable; without
+         * this, an application upgraded with its old configuration silently fell back to
+         * the default threshold. The values are applied to the classifier settings and a
+         * warning names the keys to rename.
+         *
+         * @deprecated configure {@code agent.routing.classifier.threshold} and
+         *             {@code agent.routing.classifier.semantic.model} instead
+         */
+        @Deprecated
+        public void setSemantic(LegacySemantic legacy) {
+            if (legacy == null) return;
+            if (legacy.getThreshold() != null) {
+                classifier.setThreshold(legacy.getThreshold());
+                LEGACY_LOG.warn("agent.routing.semantic.threshold is deprecated and will stop being read: "
+                        + "rename it to agent.routing.classifier.threshold");
+            }
+            if (legacy.getModel() != null && !legacy.getModel().isBlank()) {
+                classifier.getSemantic().setModel(legacy.getModel());
+                LEGACY_LOG.warn("agent.routing.semantic.model is deprecated and will stop being read: "
+                        + "rename it to agent.routing.classifier.semantic.model");
+            }
+        }
+
+        /** Never holds state: the legacy block is folded into {@link #getClassifier()} on bind. */
+        @Deprecated
+        public LegacySemantic getSemantic() { return null; }
+
+        private static final Logger LEGACY_LOG = LoggerFactory.getLogger(Routing.class);
+
+        /** Shape of the pre-1.5 {@code agent.routing.semantic} block. */
+        public static class LegacySemantic {
+            private Double threshold;
+            private String model;
+            public Double getThreshold() { return threshold; }
+            public void setThreshold(Double threshold) { this.threshold = threshold; }
+            public String getModel() { return model; }
+            public void setModel(String model) { this.model = model; }
+        }
+
         /** Config for the pluggable {@link ai.gargantua.core.routing.SkillClassifier} (see docs/architecture/offline-skill-classifier-proposal.md). */
         public static class Classifier {
             private String engine = "semantic";
