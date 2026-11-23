@@ -396,6 +396,8 @@ Both directions work at the same time.
 
 The budget manager prevents the prompt from exceeding the model's context window. It estimates tokens for each prompt component and truncates from the least important sections first.
 
+The system prompt is **built from the allocation**: `TurnPipeline` hands the skill's references, the episodic summaries and the knowledge segments to the budget as lists it may shorten, then assembles the prompt from what survived. The budget those sections compete for is `max-context-tokens` less the conversation history replayed alongside the prompt — a long history squeezes out references and memory before it can fail a request. If the parts that can never be truncated do not fit on their own, the request fails with `token-budget-exceeded` (413).
+
 ### What gets truncated (in order of priority)
 
 | Priority | Component | Truncatable? |

@@ -11,6 +11,7 @@ import ai.gargantua.core.guardrail.GuardrailResult;
 import ai.gargantua.core.llm.LlmRoutingContext;
 import ai.gargantua.core.memory.ChatMessage;
 import ai.gargantua.core.memory.ComposedMemory;
+import ai.gargantua.core.memory.SessionSummary;
 import ai.gargantua.core.memory.WorkingMemoryPort;
 import ai.gargantua.core.orchestrator.AgentRequest;
 import ai.gargantua.core.orchestrator.AgentResponse;
@@ -269,21 +270,40 @@ public class TurnPipeline {
 
         ComposedMemory memory = composeMemory(request.userId(), effectiveSessionId);
 
-        String systemPrompt = buildSystemPrompt(request, effectiveSessionId, skillCard,
-                memory, llmUserMessage, requestAttrs);
+        EnricherContext promptContext = runEnrichers(request, effectiveSessionId, skillCard,
+                llmUserMessage, requestAttrs);
 
+        // Budget first, prompt second. The fixed part — the skill's own prompt and the
+        // enricher sections — is what must fit; references, episodic summaries and knowledge
+        // are handed over as lists the budget may shorten, and the prompt is then built
+        // from what survived. (It used to be built first, with everything in it, so the
+        // allocation's truncation never reached the model.)
+        String fixedPrompt = promptBuilder.build(withReferences(skillCard, List.of()),
+                EMPTY_MEMORY, promptContext);
         var toolDescriptions = toolRegistry.getFilteredTools(skillCard.allowedTools()).stream()
                 .map(ToolDefinition::description)
                 .toList();
         var allocation = tokenBudgetManager.allocate(new BudgetRequest(
-                systemPrompt,
+                fixedPrompt,
                 "",
                 skillCard.references() != null ? skillCard.references() : List.of(),
-                List.of(),
+                memory.episodicSummaries().stream().map(SessionSummary::summary).toList(),
                 memory.knowledgeSegments(),
                 toolDescriptions,
                 llmUserMessage,
-                properties.getMemory().getComposer().getMaxContextTokens()));
+                contextBudget(fixedPrompt, toolDescriptions, llmUserMessage, memory)));
+
+        // Truncation keeps a prefix of each list, so the surviving summaries are the first N.
+        var keptEpisodic = memory.episodicSummaries()
+                .subList(0, Math.min(allocation.episodicSummaries().size(), memory.episodicSummaries().size()));
+        String systemPrompt = promptBuilder.build(
+                withReferences(skillCard, allocation.references()),
+                new ComposedMemory(memory.workingMessages(), keptEpisodic, allocation.knowledge(),
+                        memory.estimatedTokens()),
+                promptContext);
+        if (allocation.wasTruncated()) {
+            log.info("[Pipeline] Prompt trimmed to fit the context budget: {}", allocation.truncationLog());
+        }
 
         var llmCtx = new LlmRoutingContext(
                 request.userId(),
@@ -300,11 +320,11 @@ public class TurnPipeline {
         String alias = llmProviderFactory.resolveModelAlias(skillCard, llmCtx);
 
         var messages = llmProviderFactory.buildMessages(
-                allocation.systemPrompt(), llmUserMessage, memory.workingMessages());
+                systemPrompt, llmUserMessage, memory.workingMessages());
 
         // Fallback input size for providers that report no usage: the whole prompt the
         // model is sent, not just the user's line — history and system prompt are billed too.
-        int estimatedPromptTokens = tokenBudgetManager.estimate(allocation.systemPrompt())
+        int estimatedPromptTokens = tokenBudgetManager.estimate(systemPrompt)
                 + tokenBudgetManager.estimate(llmUserMessage);
         for (ChatMessage past : memory.workingMessages()) {
             estimatedPromptTokens += tokenBudgetManager.estimate(past.content());
@@ -437,9 +457,10 @@ public class TurnPipeline {
         }
     }
 
-    private String buildSystemPrompt(AgentRequest request, String effectiveSessionId,
-                                     SkillCard skillCard, ComposedMemory memory,
-                                     String llmUserMessage, Map<String, String> requestAttrs) {
+    /** Runs the context enrichers and returns the context the prompt is built from. */
+    private EnricherContext runEnrichers(AgentRequest request, String effectiveSessionId,
+                                         SkillCard skillCard, String llmUserMessage,
+                                         Map<String, String> requestAttrs) {
         String skillName = skillCard.meta().name();
         String domain = skillCard.meta().domain();
         // Seeded with the request attributes (X-Context-* headers) so enrichers can read
@@ -460,8 +481,34 @@ public class TurnPipeline {
                 log.warn("Context enricher '{}' failed: {}", enricher.sectionName(), e.getMessage());
             }
         }
-        return promptBuilder.build(skillCard, memory, new EnricherContext(
-                request.userId(), effectiveSessionId, skillName, domain, llmUserMessage, sections));
+        return new EnricherContext(
+                request.userId(), effectiveSessionId, skillName, domain, llmUserMessage, sections);
+    }
+
+    private static SkillCard withReferences(SkillCard card, List<String> references) {
+        return new SkillCard(card.meta(), card.systemPrompt(), card.allowedTools(), card.outputSchema(),
+                references, card.maxTokens(), card.temperature(), card.preferredModel(),
+                card.ragConfig(), card.enabledMemoryLayers(), card.examples());
+    }
+
+    /**
+     * The token budget the prompt's optional sections compete for: the configured context
+     * size, less the conversation history that is replayed alongside the prompt. It never
+     * drops below what the fixed parts need, so a long history squeezes out references and
+     * memory rather than failing a request that would otherwise have fitted.
+     */
+    private int contextBudget(String fixedPrompt, List<String> toolDescriptions,
+                              String llmUserMessage, ComposedMemory memory) {
+        int configured = properties.getMemory().getComposer().getMaxContextTokens();
+        int history = 0;
+        for (ChatMessage past : memory.workingMessages()) {
+            history += tokenBudgetManager.estimate(past.content());
+        }
+        int fixed = tokenBudgetManager.estimate(fixedPrompt) + tokenBudgetManager.estimate(llmUserMessage);
+        for (String description : toolDescriptions) {
+            fixed += tokenBudgetManager.estimate(description);
+        }
+        return Math.max(configured - history, Math.min(fixed, configured));
     }
 
     private void persist(AgentRequest request, PreparedTurn turn, String responseText) {
